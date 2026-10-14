@@ -39,13 +39,13 @@ Dokumen ini merupakan spesifikasi arsitektur teknis, desain antarmuka, alur kerj
                  │                         │
                  ▼                         ▼
    ┌───────────────────────────┐ ┌───────────────────────────┐
-   │    GOOGLE SHEETS API v4   │ │  GOOGLE GEMINI 1.5 FLASH  │
-   │ Spreadsheet ID:           │ │ Vision Multimodal AI      │
-   │ 15n9joeQAoic8FvP5V...     │ │ (Gratis 1.500 scan/hari   │
-   │                           │ │  via Google AI Studio)    │
-   │ • PO 2026 (Transaksi)     │ │                           │
-   │ • database Material       │ │ • Ekstraksi Tabel PO Foto │
-   │ • database Supplier Mat.  │ │ • Konversi ke JSON Format │
+   │    GOOGLE SHEETS API v4   │ │   LOCAL TESSERACT.JS OCR  │
+   │ Spreadsheet ID:           │ │ 100% Offline / Self-Hosted│
+   │ 15n9joeQAoic8FvP5V...     │ │ Tanpa Perlu API Key Luar  │
+   │                           │ │                           │
+   │ • PO 2026 (Transaksi)     │ │ • Ekstraksi Teks Foto/Scan│
+   │ • database Material       │ │ • Normalisasi Typo Kode   │
+   │ • database Supplier Mat.  │ │ • pdf-parse Dokumen PDF   │
    └───────────────────────────┘ └───────────────────────────┘
 ```
 
@@ -62,8 +62,7 @@ Dokumen ini merupakan spesifikasi arsitektur teknis, desain antarmuka, alur kerj
    - **`conversationManager.js`**: Mesin pengelola sesi percakapan interaktif per kontak WA.
    - **`cacheService.js`**: Menyimpan 1.506 master material dan master supplier di RAM untuk respon instan (<5ms).
    - **`sheetsService.js`**: Mengeksekusi penambahan baris (append multi-item), pencarian, update kolom tertentu, dan pembatalan (*soft delete*).
-   - **`pdfParserService.js`**: Ekstraktor teks digital untuk dokumen PO berbentuk file PDF.
-   - **`geminiVisionService.js`**: AI vision untuk membaca foto atau pindaian dokumen PO fisik.
+   - **`ocrService.js`**: Mesin OCR Tesseract.js & parser PDF lokal terintegrasi untuk membaca foto dan file PDF dokumen PO tanpa API eksternal.
 
 ---
 
@@ -233,7 +232,11 @@ Setiap baris di tab ini mewakili 1 item pesanan material dalam suatu PO:
                  ▼
      [Deteksi Format File]
       ├── Jika PDF  ──► Local pdf-parse (Ekstrak teks digital langsung)
-      └── Jika Foto ──► Google Gemini 1.5 Flash Vision (Multimodal AI)
+      └── Jika Foto ──► Local Tesseract.js OCR (Ekstraksi teks gambar offline)
+                 │
+                 ▼
+     [Normalisasi Typo Karakter OCR & Parser Teks PO]
+     (Perbaiki typo kode misal RM0O355 -> RM00355)
                  │
                  ▼
      [Hasil JSON Terstruktur]
@@ -241,7 +244,7 @@ Setiap baris di tab ini mewakili 1 item pesanan material dalam suatu PO:
                  │
                  ▼
      [Fuzzy Matching Nama Barang ke database Material]
-     (Lengkapi kode barang otomatis)
+     (Lengkapi kode barang & nama resmi otomatis)
                  │
                  ▼
      [Kirim Draf Nota ke WhatsApp Pengguna]

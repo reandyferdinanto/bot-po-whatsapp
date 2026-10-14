@@ -1,6 +1,5 @@
 const openwaService = require('../services/openwaService');
-const pdfParserService = require('../services/pdfParserService');
-const geminiVisionService = require('../services/geminiVisionService');
+const ocrService = require('../services/ocrService');
 const conversationManager = require('./conversationManager');
 
 /**
@@ -12,7 +11,7 @@ async function handleIncomingMedia(message) {
 
   if (!media) return false;
 
-  await openwaService.sendText(chatId, '🔍 *Dokumen terdeteksi!* Sedang menganalisis dan mengekstrak data PO, mohon tunggu...');
+  await openwaService.sendText(chatId, '🔍 *Dokumen terdeteksi!* Sedang memindai teks dokumen via OCR, mohon tunggu...');
 
   let mediaBuffer;
   let mimeType = media.mimetype || 'application/octet-stream';
@@ -29,15 +28,15 @@ async function handleIncomingMedia(message) {
 
     let extractedData;
 
-    // 2. Routing ke Parser yang Tepat
+    // 2. Routing ke Parser OCR
     const isPdf = mimeType.includes('pdf') || (media.filename && media.filename.toLowerCase().endsWith('.pdf'));
 
     if (isPdf) {
       console.log(`📄 Memproses file PDF (${media.filename || 'dokumen.pdf'})...`);
-      extractedData = await pdfParserService.parsePdfPO(mediaBuffer);
+      extractedData = await ocrService.parsePdfDocument(mediaBuffer);
     } else if (mimeType.startsWith('image/')) {
-      console.log(`📷 Memproses foto PO via Gemini Vision (${mimeType})...`);
-      extractedData = await geminiVisionService.parseImageWithGemini(mediaBuffer, mimeType);
+      console.log(`📷 Memproses foto PO via Tesseract OCR (${mimeType})...`);
+      extractedData = await ocrService.parseImageWithOcr(mediaBuffer);
     } else {
       await openwaService.sendText(
         chatId,
