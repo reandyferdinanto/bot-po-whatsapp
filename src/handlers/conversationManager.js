@@ -121,6 +121,9 @@ async function handleConversationMessage(chatId, messageText, rawMessage) {
     case 'CONFIRM_OCR_PO':
       return handleConfirmOcrPO(chatId, text, session);
 
+    case 'CONFIRM_UPDATE_GRPO':
+      return handleConfirmUpdateGrpo(chatId, text, session);
+
     case 'UPDATE_PO_WAIT_NO':
       return handleUpdatePOWaitNo(chatId, text);
 
@@ -456,6 +459,46 @@ Total: *Rp ${result.grandTotal.toLocaleString('id-ID')}*`
   } else {
     clearSession(chatId);
     await openwaService.sendText(chatId, '❌ Draf hasil scan dibatalkan.');
+  }
+}
+
+// -------------------------------------------------------------
+// HANDLER KONFIRMASI UPDATE GRPO (PURCHASE DELIVERY NOTE)
+// -------------------------------------------------------------
+async function handleConfirmUpdateGrpo(chatId, text, session) {
+  const lower = text.toLowerCase();
+  const data = session.data;
+
+  if (lower === 'ya' || lower === 'simpan' || lower === 'oke' || lower === 'ok' || lower === 'update') {
+    try {
+      await openwaService.sendText(chatId, `⏳ Sedang mengupdate GRPO untuk PO *${data.noPo}* di Google Sheets...`);
+
+      const updatePayload = {
+        grpo: data.noGrpo,
+        lastGrpoDate: data.lastGrpoDate,
+        ket: data.updateFields ? data.updateFields.ket : `GRPO ${data.noGrpo}`,
+      };
+
+      const res = await sheetsService.updatePOField(data.noPo, updatePayload);
+      clearSession(chatId);
+
+      if (res.success) {
+        await openwaService.sendText(
+          chatId,
+          `✅ *BERHASIL UPDATE GRPO!*
+Data PO *${data.noPo}* (${res.rowsUpdated} baris) berhasil di-update dengan Purchase Delivery Note *${data.noGrpo}*:
+• *No. GRPO (Kolom R):* ${data.noGrpo}
+• *LAST DATE OF GRPO JOB DONE (Kolom S):* ${data.lastGrpoDate || '-'}`
+        );
+      } else {
+        await openwaService.sendText(chatId, `⚠️ ${res.message}`);
+      }
+    } catch (err) {
+      await openwaService.sendText(chatId, `❌ Gagal update GRPO ke Google Sheets: ${err.message}`);
+    }
+  } else {
+    clearSession(chatId);
+    await openwaService.sendText(chatId, '❌ Update GRPO dibatalkan.');
   }
 }
 

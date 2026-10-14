@@ -1,5 +1,6 @@
 const openwaService = require('../services/openwaService');
 const ocrService = require('../services/ocrService');
+const sheetsService = require('../services/sheetsService');
 const conversationManager = require('./conversationManager');
 
 /**
@@ -28,14 +29,14 @@ async function handleIncomingMedia(message) {
 
     let extractedData;
 
-    // 2. Routing ke Parser OCR
+    // 2. Routing ke Parser OCR (PDF atau Gambar)
     const isPdf = mimeType.includes('pdf') || (media.filename && media.filename.toLowerCase().endsWith('.pdf'));
 
     if (isPdf) {
       console.log(`📄 Memproses file PDF (${media.filename || 'dokumen.pdf'})...`);
       extractedData = await ocrService.parsePdfDocument(mediaBuffer);
     } else if (mimeType.startsWith('image/')) {
-      console.log(`📷 Memproses foto PO via Tesseract OCR (${mimeType})...`);
+      console.log(`📷 Memproses foto dokumen via OCR (${mimeType})...`);
       extractedData = await ocrService.parseImageWithOcr(mediaBuffer);
     } else {
       await openwaService.sendText(
@@ -45,7 +46,62 @@ async function handleIncomingMedia(message) {
       return true;
     }
 
-    // 3. Validasi hasil ekstraksi
+    // =========================================================================
+    // KASUS 1: DOKUMEN PURCHASE DELIVERY NOTE (GRPO) -> AUTO UPDATE PO
+    // =========================================================================
+    if (extractedData.tipeDokumen === 'PURCHASE_DELIVERY_NOTE_GRPO') {
+      const targetPo = extractedData.noPo;
+      console.log(`📦 Terdeteksi Purchase Delivery Note ${extractedData.noGrpo} untuk PO ${targetPo}`);
+
+      let existingPo = null;
+      try {
+        existingPo = await sheetsService.getPOByNumber(targetPo);
+      } catch (err) {
+        console.warn(`Gagal cek PO ${targetPo}:`, err.message);
+      }
+
+      let summaryText = `📦 *HASIL PINDAIAN PURCHASE DELIVERY NOTE (GRPO)*\n`;
+      summaryText += `───────────────────────\n`;
+      summaryText += `• *No. GRPO:* ${extractedData.noGrpo}\n`;
+      summaryText += `• *Target No. PO:* ${targetPo}` + (existingPo ? ` (Ditemukan, Status: ${existingPo.status})\n` : `\n`);
+      summaryText += `• *Tgl Selesai / Terima:* ${extractedData.lastGrpoDate || 'Hari ini'}\n`;
+      summaryText += `• *Supplier:* ${extractedData.supplier}\n`;
+      if (extractedData.receivedBy) {
+        summaryText += `• *Penerima:* ${extractedData.receivedBy}\n`;
+      }
+      if (extractedData.remarks) {
+        summaryText += `• *Catatan:* ${extractedData.remarks}\n`;
+      }
+
+      if (extractedData.items && extractedData.items.length > 0) {
+        summaryText += `\n📦 *Barang Diterima (${extractedData.items.length} Item):*\n`;
+        for (let i = 0; i < extractedData.items.length; i++) {
+          const it = extractedData.items[i];
+          summaryText += `${i + 1}. [${it.kode}] ${it.nama} (Qty: ${it.qty} ${it.uom})\n`;
+        }
+      }
+
+      summaryText += `───────────────────────\n`;
+      summaryText += `📝 *Kolom yang akan di-update pada PO ${targetPo}:*\n`;
+      summaryText += `• No. GRPO ➔ *${extractedData.noGrpo}*\n`;
+      summaryText += `• LAST DATE OF GRPO JOB DONE ➔ *${extractedData.lastGrpoDate || 'Hari ini'}*\n`;
+      summaryText += `• KET ➔ *${extractedData.updateFields.ket}*\n\n`;
+
+      if (!existingPo) {
+        summaryText += `⚠️ *Perhatian:* Nomor PO *${targetPo}* saat ini belum tercatat di sheet 'PO 2026'.\n`;
+        summaryText += `Jika Anda konfirmasi 'YA', bot akan mencoba mencari dan mengupdate baris tersebut saat data siap.\n\n`;
+      }
+
+      summaryText += `Ketik:\n• *YA* untuk update baris PO di Google Sheets 'PO 2026'\n• *BATAL* jika data tidak sesuai`;
+
+      conversationManager.setSession(chatId, 'CONFIRM_UPDATE_GRPO', extractedData);
+      await openwaService.sendText(chatId, summaryText);
+      return true;
+    }
+
+    // =========================================================================
+    // KASUS 2: DOKUMEN PURCHASE ORDER (PO MATERIAL / JASA) -> AUTO INPUT PO
+    // =========================================================================
     if (!extractedData.items || extractedData.items.length === 0) {
       await openwaService.sendText(
         chatId,
@@ -58,7 +114,6 @@ Silakan coba gunakan menu *Input PO Manual* dengan mengetik *menu*.`
       return true;
     }
 
-    // 4. Hitung estimasi total
     let grandTotal = 0;
     const tipeDisplay = extractedData.tipePo === 'PO_JASA' ? 'PO JASA / OPERASIONAL' : 'PO MATERIAL';
 
@@ -87,15 +142,14 @@ Silakan coba gunakan menu *Input PO Manual* dengan mengetik *menu*.`
     summaryText += `*TOTAL ESTIMASI: Rp ${grandTotal.toLocaleString('id-ID')}*\n\n`;
     summaryText += `Ketik:\n• *YA* untuk simpan ke sheet 'PO 2026'\n• *BATAL* jika data tidak sesuai`;
 
-    // Simpan draf ke sesi pengguna untuk menunggu konfirmasi "YA"
     conversationManager.setSession(chatId, 'CONFIRM_OCR_PO', extractedData);
     await openwaService.sendText(chatId, summaryText);
     return true;
   } catch (err) {
-    console.error('❌ Gagal memproses media PO:', err.message);
+    console.error('❌ Gagal memproses media:', err.message);
     await openwaService.sendText(
       chatId,
-      `❌ Gagal mengekstrak dokumen PO: ${err.message}\nSilakan periksa kembali kualitas foto atau gunakan menu manual.`
+      `❌ Gagal mengekstrak dokumen: ${err.message}\nSilakan periksa kembali foto atau gunakan menu manual.`
     );
     return true;
   }
