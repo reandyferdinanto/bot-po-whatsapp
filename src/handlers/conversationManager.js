@@ -233,40 +233,58 @@ async function handleSearchMenuChoice(chatId, choice) {
 }
 
 async function handleSearchSupplierQuery(chatId, query) {
-  const results = await cacheService.searchSupplierRecommendations(query, 5);
+  const res = await cacheService.searchSupplierRecommendations(query, 10);
   clearSession(chatId);
 
-  if (!results || results.length === 0) {
+  const items = Array.isArray(res) ? res : (res.items || []);
+  const total = Array.isArray(res) ? res.length : (res.total || items.length);
+
+  if (!items || items.length === 0) {
     await openwaService.sendText(chatId, `⚠️ Tidak ditemukan riwayat supplier untuk kata kunci: "${query}".`);
     return;
   }
 
-  let text = `🏢 *HASIL REKOMENDASI SUPPLIER (${results.length}):*\n`;
-  for (let i = 0; i < results.length; i++) {
-    const item = results[i];
+  let text = `🏢 *HASIL REKOMENDASI SUPPLIER (${total} Ditemukan):*\n`;
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
     text += `\n${i + 1}. *[${item.kode}]* ${item.nama}\n`;
     text += `   • *Supplier Utama:* ${item.supplierUtama || '-'}\n`;
     text += `   • *Frekuensi PO:* ${item.frekuensi} kali (${item.totalQty} unit diorder)\n`;
   }
-  text += `\n💡 _Ketik *menu* untuk opsi lainnya._`;
+
+  if (total > items.length) {
+    text += `\n_... dan ${total - items.length} hasil lainnya._\n`;
+    text += `💡 _Tips: Persempit kata kunci (misal: "${query} 1/2") untuk hasil lebih spesifik._`;
+  } else {
+    text += `\n💡 _Ketik *menu* untuk opsi lainnya._`;
+  }
   await openwaService.sendText(chatId, text);
 }
 
 async function handleSearchMaterialQuery(chatId, query) {
-  const results = await cacheService.searchMaterials(query, 5);
+  const res = await cacheService.searchMaterials(query, 15);
   clearSession(chatId);
 
-  if (!results || results.length === 0) {
+  const items = Array.isArray(res) ? res : (res.items || []);
+  const total = Array.isArray(res) ? res.length : (res.total || items.length);
+
+  if (!items || items.length === 0) {
     await openwaService.sendText(chatId, `⚠️ Material dengan kata kunci "${query}" tidak ditemukan di database master.`);
     return;
   }
 
-  let text = `📦 *HASIL PENCARIAN MATERIAL (${results.length}):*\n`;
-  for (let i = 0; i < results.length; i++) {
-    const item = results[i];
+  let text = `📦 *HASIL PENCARIAN MATERIAL (${total} Ditemukan):*\n`;
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
     text += `\n${i + 1}. *${item.kode}* - ${item.nama}`;
   }
-  text += `\n\n💡 _Ketik *menu* untuk opsi lainnya._`;
+
+  if (total > items.length) {
+    text += `\n\n_... dan ${total - items.length} material lainnya._`;
+    text += `\n💡 _Tips: Ketik spesifikasi lebih detail (misal: "${query} 1/2" atau "${query} 3/4") untuk mempersempit hasil._`;
+  } else {
+    text += `\n\n💡 _Ketik *menu* untuk opsi lainnya._`;
+  }
   await openwaService.sendText(chatId, text);
 }
 

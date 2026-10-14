@@ -41,17 +41,23 @@ Silakan pilih menu di bawah:
         await openwaService.sendText(chatId, '⚠️ Format: `!cari <nama_barang / kode_material>`\nContoh: `!cari RM00355` atau `!cari Hex Nipples`');
         return true;
       }
-      const supResults = await cacheService.searchSupplierRecommendations(args, 5);
-      if (!supResults || supResults.length === 0) {
+      const supRes = await cacheService.searchSupplierRecommendations(args, 10);
+      const supItems = Array.isArray(supRes) ? supRes : (supRes.items || []);
+      const supTotal = Array.isArray(supRes) ? supRes.length : (supRes.total || supItems.length);
+
+      if (!supItems || supItems.length === 0) {
         await openwaService.sendText(chatId, `⚠️ Tidak ditemukan rekomendasi untuk "${args}".`);
         return true;
       }
-      let replyCari = `🏢 *HASIL PENCARIAN & REKOMENDASI (${supResults.length}):*\n`;
-      for (let i = 0; i < supResults.length; i++) {
-        const item = supResults[i];
+      let replyCari = `🏢 *HASIL PENCARIAN & REKOMENDASI (${supTotal} Ditemukan):*\n`;
+      for (let i = 0; i < supItems.length; i++) {
+        const item = supItems[i];
         replyCari += `\n${i + 1}. *[${item.kode}]* ${item.nama}\n`;
         replyCari += `   • *Supplier Utama:* ${item.supplierUtama || '-'}\n`;
         replyCari += `   • *Riwayat PO:* ${item.frekuensi} kali (${item.totalQty} pcs)\n`;
+      }
+      if (supTotal > supItems.length) {
+        replyCari += `\n_... dan ${supTotal - supItems.length} hasil lainnya._`;
       }
       await openwaService.sendText(chatId, replyCari);
       return true;

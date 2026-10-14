@@ -25,6 +25,7 @@ async function sendText(chatId, text) {
     const res = await apiClient.post(`/sessions/${sessionId}/messages/send-text`, {
       chatId,
       text,
+      linkPreview: false,
     });
     return res.data;
   } catch (err) {
@@ -48,6 +49,7 @@ async function replyMessage(chatId, quotedMessageId, text) {
       chatId,
       quotedMessageId,
       text,
+      linkPreview: false,
     });
     return res.data;
   } catch (err) {

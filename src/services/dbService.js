@@ -190,7 +190,7 @@ async function syncFromSheetsToPg(materials, suppliers, poItems = []) {
 /**
  * Mencari rekomendasi supplier berdasarkan nama barang atau kode material.
  */
-async function searchSupplierFromPg(query, limit = 5) {
+async function searchSupplierFromPg(query, limit = 10) {
   if (!isDbConnected && !(await migrateTables())) return null;
 
   try {
@@ -213,7 +213,7 @@ async function searchSupplierFromPg(query, limit = 5) {
 /**
  * Mencari master material berdasarkan kode atau nama barang.
  */
-async function searchMaterialFromPg(query, limit = 5) {
+async function searchMaterialFromPg(query, limit = 15) {
   if (!isDbConnected && !(await migrateTables())) return null;
 
   try {

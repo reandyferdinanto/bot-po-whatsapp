@@ -137,23 +137,40 @@ function findMaterialByCode(kode) {
 }
 
 /**
- * Mencari material dengan fuzzy search (PostgreSQL jika aktif, fallback ke Fuse.js RAM).
+ * Mencari material berdasarkan kode atau nama barang (Substring match + Fuzzy search).
  */
-async function searchMaterials(query, limit = 5) {
-  if (!query) return [];
+async function searchMaterials(query, limit = 15) {
+  if (!query) return { total: 0, items: [] };
+  const q = query.trim();
+  const lowerQ = q.toLowerCase();
 
   // 1. Coba PostgreSQL jika aktif
   if (dbService.isAvailable()) {
-    const pgResults = await dbService.searchMaterialFromPg(query, limit);
+    const pgResults = await dbService.searchMaterialFromPg(q, limit);
     if (pgResults && pgResults.length > 0) {
-      return pgResults;
+      return { total: pgResults.length, items: pgResults };
     }
   }
 
-  // 2. Fallback ke RAM Fuse.js
-  if (!fuseMaterial) return [];
-  const results = fuseMaterial.search(query);
-  return results.slice(0, limit).map(res => res.item);
+  // 2. Direct Substring Match di RAM (Paling Cepat & Lengkap untuk kata kunci seperti 'elbow', 'gates')
+  const exactMatches = materialList.filter(m =>
+    m.kode.toLowerCase().includes(lowerQ) || m.nama.toLowerCase().includes(lowerQ)
+  );
+
+  if (exactMatches.length > 0) {
+    return {
+      total: exactMatches.length,
+      items: exactMatches.slice(0, limit),
+    };
+  }
+
+  // 3. Fallback ke Fuse.js jika ada typo penulisan
+  if (!fuseMaterial) return { total: 0, items: [] };
+  const results = fuseMaterial.search(q);
+  return {
+    total: results.length,
+    items: results.slice(0, limit).map(res => res.item),
+  };
 }
 
 /**
@@ -165,23 +182,42 @@ function getSupplierByCode(kode) {
 }
 
 /**
- * Mencari rekomendasi supplier (PostgreSQL jika aktif, fallback ke Fuse.js RAM).
+ * Mencari rekomendasi supplier (Substring match + Fuzzy search).
  */
-async function searchSupplierRecommendations(query, limit = 5) {
-  if (!query) return [];
+async function searchSupplierRecommendations(query, limit = 10) {
+  if (!query) return { total: 0, items: [] };
+  const q = query.trim();
+  const lowerQ = q.toLowerCase();
 
   // 1. Coba PostgreSQL jika aktif
   if (dbService.isAvailable()) {
-    const pgResults = await dbService.searchSupplierFromPg(query, limit);
+    const pgResults = await dbService.searchSupplierFromPg(q, limit);
     if (pgResults && pgResults.length > 0) {
-      return pgResults;
+      return { total: pgResults.length, items: pgResults };
     }
   }
 
-  // 2. Fallback ke RAM Fuse.js
-  if (!fuseSupplier) return [];
-  const results = fuseSupplier.search(query);
-  return results.slice(0, limit).map(res => res.item);
+  // 2. Direct Substring Match di RAM
+  const exactMatches = supplierList.filter(s =>
+    s.kode.toLowerCase().includes(lowerQ) ||
+    s.nama.toLowerCase().includes(lowerQ) ||
+    s.supplierUtama.toLowerCase().includes(lowerQ)
+  );
+
+  if (exactMatches.length > 0) {
+    return {
+      total: exactMatches.length,
+      items: exactMatches.slice(0, limit),
+    };
+  }
+
+  // 3. Fallback ke Fuse.js jika ada typo
+  if (!fuseSupplier) return { total: 0, items: [] };
+  const results = fuseSupplier.search(q);
+  return {
+    total: results.length,
+    items: results.slice(0, limit).map(res => res.item),
+  };
 }
 
 function getSyncStatus() {
