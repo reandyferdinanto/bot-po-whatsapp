@@ -1,5 +1,6 @@
 const Fuse = require('fuse.js');
 const env = require('../config/env');
+const dbService = require('./dbService');
 
 let materialCache = new Map(); // kode -> { no, kode, nama }
 let materialList = [];
@@ -11,13 +12,13 @@ let fuseSupplier = null;
 let lastSyncedAt = null;
 
 /**
- * Memuat dan meng-cache tab 'database Material' dan 'database Supplier Material' ke memory.
+ * Memuat dan meng-cache tab 'database Material', 'database Supplier Material', dan 'PO 2026' ke memory & PostgreSQL.
  */
 async function syncMasterData(sheetsClient) {
   try {
     console.log('🔄 Memulai sinkronisasi Master Data dari Google Sheets...');
 
-    const [materialRes, supplierRes] = await Promise.all([
+    const [materialRes, supplierRes, poRes] = await Promise.all([
       sheetsClient.spreadsheets.values.get({
         spreadsheetId: env.sheets.spreadsheetId,
         range: "'database Material'!A2:C",
@@ -26,13 +27,20 @@ async function syncMasterData(sheetsClient) {
         spreadsheetId: env.sheets.spreadsheetId,
         range: "'database Supplier Material'!A2:F",
       }),
+      sheetsClient.spreadsheets.values.get({
+        spreadsheetId: env.sheets.spreadsheetId,
+        range: "'PO 2026'!A2:W",
+      }).catch(err => {
+        console.warn('ℹ️ Skip PO 2026 sync:', err.message);
+        return { data: { values: [] } };
+      }),
     ]);
 
     // 1. Process database Material
     const matRows = materialRes.data.values || [];
     materialCache.clear();
     materialList = matRows
-      .filter(row => row && row[1]) // Pastikan ada kode
+      .filter(row => row && row[1])
       .map(row => ({
         no: row[0] || '',
         kode: (row[1] || '').trim(),
@@ -45,7 +53,7 @@ async function syncMasterData(sheetsClient) {
 
     fuseMaterial = new Fuse(materialList, {
       keys: ['kode', 'nama'],
-      threshold: 0.35, // Cukup ketat agar akurat
+      threshold: 0.35,
       ignoreLocation: true,
     });
 
@@ -60,7 +68,7 @@ async function syncMasterData(sheetsClient) {
         nama: (row[2] || '').trim(),
         supplierUtama: (row[3] || '').trim(),
         frekuensi: parseInt(row[4], 10) || 0,
-        totalQty: parseInt(row[5], 10) || 0,
+        totalQty: parseFloat(row[5]) || 0,
       }));
 
     for (const item of supplierList) {
@@ -73,11 +81,45 @@ async function syncMasterData(sheetsClient) {
       ignoreLocation: true,
     });
 
+    // 3. Process PO 2026 Rows
+    const poRawRows = poRes.data.values || [];
+    const poList = poRawRows
+      .filter(r => r && r[3])
+      .map((r, idx) => ({
+        rowIndex: idx + 2,
+        no: r[0] || '',
+        status: r[1] || 'Open',
+        date: r[2] || '',
+        noPo: r[3] || '',
+        supplier: r[4] || '',
+        quotation: r[5] || '',
+        kode: r[6] || '',
+        nama: r[7] || '',
+        qty: parseFloat(r[8]) || 0,
+        priceUnit: parseFloat(r[13]) || 0,
+        discount: parseFloat(r[14]) || 0,
+        ppn: parseFloat(r[15]) || 0,
+        total: parseFloat(r[16]) || 0,
+        grpo: r[17] || '',
+        lastGrpoDate: r[18] || '',
+        tglBayar: r[19] || '',
+        tglInvoice: r[20] || '',
+        noInvoice: r[21] || '',
+        ket: r[22] || '',
+      }));
+
     lastSyncedAt = new Date();
-    console.log(`✅ Master Data tersinkronisasi: ${materialList.length} Material, ${supplierList.length} Supplier Master.`);
+
+    // 4. Sinkronisasi ke PostgreSQL jika aktif
+    if (dbService.isAvailable()) {
+      await dbService.syncFromSheetsToPg(materialList, supplierList, poList);
+    }
+
+    console.log(`✅ Master Data tersinkronisasi: ${materialList.length} Material, ${supplierList.length} Supplier Master, ${poList.length} PO Transaksi.`);
     return {
       totalMaterials: materialList.length,
       totalSuppliers: supplierList.length,
+      totalPOs: poList.length,
       syncedAt: lastSyncedAt,
     };
   } catch (err) {
@@ -87,7 +129,7 @@ async function syncMasterData(sheetsClient) {
 }
 
 /**
- * Mencari material berdasarkan kode eksak (case-insensitive).
+ * Mencari material berdasarkan kode eksak (case-insensitive) dari RAM.
  */
 function findMaterialByCode(kode) {
   if (!kode) return null;
@@ -95,16 +137,27 @@ function findMaterialByCode(kode) {
 }
 
 /**
- * Mencari material dengan fuzzy search (berdasarkan kode atau nama barang).
+ * Mencari material dengan fuzzy search (PostgreSQL jika aktif, fallback ke Fuse.js RAM).
  */
-function searchMaterials(query, limit = 5) {
-  if (!query || !fuseMaterial) return [];
+async function searchMaterials(query, limit = 5) {
+  if (!query) return [];
+
+  // 1. Coba PostgreSQL jika aktif
+  if (dbService.isAvailable()) {
+    const pgResults = await dbService.searchMaterialFromPg(query, limit);
+    if (pgResults && pgResults.length > 0) {
+      return pgResults;
+    }
+  }
+
+  // 2. Fallback ke RAM Fuse.js
+  if (!fuseMaterial) return [];
   const results = fuseMaterial.search(query);
   return results.slice(0, limit).map(res => res.item);
 }
 
 /**
- * Mencari supplier utama berdasarkan kode material.
+ * Mencari supplier utama berdasarkan kode material dari RAM.
  */
 function getSupplierByCode(kode) {
   if (!kode) return null;
@@ -112,10 +165,21 @@ function getSupplierByCode(kode) {
 }
 
 /**
- * Mencari rekomendasi supplier berdasarkan nama barang atau kode.
+ * Mencari rekomendasi supplier (PostgreSQL jika aktif, fallback ke Fuse.js RAM).
  */
-function searchSupplierRecommendations(query, limit = 5) {
-  if (!query || !fuseSupplier) return [];
+async function searchSupplierRecommendations(query, limit = 5) {
+  if (!query) return [];
+
+  // 1. Coba PostgreSQL jika aktif
+  if (dbService.isAvailable()) {
+    const pgResults = await dbService.searchSupplierFromPg(query, limit);
+    if (pgResults && pgResults.length > 0) {
+      return pgResults;
+    }
+  }
+
+  // 2. Fallback ke RAM Fuse.js
+  if (!fuseSupplier) return [];
   const results = fuseSupplier.search(query);
   return results.slice(0, limit).map(res => res.item);
 }
@@ -125,6 +189,7 @@ function getSyncStatus() {
     isSynced: materialList.length > 0,
     materialCount: materialList.length,
     supplierCount: supplierList.length,
+    postgresConnected: dbService.isAvailable(),
     lastSyncedAt,
   };
 }

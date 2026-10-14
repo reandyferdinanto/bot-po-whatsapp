@@ -25,4 +25,17 @@ module.exports = {
       .map(n => n.trim().replace(/[^0-9]/g, ''))
       .filter(Boolean),
   },
+  db: {
+    enabled: process.env.PG_ENABLED === 'true' || !!process.env.PGDATABASE,
+    host: process.env.PGHOST || 'localhost',
+    port: parseInt(process.env.PGPORT, 10) || 5432,
+    user: process.env.PGUSER || 'postgres',
+    password: process.env.PGPASSWORD || '',
+    database: process.env.PGDATABASE || 'bot_po',
+    ssl: process.env.PGSSL === 'true',
+  },
+  cron: {
+    enabled: process.env.CRON_ENABLED !== 'false',
+    schedule: process.env.CRON_SYNC_SCHEDULE || '*/30 * * * *', // Default: tiap 30 menit
+  },
 };

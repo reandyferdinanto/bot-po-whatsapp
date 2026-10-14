@@ -233,7 +233,7 @@ async function handleSearchMenuChoice(chatId, choice) {
 }
 
 async function handleSearchSupplierQuery(chatId, query) {
-  const results = cacheService.searchSupplierRecommendations(query, 5);
+  const results = await cacheService.searchSupplierRecommendations(query, 5);
   clearSession(chatId);
 
   if (!results || results.length === 0) {
@@ -253,7 +253,7 @@ async function handleSearchSupplierQuery(chatId, query) {
 }
 
 async function handleSearchMaterialQuery(chatId, query) {
-  const results = cacheService.searchMaterials(query, 5);
+  const results = await cacheService.searchMaterials(query, 5);
   clearSession(chatId);
 
   if (!results || results.length === 0) {

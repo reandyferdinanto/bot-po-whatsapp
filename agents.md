@@ -33,7 +33,9 @@ Dokumen ini merupakan spesifikasi arsitektur teknis, desain antarmuka, alur kerj
 │ │  ├── 2. Whitelist Security Guard                    │ │
 │ │  ├── 3. Conversation State Machine (Multi-Step)     │ │
 │ │  ├── 4. In-Memory Cache + Fuse.js (Fuzzy Match)     │ │
-│ │  └── 5. Hybrid Document Parser Engine               │ │
+│ │  ├── 5. PostgreSQL Local VPS Cache (Fast Search)    │ │
+│ │  ├── 6. Cron Job Auto-Sync (Every 30 Mins)          │ │
+│ │  └── 7. Hybrid Document Parser Engine               │ │
 │ └──────────────┬─────────────────────────┬────────────┘ │
 └────────────────┼─────────────────────────┼──────────────┘
                  │                         │
@@ -46,7 +48,18 @@ Dokumen ini merupakan spesifikasi arsitektur teknis, desain antarmuka, alur kerj
    │ • PO 2026 (Transaksi)     │ │ • Ekstraksi Teks Foto/Scan│
    │ • database Material       │ │ • Normalisasi Typo Kode   │
    │ • database Supplier Mat.  │ │ • pdf-parse Dokumen PDF   │
-   └───────────────────────────┘ └───────────────────────────┘
+   └─────────────▲─────────────┘ └───────────────────────────┘
+                 │ (Cron Auto-Sync / Every 30 Mins)
+                 ▼
+   ┌───────────────────────────┐
+   │   POSTGRESQL (VPS LOKAL)  │
+   │ Port 5432 - DB: bot_po    │
+   │                           │
+   │ • master_materials        │
+   │ • master_suppliers        │
+   │ • transactions_po         │
+   │ (Respon Cari Data <5ms)   │
+   └───────────────────────────┘
 ```
 
 ### B. Komponen & Peran
@@ -57,10 +70,12 @@ Dokumen ini merupakan spesifikasi arsitektur teknis, desain antarmuka, alur kerj
 2. **Nginx Reverse Proxy & SSL Certbot (Di VPS):**
    - Menerima koneksi HTTPS aman dari internet pada port `443` menggunakan sertifikat SSL Let's Encrypt.
    - Meneruskan *traffic* lokal ke aplikasi Node.js di `http://127.0.0.1:3000`.
-3. **Bot Engine Node.js (Express):**
+3. **Node.js Backend Engine (Express):**
    - **`server.js`**: Web server penerima webhook dan pengecek kesehatan (`/health`).
    - **`conversationManager.js`**: Mesin pengelola sesi percakapan interaktif per kontak WA.
-   - **`cacheService.js`**: Menyimpan 1.506 master material dan master supplier di RAM untuk respon instan (<5ms).
+   - **`dbService.js`**: Driver database PostgreSQL lokal di VPS untuk pencarian kilat (<5ms) dan penyimpanan terindeks.
+   - **`cronService.js`**: Mesin penjadwal otomatis (Cron Job) yang berjalan setiap 30 menit menarik data terbaru dari Google Sheets ke PostgreSQL & RAM.
+   - **`cacheService.js`**: In-memory cache & fallback engine.
    - **`sheetsService.js`**: Mengeksekusi penambahan baris (append multi-item), pencarian, update kolom tertentu, dan pembatalan (*soft delete*).
    - **`ocrService.js`**: Mesin OCR Tesseract.js & parser PDF lokal terintegrasi untuk membaca foto dan file PDF dokumen PO tanpa API eksternal.
 

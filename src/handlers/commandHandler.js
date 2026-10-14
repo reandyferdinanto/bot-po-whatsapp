@@ -41,7 +41,7 @@ Silakan pilih menu di bawah:
         await openwaService.sendText(chatId, '⚠️ Format: `!cari <nama_barang / kode_material>`\nContoh: `!cari RM00355` atau `!cari Hex Nipples`');
         return true;
       }
-      const supResults = cacheService.searchSupplierRecommendations(args, 5);
+      const supResults = await cacheService.searchSupplierRecommendations(args, 5);
       if (!supResults || supResults.length === 0) {
         await openwaService.sendText(chatId, `⚠️ Tidak ditemukan rekomendasi untuk "${args}".`);
         return true;

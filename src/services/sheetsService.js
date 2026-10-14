@@ -1,6 +1,7 @@
 const { getSheetsClient } = require('../config/googleAuth');
 const env = require('../config/env');
 const cacheService = require('./cacheService');
+const dbService = require('./dbService');
 
 /**
  * Format tanggal sekarang menjadi DD/MM/YYYY
@@ -135,8 +136,19 @@ async function appendPOTransaction(poData) {
 async function getPOByNumber(noPo) {
   if (!noPo) return null;
   const cleanNo = noPo.trim().toUpperCase();
-  const sheets = getSheetsClient();
 
+  // 1. Coba baca dari PostgreSQL lokal (<5ms)
+  if (dbService.isAvailable()) {
+    try {
+      const pgPo = await dbService.getPOFromPg(cleanNo);
+      if (pgPo) return pgPo;
+    } catch (err) {
+      console.warn('Fallback ke Google Sheets untuk getPOByNumber:', err.message);
+    }
+  }
+
+  // 2. Fallback baca langsung dari Google Sheets
+  const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: env.sheets.spreadsheetId,
     range: "'PO 2026'!A:W",
