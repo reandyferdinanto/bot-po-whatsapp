@@ -4,3 +4,4 @@ credentials/token.json
 credentials/*.json
 !credentials/client_secret.json.example
 npm-debug.log*
+*.traineddata
