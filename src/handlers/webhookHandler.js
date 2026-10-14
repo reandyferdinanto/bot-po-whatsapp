@@ -94,10 +94,24 @@ async function handleWebhook(req, res) {
 
     console.log(`📩 Pesan masuk [${chatId}]: ${msg.type} - "${body.substring(0, 50)}"`);
 
+    const session = conversationManager.getSession(chatId);
+    const isStartOrMenu = /^(?:!|\/)?(start|menu)\b/i.test(body);
+
     // 4. Periksa apakah pesan membawa file/gambar dokumen PO
     if (msg.media || msg.type === 'image' || msg.type === 'document') {
-      const handled = await mediaHandler.handleIncomingMedia(msg);
-      if (handled) return;
+      // Proses media jika ada sesi aktif, caption diawali start/menu, atau dalam pesan pribadi (DM)
+      const isMediaAllowed = session || isStartOrMenu || !msg.isGroup;
+      if (isMediaAllowed) {
+        const handled = await mediaHandler.handleIncomingMedia(msg);
+        if (handled) return;
+      } else {
+        return;
+      }
+    }
+
+    // Jika TIDAK ada sesi aktif dan pesan TIDAK diawali start/menu: JANGAN MENJAWAB APAPUN
+    if (!session && !isStartOrMenu) {
+      return;
     }
 
     // 5. Periksa jika ada perintah langsung (misal: !cari, !cekpo, !menu)

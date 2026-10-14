@@ -69,38 +69,33 @@ async function handleConversationMessage(chatId, messageText, rawMessage) {
   const text = (messageText || '').trim();
   const lower = text.toLowerCase();
 
-  // 1. Perintah Batal Universal
+  // 1. Ambil sesi pengguna saat ini
+  const session = getSession(chatId);
+
+  // Periksa apakah pesan diawali dengan 'start' atau 'menu' (case-insensitive: start, Start, menu, Menu, !start, /start, dll)
+  const isStartOrMenu = /^(?:!|\/)?(start|menu)\b/i.test(text);
+
+  // Jika pesan diawali 'start' atau 'menu', selalu buka menu utama & aktifkan sesi
+  if (isStartOrMenu) {
+    setSession(chatId, 'MAIN_MENU');
+    await openwaService.sendText(chatId, getMainTextMenu());
+    return;
+  }
+
+  // Jika TIDAK ada sesi aktif dan pesan TIDAK diawali start/menu:
+  // JANGAN MENJAWAB APAPUN (Abaikan pesan)
+  if (!session || session.state === 'IDLE') {
+    return;
+  }
+
+  // 2. Jika ada sesi aktif dan user ingin batal
   if (lower === 'batal' || lower === 'cancel') {
     clearSession(chatId);
     await openwaService.sendText(chatId, '❌ Sesi dibatalkan. Ketik *menu* atau *start* untuk membuka menu utama.');
     return;
   }
 
-  // 2. Ambil sesi pengguna
-  const session = getSession(chatId);
-
-  // Jika tidak ada sesi aktif, periksa trigger menu
-  if (!session || session.state === 'IDLE') {
-    if (lower === 'start' || lower === 'menu' || lower === 'halo' || lower === 'hai' || lower === 'hi') {
-      setSession(chatId, 'MAIN_MENU');
-      await openwaService.sendText(chatId, getMainTextMenu());
-      return;
-    }
-
-    // Jika user langsung ketik angka tanpa 'start'
-    if (['1', '2', '3', '4'].includes(text)) {
-      return handleMainMenuChoice(chatId, text);
-    }
-
-    // Jika pesan tidak dikenali
-    await openwaService.sendText(
-      chatId,
-      'Halo! Ketik *menu* atau *start* untuk melihat daftar menu rekap PO, atau kirim foto/PDF dokumen PO untuk scan otomatis.'
-    );
-    return;
-  }
-
-  // 3. Tangani berdasarkan State Mesin Percakapan
+  // 3. Tangani berdasarkan State Mesin Percakapan (Sesi Aktif)
   switch (session.state) {
     case 'MAIN_MENU':
       return handleMainMenuChoice(chatId, text);
@@ -140,7 +135,6 @@ async function handleConversationMessage(chatId, messageText, rawMessage) {
 
     default:
       clearSession(chatId);
-      await openwaService.sendText(chatId, getMainTextMenu());
       break;
   }
 }
