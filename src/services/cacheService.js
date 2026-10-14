@@ -6,6 +6,7 @@ let materialCache = new Map(); // kode -> { no, kode, nama }
 let materialList = [];
 let supplierCache = new Map(); // kode -> { no, kode, nama, supplierUtama, frekuensi, totalQty }
 let supplierList = [];
+let priceCache = new Map(); // kode -> { minPrice, maxPrice, latestPrice, latestSupplier, latestDate, totalOrders }
 
 let fuseMaterial = null;
 let fuseSupplier = null;
@@ -93,7 +94,7 @@ async function syncMasterData(sheetsClient) {
         noPo: r[3] || '',
         supplier: r[4] || '',
         quotation: r[5] || '',
-        kode: r[6] || '',
+        kode: (r[6] || '').trim().toUpperCase(),
         nama: r[7] || '',
         qty: parseFloat(r[8]) || 0,
         priceUnit: parseFloat(r[13]) || 0,
@@ -108,18 +109,47 @@ async function syncMasterData(sheetsClient) {
         ket: r[22] || '',
       }));
 
+    // Hitung Indeks Harga (Min, Max, Terakhir per material)
+    priceCache.clear();
+    for (const p of poList) {
+      if (!p.kode || p.priceUnit <= 0) continue;
+      const k = p.kode;
+      if (!priceCache.has(k)) {
+        priceCache.set(k, {
+          kode: k,
+          nama: p.nama,
+          minPrice: p.priceUnit,
+          maxPrice: p.priceUnit,
+          latestPrice: p.priceUnit,
+          latestSupplier: p.supplier,
+          latestDate: p.date,
+          totalOrders: 1,
+        });
+      } else {
+        const item = priceCache.get(k);
+        item.minPrice = Math.min(item.minPrice, p.priceUnit);
+        item.maxPrice = Math.max(item.maxPrice, p.priceUnit);
+        item.latestPrice = p.priceUnit;
+        item.latestSupplier = p.supplier || item.latestSupplier;
+        item.latestDate = p.date || item.latestDate;
+        item.totalOrders++;
+      }
+    }
+
+    const priceList = Array.from(priceCache.values());
     lastSyncedAt = new Date();
 
     // 4. Sinkronisasi ke PostgreSQL jika aktif
     if (dbService.isAvailable()) {
-      await dbService.syncFromSheetsToPg(materialList, supplierList, poList);
+      await dbService.syncFromSheetsToPg(materialList, supplierList, poList, priceList);
     }
 
-    console.log(`✅ Master Data tersinkronisasi: ${materialList.length} Material, ${supplierList.length} Supplier Master, ${poList.length} PO Transaksi.`);
+    console.log(`✅ Master Data tersinkronisasi: ${materialList.length} Material, ${supplierList.length} Supplier Master, ${poList.length} PO Transaksi, ${priceList.length} Indeks Harga.`);
     return {
       totalMaterials: materialList.length,
       totalSuppliers: supplierList.length,
       totalPOs: poList.length,
+      totalPrices: priceList.length,
       syncedAt: lastSyncedAt,
     };
   } catch (err) {
@@ -136,8 +166,22 @@ function findMaterialByCode(kode) {
   return materialCache.get(kode.trim().toUpperCase()) || null;
 }
 
+function enrichItemWithPrice(item) {
+  if (item.hargaMin !== undefined) return item; // Sudah diperkaya dari PostgreSQL
+  const pInfo = priceCache.get(item.kode.toUpperCase());
+  return {
+    ...item,
+    hargaMin: pInfo ? pInfo.minPrice : 0,
+    hargaMax: pInfo ? pInfo.maxPrice : 0,
+    hargaTerakhir: pInfo ? pInfo.latestPrice : 0,
+    supplierTerakhir: pInfo ? pInfo.latestSupplier : '',
+    tglTerakhir: pInfo ? pInfo.latestDate : '',
+    totalTransaksi: pInfo ? pInfo.totalOrders : 0,
+  };
+}
+
 /**
- * Mencari material berdasarkan kode atau nama barang (Substring match + Fuzzy search).
+ * Mencari material berdasarkan kode atau nama barang (Substring match + Fuzzy search) beserta histori harga.
  */
 async function searchMaterials(query, limit = 15) {
   if (!query) return { total: 0, items: [] };
@@ -160,7 +204,7 @@ async function searchMaterials(query, limit = 15) {
   if (exactMatches.length > 0) {
     return {
       total: exactMatches.length,
-      items: exactMatches.slice(0, limit),
+      items: exactMatches.slice(0, limit).map(enrichItemWithPrice),
     };
   }
 
@@ -169,7 +213,7 @@ async function searchMaterials(query, limit = 15) {
   const results = fuseMaterial.search(q);
   return {
     total: results.length,
-    items: results.slice(0, limit).map(res => res.item),
+    items: results.slice(0, limit).map(res => enrichItemWithPrice(res.item)),
   };
 }
 
@@ -193,7 +237,7 @@ async function searchSupplierRecommendations(query, limit = 10) {
   if (dbService.isAvailable()) {
     const pgResults = await dbService.searchSupplierFromPg(q, limit);
     if (pgResults && pgResults.length > 0) {
-      return { total: pgResults.length, items: pgResults };
+      return { total: pgResults.length, items: pgResults.map(enrichItemWithPrice) };
     }
   }
 
@@ -207,7 +251,7 @@ async function searchSupplierRecommendations(query, limit = 10) {
   if (exactMatches.length > 0) {
     return {
       total: exactMatches.length,
-      items: exactMatches.slice(0, limit),
+      items: exactMatches.slice(0, limit).map(enrichItemWithPrice),
     };
   }
 
@@ -216,7 +260,7 @@ async function searchSupplierRecommendations(query, limit = 10) {
   const results = fuseSupplier.search(q);
   return {
     total: results.length,
-    items: results.slice(0, limit).map(res => res.item),
+    items: results.slice(0, limit).map(res => enrichItemWithPrice(res.item)),
   };
 }
 

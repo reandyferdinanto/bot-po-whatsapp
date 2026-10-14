@@ -250,6 +250,13 @@ async function handleSearchSupplierQuery(chatId, query) {
     text += `\n${i + 1}. *[${item.kode}]* ${item.nama}\n`;
     text += `   • *Supplier Utama:* ${item.supplierUtama || '-'}\n`;
     text += `   • *Frekuensi PO:* ${item.frekuensi} kali (${item.totalQty} unit diorder)\n`;
+    if (item.hargaMin && item.hargaMin > 0) {
+      if (item.hargaMin === item.hargaMax) {
+        text += `   💰 *Histori Harga:* Rp ${item.hargaMin.toLocaleString('id-ID')}\n`;
+      } else {
+        text += `   💰 *Histori Harga:* Rp ${item.hargaMin.toLocaleString('id-ID')} _(Termurah)_ - Rp ${item.hargaMax.toLocaleString('id-ID')} _(Termahal)_\n`;
+      }
+    }
   }
 
   if (total > items.length) {
@@ -276,14 +283,27 @@ async function handleSearchMaterialQuery(chatId, query) {
   let text = `📦 *HASIL PENCARIAN MATERIAL (${total} Ditemukan):*\n`;
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    text += `\n${i + 1}. *${item.kode}* - ${item.nama}`;
+    text += `\n${i + 1}. *[${item.kode}]* ${item.nama}\n`;
+
+    if (item.hargaMin && item.hargaMin > 0) {
+      if (item.hargaMin === item.hargaMax) {
+        text += `   💰 *Harga:* Rp ${item.hargaMin.toLocaleString('id-ID')}\n`;
+      } else {
+        text += `   💰 *Harga:* Rp ${item.hargaMin.toLocaleString('id-ID')} _(Termurah)_ - Rp ${item.hargaMax.toLocaleString('id-ID')} _(Termahal)_\n`;
+      }
+      if (item.supplierTerakhir) {
+        text += `   • *Terakhir:* Rp ${item.hargaTerakhir.toLocaleString('id-ID')} (${item.supplierTerakhir}${item.tglTerakhir ? ' - ' + item.tglTerakhir : ''})\n`;
+      }
+    } else {
+      text += `   💰 *Harga:* _Belum ada riwayat transaksi_\n`;
+    }
   }
 
   if (total > items.length) {
-    text += `\n\n_... dan ${total - items.length} material lainnya._`;
-    text += `\n💡 _Tips: Ketik spesifikasi lebih detail (misal: "${query} 1/2" atau "${query} 3/4") untuk mempersempit hasil._`;
+    text += `\n_... dan ${total - items.length} material lainnya._\n`;
+    text += `💡 _Tips: Ketik spesifikasi lebih detail (misal: "${query} 1/2" atau "${query} 3/4") untuk mempersempit hasil._`;
   } else {
-    text += `\n\n💡 _Ketik *menu* untuk opsi lainnya._`;
+    text += `\n💡 _Ketik *menu* untuk opsi lainnya._`;
   }
   await openwaService.sendText(chatId, text);
 }

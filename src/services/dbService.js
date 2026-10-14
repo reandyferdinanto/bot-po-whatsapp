@@ -106,6 +106,22 @@ async function migrateTables() {
         CREATE INDEX IF NOT EXISTS idx_po_nopo ON transactions_po (no_po);
       `);
 
+      // 5. Tabel Riwayat Harga Material (Min, Max, Terakhir)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS material_prices (
+          kode VARCHAR(50) PRIMARY KEY,
+          nama TEXT,
+          harga_min NUMERIC DEFAULT 0,
+          harga_max NUMERIC DEFAULT 0,
+          harga_terakhir NUMERIC DEFAULT 0,
+          supplier_terakhir TEXT,
+          tgl_terakhir VARCHAR(50),
+          total_transaksi INT DEFAULT 0,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_mat_prices_kode ON material_prices (kode);
+      `);
+
       isDbConnected = true;
       console.log('✅ PostgreSQL Schema siap & termigrasi.');
       return true;
@@ -122,7 +138,7 @@ async function migrateTables() {
 /**
  * Sinkronisasi data dari Google Sheets ke PostgreSQL (Batch Upsert).
  */
-async function syncFromSheetsToPg(materials, suppliers, poItems = []) {
+async function syncFromSheetsToPg(materials, suppliers, poItems = [], priceList = []) {
   if (!isDbConnected && !(await migrateTables())) {
     return false;
   }
@@ -175,8 +191,32 @@ async function syncFromSheetsToPg(materials, suppliers, poItems = []) {
       }
     }
 
+    // 4. Upsert Riwayat Harga Material (Min, Max, Terakhir)
+    if (priceList && priceList.length > 0) {
+      for (const pr of priceList) {
+        await client.query(`
+          INSERT INTO material_prices (
+            kode, nama, harga_min, harga_max, harga_terakhir,
+            supplier_terakhir, tgl_terakhir, total_transaksi, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
+          ON CONFLICT (kode) DO UPDATE SET
+            nama = EXCLUDED.nama,
+            harga_min = EXCLUDED.harga_min,
+            harga_max = EXCLUDED.harga_max,
+            harga_terakhir = EXCLUDED.harga_terakhir,
+            supplier_terakhir = EXCLUDED.supplier_terakhir,
+            tgl_terakhir = EXCLUDED.tgl_terakhir,
+            total_transaksi = EXCLUDED.total_transaksi,
+            updated_at = CURRENT_TIMESTAMP;
+        `, [
+          pr.kode, pr.nama || '', pr.minPrice || 0, pr.maxPrice || 0, pr.latestPrice || 0,
+          pr.latestSupplier || '', pr.latestDate || '', pr.totalOrders || 0
+        ]);
+      }
+    }
+
     await client.query('COMMIT');
-    console.log(`✅ Sinkronisasi PostgreSQL berhasil: ${materials.length} Material, ${suppliers.length} Supplier.`);
+    console.log(`✅ Sinkronisasi PostgreSQL berhasil: ${materials.length} Material, ${suppliers.length} Supplier, ${priceList.length} Indeks Harga.`);
     return true;
   } catch (err) {
     await client.query('ROLLBACK');
@@ -211,7 +251,7 @@ async function searchSupplierFromPg(query, limit = 10) {
 }
 
 /**
- * Mencari master material berdasarkan kode atau nama barang.
+ * Mencari master material berdasarkan kode atau nama barang beserta histori harga.
  */
 async function searchMaterialFromPg(query, limit = 15) {
   if (!isDbConnected && !(await migrateTables())) return null;
@@ -219,14 +259,29 @@ async function searchMaterialFromPg(query, limit = 15) {
   try {
     const qPattern = `%${query.trim()}%`;
     const res = await pool.query(`
-      SELECT kode, nama, no_urut as "no"
-      FROM master_materials
-      WHERE kode ILIKE $1 OR nama ILIKE $1
-      ORDER BY CASE WHEN kode ILIKE $1 THEN 1 ELSE 2 END, kode ASC
+      SELECT
+        m.kode,
+        m.nama,
+        m.no_urut as "no",
+        COALESCE(p.harga_min, 0)::numeric as "hargaMin",
+        COALESCE(p.harga_max, 0)::numeric as "hargaMax",
+        COALESCE(p.harga_terakhir, 0)::numeric as "hargaTerakhir",
+        COALESCE(p.supplier_terakhir, '') as "supplierTerakhir",
+        COALESCE(p.tgl_terakhir, '') as "tglTerakhir",
+        COALESCE(p.total_transaksi, 0) as "totalTransaksi"
+      FROM master_materials m
+      LEFT JOIN material_prices p ON m.kode = p.kode
+      WHERE m.kode ILIKE $1 OR m.nama ILIKE $1
+      ORDER BY CASE WHEN m.kode ILIKE $1 THEN 1 ELSE 2 END, m.kode ASC
       LIMIT $2;
     `, [qPattern, limit]);
 
-    return res.rows;
+    return res.rows.map(r => ({
+      ...r,
+      hargaMin: parseFloat(r.hargaMin) || 0,
+      hargaMax: parseFloat(r.hargaMax) || 0,
+      hargaTerakhir: parseFloat(r.hargaTerakhir) || 0,
+    }));
   } catch (err) {
     console.error('❌ Gagal query material dari PostgreSQL:', err.message);
     return null;

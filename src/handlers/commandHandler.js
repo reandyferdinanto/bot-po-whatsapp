@@ -55,6 +55,13 @@ Silakan pilih menu di bawah:
         replyCari += `\n${i + 1}. *[${item.kode}]* ${item.nama}\n`;
         replyCari += `   • *Supplier Utama:* ${item.supplierUtama || '-'}\n`;
         replyCari += `   • *Riwayat PO:* ${item.frekuensi} kali (${item.totalQty} pcs)\n`;
+        if (item.hargaMin && item.hargaMin > 0) {
+          if (item.hargaMin === item.hargaMax) {
+            replyCari += `   💰 *Histori Harga:* Rp ${item.hargaMin.toLocaleString('id-ID')}\n`;
+          } else {
+            replyCari += `   💰 *Histori Harga:* Rp ${item.hargaMin.toLocaleString('id-ID')} _(Termurah)_ - Rp ${item.hargaMax.toLocaleString('id-ID')} _(Termahal)_\n`;
+          }
+        }
       }
       if (supTotal > supItems.length) {
         replyCari += `\n_... dan ${supTotal - supItems.length} hasil lainnya._`;
