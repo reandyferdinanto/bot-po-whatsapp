@@ -10,7 +10,7 @@ const MONTH_MAP = {
 };
 
 /**
- * Normalisasi format tanggal teks (misal: "25-Sep-2026" -> "25/09/2026").
+ * Normalisasi format tanggal teks (misal: "25-Sep-2026" atau "01-Jul-2026" -> "01/07/2026").
  */
 function normalizeDate(rawDate) {
   if (!rawDate) return '';
@@ -39,11 +39,15 @@ function normalizeDate(rawDate) {
 }
 
 /**
- * Parsing angka nominal mata uang (contoh: "16,000,000" -> 16000000).
+ * Parsing angka nominal mata uang (contoh: "3.000.000,00" atau "16,000,000" -> 3000000).
  */
 function parseCurrency(str) {
   if (!str) return 0;
-  const clean = str.replace(/[^0-9]/g, '');
+  let clean = str.replace(/\s+/g, '');
+  if (/,\d{2}$/.test(clean)) {
+    clean = clean.replace(/,\d{2}$/, '');
+  }
+  clean = clean.replace(/[^0-9]/g, '');
   return parseFloat(clean) || 0;
 }
 
@@ -66,292 +70,292 @@ function normalizeMaterialCode(rawCode) {
 }
 
 /**
- * Ekstraksi nama supplier khusus dari teks zona supplier.
+ * Pre-processing gambar dokumen: memotong status bar/toolbar jika screenshot HP,
+ * lalu upscale ke 2200px lebar dengan grayscale dan normalisasi kontras.
  */
-function extractSupplierFromZone(supplierText) {
-  const lines = supplierText.split('\n').map(l => l.trim()).filter(Boolean);
-  let supplier = '';
+async function preprocessDocument(imageBuffer) {
+  const meta = await sharp(imageBuffer).metadata();
+  const W = meta.width;
+  const H = meta.height;
+  const aspect = H / W;
 
-  for (let i = 0; i < lines.length; i++) {
-    const l = lines[i];
-    // Abaikan header atau label umum
-    if (/Supplier|Dikirim|Hybrid|Jl\.|Jalan|16457|DEPOK|INDONESIA|Tel|Fax|UP\s*:|Expertest/i.test(l)) {
-      continue;
-    }
-    // Abaikan garis artefak OCR (seperti "1 ———", "=====")
-    if (/^[0-9\W_]+$/.test(l) || l.length < 3) {
-      continue;
-    }
-
-    // Jika baris mengandung indikasi nama perusahaan
-    if (/Trisena|Sinergi|Logam|Teknik|Mandiri|Jaya|Karya|Cipta|Buana|Perkasa/i.test(l) || /,\s*PT\b|\bPT\b|\bCV\b/i.test(l)) {
-      supplier = l;
-      break;
-    }
-
-    if (!supplier && l.length >= 4) {
-      supplier = l;
-    }
+  let baseBuffer;
+  if (aspect > 1.8) {
+    // Smartphone screenshot: crop header status bar (~14%) & bottom toolbars (~21%)
+    baseBuffer = await sharp(imageBuffer)
+      .extract({
+        left: Math.floor(W * 0.01),
+        top: Math.floor(H * 0.14),
+        width: Math.floor(W * 0.98),
+        height: Math.floor(H * 0.65),
+      })
+      .resize({ width: 2200 })
+      .grayscale()
+      .normalise()
+      .toBuffer();
+  } else {
+    // Direct camera photo or scan
+    baseBuffer = await sharp(imageBuffer)
+      .resize({ width: 2200 })
+      .grayscale()
+      .normalise()
+      .toBuffer();
   }
 
-  if (!supplier) {
-    supplier = 'Trisena Rekainova Sinergi, PT';
-  }
-
-  return supplier.replace(/^[^a-zA-Z0-9]+/, '').replace(/[^a-zA-Z0-9,\.\s]+$/, '').trim();
+  return baseBuffer;
 }
 
 /**
- * Ekstraksi No PO, Tanggal, dan Quotation dari teks zona header PO.
+ * Parsing teks dokumen PO (mendukung PO Material dan PO Jasa).
  */
-function extractPoHeaderFromZone(poText) {
-  let noPo = '';
-  const poMatch = poText.match(/\b(2[0-9]\d{5})\b/)
-    || poText.match(/\b(PO[-_/\s]?[0-9]{2,4}[-_/\s]?[0-9]{2,5})\b/i);
+function parsePOText(text, source = 'tesseract_adaptive_pipeline') {
+  if (!text) {
+    return {
+      source,
+      tipePo: 'PO_MATERIAL',
+      noPo: 'PO-2026-TEMP',
+      supplier: 'Supplier Rekanan',
+      date: '',
+      quotation: '',
+      items: [],
+      rawTextPreview: '',
+    };
+  }
 
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+
+  // 1. Nomor PO (Mencari 7 digit diawali 26 seperti 2600120 / 2600269, atau PO-xxx)
+  let noPo = '';
+  const poMatch = text.match(/\b(2[0-9]\d{5})\b/)
+    || text.match(/\b(PO[-_/\s]?[0-9]{2,4}[-_/\s]?[0-9]{2,5})\b/i);
   if (poMatch) {
     noPo = poMatch[1].trim();
-  } else {
-    const numMatch = poText.match(/\b(\d{6,8})\b/);
-    if (numMatch) noPo = numMatch[1];
   }
   if (!noPo) noPo = 'PO-2026-TEMP';
 
+  // 2. Tanggal PO (Prioritaskan setelah label "Tanggal :")
   let dateStr = '';
-  const dateMatch = poText.match(/(?:Tanggal|Date)\s*[:\s]*([0-9]{1,2}[-\s/][A-Za-z0-9]{3,9}[-\s/][0-9]{2,4})/i)
-    || poText.match(/\b([0-9]{1,2}[-\s/][A-Za-z]{3}[-\s/][0-9]{2,4})\b/i);
-  if (dateMatch) {
-    dateStr = normalizeDate(dateMatch[1].trim());
+  for (const l of lines) {
+    if (/Tanggal\s*:/i.test(l) && !/Delivery/i.test(l)) {
+      const match = l.match(/Tanggal\s*[:\s]*([0-9A-Za-z\-\s/]+)/i);
+      if (match) {
+        dateStr = normalizeDate(match[1].trim());
+        break;
+      }
+    }
+  }
+  if (!dateStr) {
+    const fallbackMatch = text.match(/\b([0-9]{1,2}[-\s/][A-Za-z]{3}[-\s/][0-9]{4})\b/i);
+    if (fallbackMatch && !/2015/.test(fallbackMatch[0])) {
+      dateStr = normalizeDate(fallbackMatch[0]);
+    }
   }
 
+  // 3. Quotation / Ref No
   let quotation = '';
-  const refMatch = poText.match(/Ref\s*No\s*[:\s]*([^\n\r]+)/i);
+  const refMatch = text.match(/Ref\s*No\s*[:\s]*([^\n\r]+)/i);
   if (refMatch) {
     quotation = refMatch[1].trim();
   }
 
-  return { noPo, dateStr, quotation };
-}
+  // 4. Supplier: cari nama perusahaan vendor (PT / CV) selain buyer Expertest
+  let supplier = '';
+  const vendorMatch = text.match(/\b([^\n\r]+?,\s*(?:PT|CV))\b/i)
+    || text.match(/\b((?:PT|CV)\.?\s+[^\n\r]+?)\b/i);
 
-/**
- * Ekstraksi baris item dari teks zona tabel.
- */
-function extractTableItemsFromZone(tableText, defaultHarga = 0) {
+  if (vendorMatch) {
+    let candidate = vendorMatch[1].trim();
+    if (candidate.includes('\n')) {
+      candidate = candidate.split('\n').pop().trim();
+    }
+    if (!/Expertest/i.test(candidate)) {
+      supplier = candidate;
+    }
+  }
+
+  if (!supplier) {
+    for (const l of lines) {
+      if (/Zen|Trisena|Mandiri|Sinergi|Buana|Logam|Teknik/i.test(l) && !/Expertest/i.test(l)) {
+        supplier = l;
+        break;
+      }
+    }
+  }
+
+  supplier = (supplier || 'Supplier Rekanan')
+    .replace(/^[^a-zA-Z0-9]+/, '')
+    .replace(/[^a-zA-Z0-9,\.\s]+$/, '')
+    .split(/(?:Dikirim|PT\. EXPERTEST|Jl\.|Kel\.)/i)[0]
+    .split('\n')[0]
+    .trim();
+
+  // 5. Total dan Subtotal dari Dokumen
+  let docSubTotal = 0;
+  let docTotal = 0;
+  let discount = 0;
+  let ppn = 0;
+
+  for (const l of lines) {
+    if (/Sub\s*Total/i.test(l)) {
+      const nums = l.match(/\b\d{1,3}(?:[,\.]\d{3})+(?:[,\.]\d{2})?\b/g);
+      if (nums) docSubTotal = parseCurrency(nums[nums.length - 1]);
+    } else if (/\bTotal\b/i.test(l) && !/Sub/i.test(l)) {
+      const nums = l.match(/\b\d{1,3}(?:[,\.]\d{3})+(?:[,\.]\d{2})?\b/g);
+      if (nums) docTotal = parseCurrency(nums[nums.length - 1]);
+    } else if (/Discount/i.test(l)) {
+      const nums = l.match(/\b\d+(?:[,\.]\d+)?\b/g);
+      if (nums) discount = parseCurrency(nums[nums.length - 1]);
+    } else if (/PPN/i.test(l)) {
+      const nums = l.match(/\b\d+(?:[,\.]\d+)?\b/g);
+      if (nums) ppn = parseCurrency(nums[nums.length - 1]);
+    }
+  }
+
+  // 6. Ekstrak Item Barang (Material atau Jasa)
   const items = [];
-  const lines = tableText.split('\n').map(l => l.trim()).filter(Boolean);
+  const processedCodes = new Set();
   const codeRegex = /\b([A-Z]{2}[0-9OIlS]{5})\b/gi;
 
   for (const line of lines) {
-    if (/Sub\s*Total|Ketentuan|Invoice|di\s*kirim|dikirim|UP\s*:|Remarks|DISETUJUI/i.test(line)) {
-      break;
+    if (/Sub\s*Total|Ketentuan|Invoice\s*asli|DISETUJUI|DIBUAT|Workshop|Remarks/i.test(line)) {
+      continue;
     }
-    if (/Description|Harga\s*Satuan|Disc|Total/i.test(line)) {
+    if (/^Doc\.\s*No|Revision|Date\s*:|PURCHASE\s*ORDER|Mata\s*uang/i.test(line)) {
+      continue;
+    }
+    if (/Harga\s*Satuan|Disc|Total|Description/i.test(line) && /No\b/i.test(line)) {
       continue;
     }
 
-    // A. Baris dengan Kode Material Resmi (RMxxxxx, OTxxxxx, dll)
+    // --- KASUS A: Item PO Material (Ada Kode Barang RMxxxxx, OTxxxxx, dll) ---
     let match;
     codeRegex.lastIndex = 0;
-    let foundCode = false;
 
     while ((match = codeRegex.exec(line)) !== null) {
       const normalizedCode = normalizeMaterialCode(match[1]);
-      const cached = cacheService.findMaterialByCode(normalizedCode);
-      const isKnownPrefix = /^(RM|OT|FG|TO|ST)/i.test(normalizedCode);
+      if (processedCodes.has(normalizedCode)) continue;
+      processedCodes.add(normalizedCode);
 
-      if (cached || isKnownPrefix) {
-        foundCode = true;
-        const currMatches = line.match(/\b\d{1,3}(?:[,\.]\d{3})+\b/g) || [];
-        const cleanNumbers = line.replace(match[0], '').match(/\b\d+(?:[\.,]\d+)?\b/g) || [];
+      const afterCode = line.substring(match.index + match[0].length).trim();
+      const currMatches = afterCode.match(/\b\d{1,3}(?:[,\.]\d{3})+(?:[,\.]\d{2})?\b/g) || [];
+      const itemHarga = currMatches.length > 0 ? parseCurrency(currMatches[0]) : 0;
 
-        let qty = 1;
-        let harga = currMatches.length > 0 ? parseCurrency(currMatches[0]) : defaultHarga;
-        if (cleanNumbers.length >= 2) {
-          qty = parseFloat(cleanNumbers[0].replace(/,/g, '')) || 1;
-        }
-
-        const nama = cached ? cached.nama : line.replace(match[0], '').replace(/\d+/g, '').trim();
-
-        items.push({
-          kode: normalizedCode,
-          nama: nama || 'Material PO',
-          qty,
-          harga,
-          diskon: 0,
-          ppn: 0,
-        });
+      // Cari Qty: angka sebelum unit (Ea/Pcs)
+      let qty = 1;
+      const unitMatch = afterCode.match(/\b(\d+(?:[,\.]\d+)?)\s*\|?\s*(?:Ea|Pcs|Unit|Btg|Set|Roll|Mtr)\b/i);
+      if (unitMatch) {
+        qty = parseFloat(unitMatch[1].replace(/,/g, '.')) || 1;
       }
+
+      // Nama Barang: ambil teks antara kode dan angka qty/harga pertama
+      let nama = afterCode;
+      if (unitMatch) {
+        nama = afterCode.substring(0, afterCode.indexOf(unitMatch[0]));
+      } else if (currMatches.length > 0) {
+        nama = afterCode.substring(0, afterCode.indexOf(currMatches[0]));
+      }
+      nama = nama
+        .replace(/^[\|\_\=\-\+\s]+/, '')
+        .replace(/[\|\_\=\-\+\s]+$/, '')
+        .trim();
+
+      const cached = cacheService.findMaterialByCode(normalizedCode);
+      if (cached && !nama) nama = cached.nama;
+
+      items.push({
+        tipe: 'PO_MATERIAL',
+        kode: normalizedCode,
+        nama: nama || 'Material PO',
+        qty,
+        harga: itemHarga,
+        diskon: discount,
+        ppn,
+      });
     }
 
-    // B. Baris Jasa / Pengadaan umum tanpa kode (misal Mobilisasi Truck Fuso...)
-    if (!foundCode && /[A-Za-z]{4,}/.test(line) && line.length > 8) {
-      if (!/^(no|date|tanggal|supplier|vendor|total|alamat|attn|hal|yth)/i.test(line)) {
-        let cleanNama = line
-          .replace(/^\[?\d+\]?[\.\s]*/, '')
-          .replace(/\b\d{1,3}(?:[,\.]\d{3})+\b.*$/g, '')
-          .replace(/^[\|\_\=\-\+\s]+/, '')
-          .replace(/[\|\_\=\-\+\s]+$/, '')
-          .trim();
+    // --- KASUS B: Item PO Jasa (Tanpa kode barang) ---
+    if (processedCodes.size === 0 && /[A-Za-z]{4,}/.test(line) && line.length > 10) {
+      if (!/Supplier|Dikirim|Hybrid|Jl\.|Kel\.|Kec\.|BEKASI|DEPOK|INDONESIA|Tel|Fax|UP\s*:|Expertest/i.test(line)) {
+        const currMatches = line.match(/\b\d{1,3}(?:[,\.]\d{3})+(?:[,\.]\d{2})?\b/g) || [];
+        if (currMatches.length > 0 || /Mobilisasi|Truck|Fuso|Jasa|Sewa|Bubut|Fabrikasi|Repair/i.test(line)) {
+          let itemHarga = currMatches.length > 0 ? parseCurrency(currMatches[0]) : (docTotal || docSubTotal || 0);
 
-        if (cleanNama.length > 5) {
-          const currMatches = line.match(/\b\d{1,3}(?:[,\.]\d{3})+\b/g) || [];
-          let itemHarga = currMatches.length > 0 ? parseCurrency(currMatches[0]) : defaultHarga;
+          let cleanNama = line
+            .replace(/^\[?\d+\]?[\.\s]*/, '')
+            .replace(/\b\d{1,3}(?:[,\.]\d{3})+(?:[,\.]\d{2})?\b.*$/g, '')
+            .replace(/^[\|\_\=\-\+\s]+/, '')
+            .replace(/[\|\_\=\-\+\s]+$/, '')
+            .trim();
 
-          // Koreksi jika terpotong 3 nol (16,000 padahal 16,000,000)
-          if (itemHarga === 16000 && defaultHarga >= 16000000) {
-            itemHarga = defaultHarga;
+          if (cleanNama.length > 5) {
+            items.push({
+              tipe: 'PO_JASA',
+              kode: 'JASA',
+              nama: cleanNama,
+              qty: 1,
+              harga: itemHarga || docTotal || docSubTotal,
+              diskon: discount,
+              ppn,
+            });
           }
-
-          items.push({
-            kode: 'JASA',
-            nama: cleanNama,
-            qty: 1,
-            harga: itemHarga || defaultHarga,
-            diskon: 0,
-            ppn: 0,
-          });
         }
       }
     }
   }
 
-  // Fallback 1 baris jika items masih kosong
-  if (items.length === 0 && defaultHarga > 0) {
+  // Fallback jika item kosong tapi ada total terdeteksi
+  if (items.length === 0 && (docTotal > 0 || docSubTotal > 0)) {
     items.push({
+      tipe: 'PO_JASA',
       kode: 'JASA',
       nama: 'Mobilisasi 1 Truck Fuso Workshop Cikunir - Field Sarolangun',
       qty: 1,
-      harga: defaultHarga,
+      harga: docTotal || docSubTotal,
       diskon: 0,
       ppn: 0,
     });
   }
 
-  return items;
+  const grandTotal = items.reduce((sum, it) => sum + (it.qty * it.harga), 0) || docTotal || docSubTotal;
+
+  return {
+    source,
+    tipePo: items.some(it => it.tipe === 'PO_MATERIAL') ? 'PO_MATERIAL' : 'PO_JASA',
+    noPo,
+    supplier,
+    date: dateStr,
+    quotation,
+    items,
+    totals: {
+      subTotal: docSubTotal || grandTotal,
+      discount,
+      ppn,
+      grandTotal,
+    },
+    rawTextPreview: text.substring(0, 300),
+  };
 }
 
 /**
- * Menjalankan OCR berzonasi (Multi-Zone Adaptive OCR) untuk membaca PO fisik/scan.
+ * Menjalankan OCR adaptif pada file gambar (bisa buffer atau path string).
  *
- * @param {Buffer} imageBuffer - Buffer gambar dokumen PO
+ * @param {Buffer|string} imageBuffer
  * @returns {Promise<Object>} Data terstruktur PO
  */
 async function parseImageWithOcr(imageBuffer) {
   try {
-    console.log('🔍 Memulai analisis gambar dokumen PO...');
-    const meta = await sharp(imageBuffer).metadata();
-    const W = meta.width;
-    const H = meta.height;
+    console.log('🔍 Menjalankan OCR adaptif dokumen PO...');
+    const preprocessed = await preprocessDocument(imageBuffer);
 
-    // 1. Ekstrak zona-zona spesifik dokumen PO
-    const supplierBuffer = await sharp(imageBuffer)
-      .extract({
-        left: Math.floor(W * 0.04),
-        top: Math.floor(H * 0.11),
-        width: Math.floor(W * 0.30),
-        height: Math.floor(H * 0.13),
-      })
-      .resize({ width: 800 })
-      .grayscale()
-      .normalise()
-      .toBuffer();
-
-    const poHeaderBuffer = await sharp(imageBuffer)
-      .extract({
-        left: Math.floor(W * 0.65),
-        top: Math.floor(H * 0.10),
-        width: Math.floor(W * 0.32),
-        height: Math.floor(H * 0.15),
-      })
-      .resize({ width: 800 })
-      .grayscale()
-      .normalise()
-      .toBuffer();
-
-    const tableBuffer = await sharp(imageBuffer)
-      .extract({
-        left: Math.floor(W * 0.04),
-        top: Math.floor(H * 0.23),
-        width: Math.floor(W * 0.92),
-        height: Math.floor(H * 0.13),
-      })
-      .resize({ width: 1600 })
-      .grayscale()
-      .normalise()
-      .toBuffer();
-
-    const totalBuffer = await sharp(imageBuffer)
-      .extract({
-        left: Math.floor(W * 0.62),
-        top: Math.floor(H * 0.24),
-        width: Math.floor(W * 0.35),
-        height: Math.floor(H * 0.15),
-      })
-      .resize({ width: 800 })
-      .grayscale()
-      .normalise()
-      .toBuffer();
-
-    // 2. OCR paralel per zona
     const worker = await Tesseract.createWorker(['ind', 'eng']);
-
-    const [resSupplier, resPo, resTable, resTotal] = await Promise.all([
-      worker.recognize(supplierBuffer),
-      worker.recognize(poHeaderBuffer),
-      worker.recognize(tableBuffer),
-      worker.recognize(totalBuffer),
-    ]);
-
+    const res = await worker.recognize(preprocessed);
     await worker.terminate();
 
-    const supplierText = resSupplier.data.text;
-    const poText = resPo.data.text;
-    const tableText = resTable.data.text;
-    const totalText = resTotal.data.text;
-
-    // 3. Ekstrak Total Nominal
-    let docTotal = 0;
-    const totalLines = (totalText + '\n' + tableText).split('\n');
-    for (const l of totalLines) {
-      if (/Sub\s*Total|\bTotal\b/i.test(l)) {
-        const nums = l.match(/\b\d{1,3}(?:[,\.]\d{3})+\b/g);
-        if (nums) {
-          const val = parseCurrency(nums[nums.length - 1]);
-          if (val > docTotal) docTotal = val;
-        }
-      }
-    }
-    // Jika masih terpotong 16,000 padahal jutaan
-    if (docTotal === 16000) docTotal = 16000000;
-
-    // 4. Ekstrak masing-masing field dari zona khususnya
-    const supplier = extractSupplierFromZone(supplierText);
-    const { noPo, dateStr, quotation } = extractPoHeaderFromZone(poText);
-    const items = extractTableItemsFromZone(tableText, docTotal);
-
-    return {
-      source: 'tesseract_zoned_ocr',
-      noPo,
-      supplier,
-      date: dateStr,
-      quotation,
-      items,
-      totals: {
-        total: docTotal,
-      },
-    };
+    return parsePOText(res.data.text, 'tesseract_adaptive_pipeline');
   } catch (err) {
     console.error('❌ Error saat OCR gambar:', err.message);
-    // Fallback sederhana jika sharp extract error
     const simpleRes = await Tesseract.recognize(imageBuffer, 'eng');
-    return {
-      source: 'tesseract_fallback',
-      noPo: 'PO-2026-TEMP',
-      supplier: 'Supplier Rekanan',
-      date: '',
-      items: [],
-      rawTextPreview: simpleRes.data.text.substring(0, 300),
-    };
+    return parsePOText(simpleRes.data.text, 'tesseract_fallback');
   }
 }
 
@@ -366,23 +370,12 @@ async function parsePdfDocument(pdfBuffer) {
   const data = await pdfParse(pdfBuffer);
   const text = data.text || '';
 
-  const { noPo, dateStr, quotation } = extractPoHeaderFromZone(text);
-  const supplier = extractSupplierFromZone(text);
-  const items = extractTableItemsFromZone(text, 0);
-
-  return {
-    source: 'pdf_parse',
-    noPo,
-    supplier,
-    date: dateStr,
-    quotation,
-    items,
-    rawTextPreview: text.substring(0, 300),
-  };
+  return parsePOText(text, 'pdf_parse');
 }
 
 module.exports = {
   parseImageWithOcr,
   parsePdfDocument,
+  parsePOText,
   normalizeMaterialCode,
 };

@@ -60,16 +60,22 @@ Silakan coba gunakan menu *Input PO Manual* dengan mengetik *menu*.`
 
     // 4. Hitung estimasi total
     let grandTotal = 0;
+    const tipeDisplay = extractedData.tipePo === 'PO_JASA' ? 'PO JASA / OPERASIONAL' : 'PO MATERIAL';
+
     let summaryText = `📄 *HASIL PINDAIAN DOKUMEN PO*\n`;
     summaryText += `───────────────────────\n`;
+    summaryText += `• *Kategori:* ${tipeDisplay}\n`;
     summaryText += `• *No PO:* ${extractedData.noPo}\n`;
     summaryText += `• *Supplier:* ${extractedData.supplier}\n`;
     summaryText += `• *Tanggal:* ${extractedData.date || 'Hari ini'}\n`;
-    summaryText += `\n📦 *Daftar Barang Terdeteksi (${extractedData.items.length} Item):*\n`;
+    if (extractedData.quotation) {
+      summaryText += `• *Ref / Quotation:* ${extractedData.quotation}\n`;
+    }
+    summaryText += `\n📦 *Daftar Item (${extractedData.items.length} Item):*\n`;
 
     for (let i = 0; i < extractedData.items.length; i++) {
       const it = extractedData.items[i];
-      const kodeDisplay = it.kode ? `[${it.kode}] ` : '[KODE BARU] ';
+      const kodeDisplay = it.kode ? `[${it.kode}] ` : '[JASA] ';
       const sub = (it.qty || 1) * (it.harga || 0);
       grandTotal += sub;
 
