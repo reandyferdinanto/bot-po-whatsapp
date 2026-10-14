@@ -291,11 +291,13 @@ function parsePurchaseOrderText(text, source = 'tesseract_adaptive_pipeline') {
     .split('\n')[0]
     .trim();
 
-  // 5. Total dan Subtotal dari Dokumen
+  // 5. Total, Subtotal, Discount, dan PPN dari Dokumen
   let docSubTotal = 0;
   let docTotal = 0;
   let discount = 0;
-  let ppn = 0;
+  let ppnRate = 0; // 0, 0.11, etc.
+  let docPpnNominal = 0;
+  let hasExplicitPpn = false;
 
   for (const l of lines) {
     if (/Sub\s*Total/i.test(l)) {
@@ -308,8 +310,27 @@ function parsePurchaseOrderText(text, source = 'tesseract_adaptive_pipeline') {
       const nums = l.match(/\b\d+(?:[,\.]\d+)?\b/g);
       if (nums) discount = parseCurrency(nums[nums.length - 1]);
     } else if (/PPN/i.test(l)) {
-      const nums = l.match(/\b\d+(?:[,\.]\d+)?\b/g);
-      if (nums) ppn = parseCurrency(nums[nums.length - 1]);
+      // Deteksi rate PPN: misal "PPN 11%", "PPN 11 %", "PPN 0%", "PPN 12%"
+      const rateMatch = l.match(/PPN\s*(\d{1,2})\s*%/i) || l.match(/(\d{1,2})\s*%/);
+      if (rateMatch) {
+        ppnRate = parseFloat(rateMatch[1]) / 100;
+        hasExplicitPpn = true;
+      }
+      const nums = l.match(/\b\d{1,3}(?:[,\.]\d{3})+(?:[,\.]\d{2})?\b/g);
+      if (nums) docPpnNominal = parseCurrency(nums[nums.length - 1]);
+    }
+  }
+
+  // Cross-check PPN rate dari selisih docTotal dan docSubTotal jika tidak eksplisit
+  if (!hasExplicitPpn && docTotal > docSubTotal && docSubTotal > 0) {
+    const diff = docTotal - docSubTotal;
+    const ratio = diff / docSubTotal;
+    if (Math.abs(ratio - 0.11) < 0.015) {
+      ppnRate = 0.11;
+      docPpnNominal = diff;
+    } else if (Math.abs(ratio - 0.12) < 0.015) {
+      ppnRate = 0.12;
+      docPpnNominal = diff;
     }
   }
 
@@ -369,7 +390,7 @@ function parsePurchaseOrderText(text, source = 'tesseract_adaptive_pipeline') {
         qty,
         harga: itemHarga,
         diskon: discount,
-        ppn,
+        ppn: 0,
       });
     }
 
@@ -395,7 +416,7 @@ function parsePurchaseOrderText(text, source = 'tesseract_adaptive_pipeline') {
               qty: 1,
               harga: itemHarga || docTotal || docSubTotal,
               diskon: discount,
-              ppn,
+              ppn: 0,
             });
           }
         }
@@ -412,11 +433,47 @@ function parsePurchaseOrderText(text, source = 'tesseract_adaptive_pipeline') {
       qty: 1,
       harga: docTotal || docSubTotal,
       diskon: 0,
-      ppn,
+      ppn: 0,
     });
   }
 
-  const grandTotal = items.reduce((sum, it) => sum + (it.qty * it.harga), 0) || docTotal || docSubTotal;
+  // 7. Cross-Check dan Rekonsiliasi Nilai Matematis
+  let calculatedSubTotal = 0;
+  for (const it of items) {
+    const itemSub = it.qty * it.harga * (1 - (it.diskon || 0));
+    calculatedSubTotal += itemSub;
+  }
+
+  // Cross-Check Subtotal: Bandingkan akumulasi (Qty x Harga) dengan Sub Total dokumen
+  let isSubtotalMatched = (docSubTotal > 0 && Math.abs(calculatedSubTotal - docSubTotal) < 100);
+  if (docSubTotal > 0 && !isSubtotalMatched) {
+    // Jika hanya 1 item dan harga satuan terbaca salah/terpotong, sesuaikan harga satuan
+    if (items.length === 1 && items[0].qty > 0) {
+      items[0].harga = docSubTotal / items[0].qty;
+      calculatedSubTotal = docSubTotal;
+      isSubtotalMatched = true;
+    }
+  }
+
+  const finalSubTotal = calculatedSubTotal || docSubTotal || 0;
+
+  // Hitungan Manual PPN 11% (Sebagai standar pembanding akurasi)
+  const manualPpn11 = Math.round(finalSubTotal * 0.11);
+
+  // Nilai PPN final yang berlaku pada transaksi:
+  const finalPpnNominal = docPpnNominal > 0 ? docPpnNominal : (ppnRate > 0 ? Math.round(finalSubTotal * ppnRate) : 0);
+
+  // Alokasikan PPN per item untuk kolom P (PPN) dan kolom Q (TOTAL) pada sheet 'PO 2026'
+  for (const it of items) {
+    const itemSub = it.qty * it.harga * (1 - (it.diskon || 0));
+    it.ppn = ppnRate > 0 ? Math.round(itemSub * ppnRate) : 0;
+    it.ppn11 = Math.round(itemSub * 0.11);
+    it.total = itemSub + it.ppn;
+  }
+
+  // Grand Total final = Subtotal - Discount + PPN
+  const finalGrandTotal = finalSubTotal - discount + finalPpnNominal;
+  const isGrandTotalMatched = (docTotal > 0 && Math.abs(finalGrandTotal - docTotal) < 100);
 
   return {
     source,
@@ -428,10 +485,16 @@ function parsePurchaseOrderText(text, source = 'tesseract_adaptive_pipeline') {
     quotation,
     items,
     totals: {
-      subTotal: docSubTotal || grandTotal,
+      subTotal: finalSubTotal,
       discount,
-      ppn,
-      grandTotal,
+      ppnRate,
+      ppnRatePercent: Math.round(ppnRate * 100),
+      ppn: finalPpnNominal,
+      ppnNominal: finalPpnNominal,
+      manualPpn11,
+      grandTotal: finalGrandTotal,
+      isSubtotalMatched,
+      isGrandTotalMatched,
     },
     rawTextPreview: text.substring(0, 300),
   };
