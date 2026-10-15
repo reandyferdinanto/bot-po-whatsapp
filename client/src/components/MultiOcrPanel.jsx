@@ -26,6 +26,7 @@ import {
   AiOutlineExclamationCircle,
   AiOutlinePlus,
   AiOutlineSearch,
+  AiOutlineSync,
 } from 'react-icons/ai';
 import { parseOcrFiles, commitBatchOCR, getPODetail } from '../services/api';
 
@@ -52,37 +53,49 @@ const DeliveryNoteSchema = Yup.object().shape({
 });
 
 export default function MultiOcrPanel({ onPoCommitted, isDark }) {
-  const [fileList, setFileList] = useState([]);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [parsedDocuments, setParsedDocuments] = useState([]);
   const [isCommitting, setIsCommitting] = useState(false);
 
   const formatRupiah = (val) => 'Rp ' + Number(val || 0).toLocaleString('id-ID');
 
-  const handleUploadChange = ({ fileList: newFileList }) => {
-    setFileList(newFileList);
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
-  const handleStartBatchOcr = async () => {
-    if (fileList.length === 0) {
-      message.warning('Pilih minimal 1 file PDF atau foto dokumen PO.');
-      return;
-    }
+  // Langsung jalankan scan OCR saat dokumen berhasil dipilih/diunggah
+  const handleProcessUploadedFiles = async (files) => {
+    if (!files || files.length === 0) return;
 
     setIsProcessing(true);
-    message.loading({ content: `Memproses OCR ${fileList.length} file...`, key: 'ocr-proc' });
+    message.loading({ content: `Memproses OCR ${files.length} dokumen secara otomatis...`, key: 'ocr-proc' });
+
+    const newUploadSummary = Array.from(files).map((f) => {
+      const isPdf = (f.type && f.type.includes('pdf')) || (f.name && f.name.toLowerCase().endsWith('.pdf'));
+      return {
+        name: f.name,
+        size: f.size,
+        isPdf,
+        type: isPdf ? 'pdf' : 'image',
+      };
+    });
+    setUploadedFiles((prev) => [...prev, ...newUploadSummary]);
 
     try {
-      const rawFiles = fileList.map((f) => f.originFileObj || f);
+      const rawFiles = Array.from(files).map((f) => f.originFileObj || f);
       const res = await parseOcrFiles(rawFiles);
 
       if (res.success && res.documents) {
-        setParsedDocuments(res.documents);
+        setParsedDocuments((prev) => [...prev, ...res.documents]);
         message.success({
           content: `Ekstraksi Sukses! Ditemukan ${res.totalPOsParsed} dokumen dari ${res.totalFiles} file.`,
           key: 'ocr-proc',
         });
-        setFileList([]); // Clear upload queue
       } else {
         message.error({ content: res.error || 'Gagal ekstraksi OCR.', key: 'ocr-proc' });
       }
@@ -347,53 +360,131 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
       >
         <Dragger
           multiple={true}
-          fileList={fileList}
-          onChange={handleUploadChange}
-          beforeUpload={() => false}
+          showUploadList={false}
+          disabled={isProcessing}
+          beforeUpload={(file, fileListArg) => {
+            if (file === fileListArg[fileListArg.length - 1]) {
+              handleProcessUploadedFiles(fileListArg);
+            }
+            return false;
+          }}
           accept=".pdf,.jpg,.jpeg,.png,.webp"
           style={{
-            padding: '24px 0',
+            padding: '20px 10px',
             backgroundColor: isDark ? '#1e293b' : '#fafafa',
-            borderColor: '#0284c7',
+            borderColor: isProcessing ? '#059669' : '#0284c7',
             borderRadius: 10,
+            cursor: isProcessing ? 'wait' : 'pointer',
           }}
         >
-          <p className="ant-upload-drag-icon">
-            <AiOutlineCloudUpload style={{ fontSize: 44, color: '#0284c7' }} />
-          </p>
-          <p style={{ fontSize: 15, fontWeight: 700, color: textColor, margin: '8px 0 4px 0' }}>
-            Klik atau Tarik Dokumen PO / Surat Jalan (GRPO) ke Area Ini
-          </p>
-          <p style={{ fontSize: 12, color: mutedColor }}>
-            Bisa multi-file sekaligus atau 1 PDF multi-halaman. Sistem otomatis membedakan apakah dokumen adalah <strong>Purchase Order</strong> atau <strong>Purchase Delivery Note (GRPO)</strong>.
-          </p>
-        </Dragger>
+          {uploadedFiles.length === 0 && !isProcessing ? (
+            <div style={{ padding: '16px 10px' }}>
+              <p className="ant-upload-drag-icon" style={{ margin: '0 0 12px 0' }}>
+                <AiOutlineCloudUpload style={{ fontSize: 48, color: '#0284c7' }} />
+              </p>
 
-        {fileList.length > 0 && (
-          <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 12, color: mutedColor }}>
-              <strong>{fileList.length} file</strong> siap diproses OCR.
-            </span>
-            <Button
-              type="primary"
-              size="large"
-              icon={<AiOutlineScan />}
-              loading={isProcessing}
-              onClick={handleStartBatchOcr}
-              style={{
-                backgroundColor: '#0284c7',
-                borderColor: '#0284c7',
-                fontWeight: 700,
-                borderRadius: 8,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              ⚡ Mulai Ekstraksi OCR ({fileList.length} Dokumen)
-            </Button>
-          </div>
-        )}
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 14, marginBottom: 12, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#fee2e2', border: '1px solid #fca5a5' }}>
+                  <AiOutlineFilePdf style={{ fontSize: 22, color: '#dc2626' }} />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#b91c1c' }}>Dokumen PDF (Multi-Halaman)</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, backgroundColor: isDark ? 'rgba(139, 92, 246, 0.15)' : '#ede9fe', border: '1px solid #c4b5fd' }}>
+                  <AiOutlineFileImage style={{ fontSize: 22, color: '#7c3aed' }} />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#6d28d9' }}>Foto / Scan (JPG, PNG, WEBP)</span>
+                </div>
+              </div>
+
+              <p style={{ fontSize: 15, fontWeight: 700, color: textColor, margin: '8px 0 4px 0' }}>
+                Klik atau Tarik Dokumen PO / Surat Jalan (GRPO) ke Area Ini
+              </p>
+              <p style={{ fontSize: 12, color: mutedColor, maxWidth: 640, margin: '0 auto' }}>
+                <strong>Otomatis langsung di-scan saat diunggah!</strong> Sistem otomatis membedakan apakah dokumen adalah <strong>Purchase Order (Input Baru)</strong> atau <strong>Purchase Delivery Note (Update GRPO)</strong>.
+              </p>
+            </div>
+          ) : (
+            <div style={{ padding: '10px 14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 14 }}>
+                {isProcessing ? (
+                  <>
+                    <AiOutlineSync style={{ fontSize: 30, color: '#0284c7', animation: 'antRotate 1s infinite linear' }} />
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: '#0284c7' }}>
+                        Sedang Mengekstrak Teks Dokumen via OCR Otomatis...
+                      </div>
+                      <div style={{ fontSize: 11, color: mutedColor }}>
+                        Memindai teks digital, tabel item, dan nomor PO.
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <AiOutlineCheckCircle style={{ fontSize: 30, color: '#059669' }} />
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: '#059669' }}>
+                        ✓ {uploadedFiles.length} Dokumen Berhasil Diunggah &amp; Diekstrak
+                      </div>
+                      <div style={{ fontSize: 11, color: mutedColor }}>
+                        Klik atau tarik file tambahan ke sini untuk menambah antrian scan OCR.
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Badges Dokumen yang Terupload dengan Pembeda Ikon Jelas */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8, maxWidth: 840, margin: '0 auto' }}>
+                {uploadedFiles.map((f, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '6px 12px',
+                      borderRadius: 8,
+                      backgroundColor: f.isPdf
+                        ? (isDark ? 'rgba(239, 68, 68, 0.2)' : '#fef2f2')
+                        : (isDark ? 'rgba(139, 92, 246, 0.2)' : '#f5f3ff'),
+                      border: `1px solid ${f.isPdf ? '#f87171' : '#c084fc'}`,
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                    }}
+                  >
+                    {f.isPdf ? (
+                      <AiOutlineFilePdf style={{ fontSize: 22, color: '#dc2626', flexShrink: 0 }} />
+                    ) : (
+                      <AiOutlineFileImage style={{ fontSize: 22, color: '#7c3aed', flexShrink: 0 }} />
+                    )}
+                    <div style={{ textAlign: 'left' }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: textColor,
+                          maxWidth: 200,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                        title={f.name}
+                      >
+                        {f.name}
+                      </div>
+                      <div style={{ fontSize: 10, color: mutedColor }}>
+                        {f.isPdf ? 'Dokumen PDF' : 'Foto Dokumen'} • {formatFileSize(f.size)}
+                      </div>
+                    </div>
+                    <Tag
+                      color={f.isPdf ? 'red' : 'purple'}
+                      style={{ fontSize: 10, margin: 0, fontWeight: 700, borderRadius: 4 }}
+                    >
+                      {f.isPdf ? 'PDF' : 'GAMBAR'}
+                    </Tag>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </Dragger>
       </div>
 
       {/* OCR Queue & Verification Section */}
@@ -426,7 +517,13 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
             </div>
 
             <div style={{ display: 'flex', gap: 8 }}>
-              <Button onClick={() => setParsedDocuments([])} size="middle">
+              <Button
+                onClick={() => {
+                  setParsedDocuments([]);
+                  setUploadedFiles([]);
+                }}
+                size="middle"
+              >
                 Bersihkan Antrian
               </Button>
               <Button
