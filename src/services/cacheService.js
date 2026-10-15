@@ -363,7 +363,20 @@ function getAllMaterials(query = '', page = 1, limit = 50) {
   return { total, page, limit, items };
 }
 
-function getAllSuppliers(query = '', page = 1, limit = 25) {
+async function getAllSuppliers(query = '', page = 1, limit = 25) {
+  // 1. Coba query dari PostgreSQL yang memiliki data lengkap
+  if (dbService.isAvailable()) {
+    try {
+      const pgRes = await dbService.getAllSuppliersFromPg(query, page, limit);
+      if (pgRes && pgRes.items && pgRes.items.length > 0) {
+        return pgRes;
+      }
+    } catch (pgErr) {
+      console.warn('⚠️ Gagal query getAllSuppliersFromPg, fallback ke RAM:', pgErr.message);
+    }
+  }
+
+  // 2. Fallback In-Memory cache (menggabungkan master suppliers + transaksi PO)
   const supplierMap = new Map();
 
   function getSupplierEntry(rawName) {
@@ -381,7 +394,7 @@ function getAllSuppliers(query = '', page = 1, limit = 25) {
     return supplierMap.get(key);
   }
 
-  // 1. Dari master database Supplier Material (1.506 baris)
+  // A. Dari master database Supplier Material (1.506 baris)
   for (const s of supplierList) {
     if (!s.supplierUtama) continue;
     const supEntry = getSupplierEntry(s.supplierUtama);
@@ -405,8 +418,9 @@ function getAllSuppliers(query = '', page = 1, limit = 25) {
     }
   }
 
-  // 2. Dari transaksi PO 2026 (transactionsList)
-  for (const tx of transactionsList) {
+  // B. Dari transaksi PO (prioritaskan allYearsTransactions jika ada)
+  const txSource = allYearsTransactions.length > 0 ? allYearsTransactions : transactionsList;
+  for (const tx of txSource) {
     if (!tx.supplier || !tx.kode) continue;
     const supEntry = getSupplierEntry(tx.supplier);
     const matKey = tx.kode.toUpperCase();
@@ -440,15 +454,38 @@ function getAllSuppliers(query = '', page = 1, limit = 25) {
     }
   }
 
-  // Convert ke array supplier dan hitung total material
-  let list = Array.from(supplierMap.values()).map(sup => {
+  // Convert ke array supplier dan hitung referensi harga keseluruhan supplier
+  let list = Array.from(supplierMap.values()).map((sup) => {
     const materials = Array.from(sup.materialsMap.values());
     materials.sort((a, b) => (b.frekuensi || b.totalOrders || 0) - (a.frekuensi || a.totalOrders || 0));
+
+    let minP = 0;
+    let maxP = 0;
+    let latestP = 0;
+    let totalSpend = 0;
+
+    for (const m of materials) {
+      if (m.hargaMin > 0) {
+        minP = minP === 0 ? m.hargaMin : Math.min(minP, m.hargaMin);
+      }
+      if (m.hargaMax > 0) {
+        maxP = Math.max(maxP, m.hargaMax);
+      }
+      if (m.hargaTerbaru > 0 && latestP === 0) {
+        latestP = m.hargaTerbaru;
+      }
+      totalSpend += (m.totalQty || 1) * (m.hargaTerbaru || m.hargaMin || 0);
+    }
+
     return {
       supplierName: sup.supplierName,
       totalMaterials: materials.length,
       totalFrequency: sup.totalFrequency,
       totalQty: sup.totalQty,
+      totalSpend: Math.round(totalSpend),
+      supplierMinPrice: minP,
+      supplierMaxPrice: maxP,
+      supplierLatestPrice: latestP,
       materials,
     };
   });

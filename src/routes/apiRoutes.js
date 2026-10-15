@@ -211,13 +211,13 @@ router.get('/materials', (req, res) => {
 /**
  * GET /api/suppliers - Master Supplier Material (1.506 rekomendasi vendor)
  */
-router.get('/suppliers', (req, res) => {
+router.get('/suppliers', async (req, res) => {
   try {
     const query = req.query.q || '';
     const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 50;
+    const limit = parseInt(req.query.limit, 10) || 25;
 
-    const result = cacheService.getAllSuppliers(query, page, limit);
+    const result = await cacheService.getAllSuppliers(query, page, limit);
     res.json({ success: true, ...result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

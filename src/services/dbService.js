@@ -408,6 +408,96 @@ async function getSupplierItemsFromPg(supplierQuery, limit = 15) {
   }
 }
 
+/**
+ * Mengambil daftar supplier lengkap dengan ragam material dan referensi harga (Min, Max, Last Price) dari PostgreSQL.
+ */
+async function getAllSuppliersFromPg(query = '', page = 1, limit = 25) {
+  if (!isDbConnected && !(await migrateTables())) return null;
+
+  try {
+    let whereClause = '';
+    const params = [];
+    if (query) {
+      params.push(`%${query.trim()}%`);
+      whereClause = `AND (t.supplier ILIKE $1 OR t.kode_material ILIKE $1 OR t.nama_material ILIKE $1)`;
+    }
+
+    const sql = `
+      WITH supplier_materials AS (
+        SELECT 
+          t.supplier as "supplierName",
+          t.kode_material as "kode",
+          t.nama_material as "nama",
+          MIN(t.price_unit)::numeric as "hargaMin",
+          MAX(t.price_unit)::numeric as "hargaMax",
+          (ARRAY_AGG(t.price_unit ORDER BY t.id DESC))[1]::numeric as "hargaTerbaru",
+          (ARRAY_AGG(t.tanggal ORDER BY t.id DESC))[1] as "tglTerbaru",
+          COUNT(DISTINCT t.no_po)::int as "frekuensi",
+          SUM(t.qty)::numeric as "totalQty",
+          SUM(t.total)::numeric as "itemTotalSpend"
+        FROM transactions_po t
+        WHERE t.supplier IS NOT NULL AND TRIM(t.supplier) != '' AND t.price_unit > 0
+        ${whereClause}
+        GROUP BY t.supplier, t.kode_material, t.nama_material
+      )
+      SELECT 
+        sm."supplierName",
+        COUNT(DISTINCT sm."kode")::int as "totalMaterials",
+        SUM(sm."frekuensi")::int as "totalFrequency",
+        SUM(sm."totalQty")::numeric as "totalQty",
+        SUM(sm."itemTotalSpend")::numeric as "totalSpend",
+        MIN(sm."hargaMin")::numeric as "supplierMinPrice",
+        MAX(sm."hargaMax")::numeric as "supplierMaxPrice",
+        (ARRAY_AGG(sm."hargaTerbaru" ORDER BY sm."frekuensi" DESC))[1]::numeric as "supplierLatestPrice",
+        JSON_AGG(
+          JSON_BUILD_OBJECT(
+            'kode', sm."kode",
+            'nama', sm."nama",
+            'hargaMin', sm."hargaMin",
+            'hargaMax', sm."hargaMax",
+            'hargaTerbaru', sm."hargaTerbaru",
+            'tglTerbaru', sm."tglTerbaru",
+            'frekuensi', sm."frekuensi",
+            'totalQty', sm."totalQty"
+          ) ORDER BY sm."frekuensi" DESC
+        ) as "materials"
+      FROM supplier_materials sm
+      GROUP BY sm."supplierName"
+      ORDER BY COUNT(DISTINCT sm."kode") DESC, SUM(sm."frekuensi") DESC;
+    `;
+
+    const res = await pool.query(sql, params);
+    if (!res.rows || res.rows.length === 0) return null;
+
+    const allSuppliers = res.rows.map((r) => ({
+      supplierName: r.supplierName,
+      totalMaterials: parseInt(r.totalMaterials, 10) || 0,
+      totalFrequency: parseInt(r.totalFrequency, 10) || 0,
+      totalQty: parseFloat(r.totalQty) || 0,
+      totalSpend: parseFloat(r.totalSpend) || 0,
+      supplierMinPrice: parseFloat(r.supplierMinPrice) || 0,
+      supplierMaxPrice: parseFloat(r.supplierMaxPrice) || 0,
+      supplierLatestPrice: parseFloat(r.supplierLatestPrice) || 0,
+      materials: (r.materials || []).map((m) => ({
+        ...m,
+        hargaMin: parseFloat(m.hargaMin) || 0,
+        hargaMax: parseFloat(m.hargaMax) || 0,
+        hargaTerbaru: parseFloat(m.hargaTerbaru) || 0,
+        totalQty: parseFloat(m.totalQty) || 0,
+      })),
+    }));
+
+    const total = allSuppliers.length;
+    const startIndex = (page - 1) * limit;
+    const items = allSuppliers.slice(startIndex, startIndex + limit);
+
+    return { total, page, limit, items };
+  } catch (err) {
+    console.error('❌ Gagal query suppliers dari PostgreSQL:', err.message);
+    return null;
+  }
+}
+
 function isAvailable() {
   return isDbConnected;
 }
@@ -420,5 +510,6 @@ module.exports = {
   searchMaterialFromPg,
   getPOFromPg,
   getSupplierItemsFromPg,
+  getAllSuppliersFromPg,
   isAvailable,
 };

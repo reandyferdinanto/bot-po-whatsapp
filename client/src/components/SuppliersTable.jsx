@@ -229,7 +229,7 @@ export default function SuppliersTable({ isDark }) {
       title: 'Akumulasi Frekuensi Order',
       dataIndex: 'totalFrequency',
       key: 'totalFrequency',
-      width: 180,
+      width: 170,
       align: 'center',
       render: (freq) => (
         <Tag color="purple" style={{ fontSize: 12, padding: '3px 8px', borderRadius: 6, fontWeight: 700 }}>
@@ -238,10 +238,41 @@ export default function SuppliersTable({ isDark }) {
       ),
     },
     {
+      title: 'Rentang Referensi Harga',
+      key: 'priceRange',
+      width: 250,
+      render: (_, record) => {
+        if (!record.supplierLatestPrice && !record.supplierMinPrice) {
+          return <span style={{ color: '#94a3b8', fontSize: 11 }}>Belum ada histori harga</span>;
+        }
+        return (
+          <div style={{ fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div>
+              <span style={{ color: '#64748b' }}>Terbaru: </span>
+              <strong style={{ color: '#2563eb', fontFamily: 'monospace' }}>
+                {formatRupiah(record.supplierLatestPrice || record.supplierMinPrice)}
+              </strong>
+            </div>
+            {record.supplierMinPrice > 0 && record.supplierMaxPrice > 0 && (
+              <div style={{ color: '#64748b' }}>
+                <span style={{ color: '#059669', fontWeight: 600, fontFamily: 'monospace' }}>
+                  {formatRupiah(record.supplierMinPrice)}
+                </span>
+                {' - '}
+                <span style={{ color: '#ea580c', fontWeight: 600, fontFamily: 'monospace' }}>
+                  {formatRupiah(record.supplierMaxPrice)}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       title: 'Total Kuantitas Dipesan',
       dataIndex: 'totalQty',
       key: 'totalQty',
-      width: 170,
+      width: 160,
       align: 'right',
       render: (qty) => (
         <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 13, color: isDark ? '#f8fafc' : '#0f172a' }}>
