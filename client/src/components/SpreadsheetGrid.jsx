@@ -10,7 +10,7 @@ const COLUMNS_DEF = [
   { letter: 'A', name: 'NO.', width: 48, align: 'center', key: 'no' },
   { letter: 'B', name: 'STATUS', width: 92, align: 'left', key: 'status' },
   { letter: 'C', name: 'DATE', width: 95, align: 'left', key: 'date' },
-  { letter: 'D', name: 'NO. PO', width: 130, align: 'left', key: 'noPo', sticky: true },
+  { letter: 'D', name: 'NO. PO', width: 130, align: 'left', key: 'noPo' },
   { letter: 'E', name: 'SUPPLIER', width: 210, align: 'left', key: 'supplier' },
   { letter: 'F', name: 'QUOT. / Vendor Reff', width: 135, align: 'left', key: 'quotation' },
   { letter: 'G', name: 'Kode Item Material', width: 120, align: 'left', key: 'kode', highlight: 'emerald' },
