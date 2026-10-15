@@ -359,19 +359,111 @@ function getAllMaterials(query = '', page = 1, limit = 50) {
   return { total, page, limit, items };
 }
 
-function getAllSuppliers(query = '', page = 1, limit = 50) {
-  let list = supplierList;
+function getAllSuppliers(query = '', page = 1, limit = 25) {
+  const supplierMap = new Map();
+
+  function getSupplierEntry(rawName) {
+    const cleanName = (rawName || 'Supplier Lainnya').trim();
+    const key = cleanName.toLowerCase();
+    if (!supplierMap.has(key)) {
+      supplierMap.set(key, {
+        supplierName: cleanName,
+        totalMaterials: 0,
+        totalFrequency: 0,
+        totalQty: 0,
+        materialsMap: new Map(),
+      });
+    }
+    return supplierMap.get(key);
+  }
+
+  // 1. Dari master database Supplier Material (1.506 baris)
+  for (const s of supplierList) {
+    if (!s.supplierUtama) continue;
+    const supEntry = getSupplierEntry(s.supplierUtama);
+    const matKey = (s.kode || '').toUpperCase();
+    const priceInfo = priceCache.get(matKey);
+
+    if (!supEntry.materialsMap.has(matKey)) {
+      supEntry.materialsMap.set(matKey, {
+        kode: s.kode,
+        nama: s.nama,
+        frekuensi: s.frekuensi || 0,
+        totalQty: s.totalQty || 0,
+        hargaMin: priceInfo ? priceInfo.minPrice : 0,
+        hargaMax: priceInfo ? priceInfo.maxPrice : 0,
+        hargaTerbaru: priceInfo ? priceInfo.latestPrice : 0,
+        tglTerbaru: priceInfo ? priceInfo.latestDate : '',
+        totalOrders: priceInfo ? priceInfo.totalOrders : (s.frekuensi || 0),
+      });
+      supEntry.totalFrequency += s.frekuensi || 0;
+      supEntry.totalQty += s.totalQty || 0;
+    }
+  }
+
+  // 2. Dari transaksi PO 2026 (transactionsList)
+  for (const tx of transactionsList) {
+    if (!tx.supplier || !tx.kode) continue;
+    const supEntry = getSupplierEntry(tx.supplier);
+    const matKey = tx.kode.toUpperCase();
+    const priceInfo = priceCache.get(matKey);
+
+    if (!supEntry.materialsMap.has(matKey)) {
+      supEntry.materialsMap.set(matKey, {
+        kode: tx.kode,
+        nama: tx.nama || (priceInfo ? priceInfo.nama : ''),
+        frekuensi: 1,
+        totalQty: tx.qty || 0,
+        hargaMin: tx.priceUnit > 0 ? tx.priceUnit : (priceInfo ? priceInfo.minPrice : 0),
+        hargaMax: tx.priceUnit > 0 ? tx.priceUnit : (priceInfo ? priceInfo.maxPrice : 0),
+        hargaTerbaru: tx.priceUnit > 0 ? tx.priceUnit : (priceInfo ? priceInfo.latestPrice : 0),
+        tglTerbaru: tx.date || (priceInfo ? priceInfo.latestDate : ''),
+        totalOrders: 1,
+      });
+      supEntry.totalFrequency += 1;
+      supEntry.totalQty += tx.qty || 0;
+    } else {
+      const mat = supEntry.materialsMap.get(matKey);
+      if (tx.priceUnit > 0) {
+        mat.hargaMin = mat.hargaMin > 0 ? Math.min(mat.hargaMin, tx.priceUnit) : tx.priceUnit;
+        mat.hargaMax = Math.max(mat.hargaMax, tx.priceUnit);
+        mat.hargaTerbaru = tx.priceUnit;
+        mat.tglTerbaru = tx.date || mat.tglTerbaru;
+      }
+      mat.totalOrders = (mat.totalOrders || 0) + 1;
+      mat.totalQty = (mat.totalQty || 0) + (tx.qty || 0);
+      supEntry.totalQty += tx.qty || 0;
+    }
+  }
+
+  // Convert ke array supplier dan hitung total material
+  let list = Array.from(supplierMap.values()).map(sup => {
+    const materials = Array.from(sup.materialsMap.values());
+    materials.sort((a, b) => (b.frekuensi || b.totalOrders || 0) - (a.frekuensi || a.totalOrders || 0));
+    return {
+      supplierName: sup.supplierName,
+      totalMaterials: materials.length,
+      totalFrequency: sup.totalFrequency,
+      totalQty: sup.totalQty,
+      materials,
+    };
+  });
+
+  // Urutkan supplier berdasarkan jumlah ragam material terbanyak
+  list.sort((a, b) => b.totalMaterials - a.totalMaterials || b.totalFrequency - a.totalFrequency);
+
+  // Filter pencarian (bisa nama supplier, kode material, atau nama material)
   if (query) {
     const q = query.trim().toLowerCase();
-    list = supplierList.filter(s =>
-      s.kode.toLowerCase().includes(q) ||
-      s.nama.toLowerCase().includes(q) ||
-      (s.supplierUtama && s.supplierUtama.toLowerCase().includes(q))
+    list = list.filter(sup =>
+      sup.supplierName.toLowerCase().includes(q) ||
+      sup.materials.some(m => m.kode.toLowerCase().includes(q) || m.nama.toLowerCase().includes(q))
     );
   }
+
   const total = list.length;
   const startIndex = (page - 1) * limit;
-  const items = list.slice(startIndex, startIndex + limit).map(enrichItemWithPrice);
+  const items = list.slice(startIndex, startIndex + limit);
   return { total, page, limit, items };
 }
 
