@@ -50,20 +50,34 @@ async function handleIncomingMedia(message) {
     // KASUS 1: DOKUMEN PURCHASE DELIVERY NOTE (GRPO) -> AUTO UPDATE PO
     // =========================================================================
     if (extractedData.tipeDokumen === 'PURCHASE_DELIVERY_NOTE_GRPO') {
-      const targetPo = extractedData.noPo;
+      const targetPo = (extractedData.noPo || '').trim();
       console.log(`📦 Terdeteksi Purchase Delivery Note ${extractedData.noGrpo} untuk PO ${targetPo}`);
 
       let existingPo = null;
-      try {
-        existingPo = await sheetsService.getPOByNumber(targetPo);
-      } catch (err) {
-        console.warn(`Gagal cek PO ${targetPo}:`, err.message);
+      if (targetPo && targetPo !== 'PO-2026-TEMP') {
+        try {
+          existingPo = await sheetsService.getPOByNumber(targetPo);
+        } catch (err) {
+          console.warn(`Gagal cek PO ${targetPo}:`, err.message);
+        }
+      }
+
+      // Jika PO tidak ditemukan di sheet 'PO 2026'
+      if (!existingPo) {
+        await openwaService.sendText(
+          chatId,
+          `⚠️ *PO TIDAK DITEMUKAN!*\n` +
+          `Nomor PO *${targetPo || '(Tidak terdeteksi)'}* dari Purchase Delivery Note *${extractedData.noGrpo || '-'}* tidak ditemukan di sheet 'PO 2026'.\n\n` +
+          `👉 *Scan atau input terlebih dahulu PO nya* sebelum mengupload Surat Jalan / Delivery Note ini.`
+        );
+        conversationManager.clearSession(chatId);
+        return true;
       }
 
       let summaryText = `📦 *HASIL PINDAIAN PURCHASE DELIVERY NOTE (GRPO)*\n`;
       summaryText += `───────────────────────\n`;
       summaryText += `• *No. GRPO:* ${extractedData.noGrpo}\n`;
-      summaryText += `• *Target No. PO:* ${targetPo}` + (existingPo ? ` (Ditemukan, Status: ${existingPo.status})\n` : `\n`);
+      summaryText += `• *Target No. PO:* ${targetPo} (✓ Ditemukan, Status: ${existingPo.status})\n`;
       summaryText += `• *Tgl Selesai / Terima:* ${extractedData.lastGrpoDate || 'Hari ini'}\n`;
       summaryText += `• *Supplier:* ${extractedData.supplier}\n`;
       if (extractedData.receivedBy) {
@@ -82,15 +96,10 @@ async function handleIncomingMedia(message) {
       }
 
       summaryText += `───────────────────────\n`;
-      summaryText += `📝 *Kolom yang akan di-update pada PO ${targetPo}:*\n`;
-      summaryText += `• No. GRPO ➔ *${extractedData.noGrpo}*\n`;
-      summaryText += `• LAST DATE OF GRPO JOB DONE ➔ *${extractedData.lastGrpoDate || 'Hari ini'}*\n`;
-      summaryText += `• KET ➔ *${extractedData.updateFields.ket}*\n\n`;
-
-      if (!existingPo) {
-        summaryText += `⚠️ *Perhatian:* Nomor PO *${targetPo}* saat ini belum tercatat di sheet 'PO 2026'.\n`;
-        summaryText += `Jika Anda konfirmasi 'YA', bot akan mencoba mencari dan mengupdate baris tersebut saat data siap.\n\n`;
-      }
+      summaryText += `📝 *Kolom yang akan di-update pada baris PO ${targetPo}:*\n`;
+      summaryText += `• No. GRPO (Kolom R) ➔ *${extractedData.noGrpo}*\n`;
+      summaryText += `• LAST DATE OF GRPO (Kolom S) ➔ *${extractedData.lastGrpoDate || 'Hari ini'}*\n`;
+      summaryText += `• KET (Kolom W) ➔ *${extractedData.updateFields ? extractedData.updateFields.ket : `GRPO ${extractedData.noGrpo}`}*\n\n`;
 
       summaryText += `Ketik:\n• *YA* untuk update baris PO di Google Sheets 'PO 2026'\n• *BATAL* jika data tidak sesuai`;
 

@@ -562,6 +562,16 @@ async function handleConfirmUpdateGrpo(chatId, text, session) {
 
   if (lower === 'ya' || lower === 'simpan' || lower === 'oke' || lower === 'ok' || lower === 'update') {
     try {
+      const existing = await sheetsService.getPOByNumber(data.noPo);
+      if (!existing) {
+        clearSession(chatId);
+        await openwaService.sendText(
+          chatId,
+          `⚠️ *PO TIDAK DITEMUKAN!*\nNomor PO *${data.noPo || '-'}* tidak ditemukan di sheet 'PO 2026'.\n\n👉 *Scan atau input terlebih dahulu PO nya* sebelum mengupdate Surat Jalan / Delivery Note ini.`
+        );
+        return;
+      }
+
       await openwaService.sendText(chatId, `⏳ Sedang mengupdate GRPO untuk PO *${data.noPo}* di Google Sheets...`);
 
       const updatePayload = {

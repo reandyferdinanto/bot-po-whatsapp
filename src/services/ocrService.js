@@ -188,10 +188,28 @@ function parseDeliveryNoteText(text, source = 'tesseract_delivery_note') {
 
   // 2. Nomor PO (Di bawah tanggal, diawali "PO# :" atau "PO :" atau "Purchase Orders xxx")
   let noPo = '';
-  const poMatch = text.match(/(?:PO\s*#|PO\s*NO\.?|NO\.?\s*PO)\s*[:#\s]*([A-Z0-9\/\-_]+)/i)
-    || text.match(/Purchase\s*Orders?\s*([0-9]+)/i);
+  const poMatch = text.match(/(?:PO\s*#|PO\s*NO\.?|NO\.?\s*PO|Based\s*on\s*PO|Ref\s*PO|Purchase\s*Order)\s*[:#\s]*([A-Z0-9\/\-_]+)/i)
+    || text.match(/Purchase\s*Orders?\s*[:#\s]*([0-9A-Z\/\-_]+)/i);
   if (poMatch) {
     noPo = poMatch[1].trim();
+  }
+
+  // Jika belum terdeteksi, cari baris tepat di bawah tanggal
+  if (!noPo) {
+    for (let i = 0; i < lines.length; i++) {
+      if (/(?:Date|Tanggal)\s*[:\s]*/i.test(lines[i])) {
+        for (let j = 1; j <= 3 && i + j < lines.length; j++) {
+          const nextL = lines[i + j];
+          const matchPo = nextL.match(/(?:PO\s*#|PO\s*NO\.?|NO\.?\s*PO|PO)\s*[:#\s]*([A-Z0-9\/\-_]+)/i)
+            || nextL.match(/\b(2[0-9]\d{5}|PO[-_/\s]?[0-9]{2,4}[-_/\s]?[0-9]{2,5})\b/i);
+          if (matchPo) {
+            noPo = matchPo[1].trim();
+            break;
+          }
+        }
+        if (noPo) break;
+      }
+    }
   }
 
   // 3. Tanggal Selesai GRPO (Date pada Delivery Note)

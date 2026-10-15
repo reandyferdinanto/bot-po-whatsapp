@@ -288,6 +288,37 @@ router.post('/ocr/parse', upload.array('files', 20), async (req, res) => {
     console.log(`📥 Menerima ${filesToProcess.length} file untuk OCR ekstraksi...`);
     const parsedBatch = await ocrService.parseBatchDocuments(filesToProcess);
 
+    // Cross-check PO reference untuk Purchase Delivery Note (GRPO)
+    for (const doc of parsedBatch) {
+      if (doc.tipeDokumen === 'PURCHASE_DELIVERY_NOTE_GRPO') {
+        if (doc.noPo && doc.noPo !== 'PO-2026-TEMP') {
+          try {
+            const existingPo = await sheetsService.getPOByNumber(doc.noPo);
+            if (existingPo) {
+              doc.poFound = true;
+              doc.existingPo = {
+                noPo: existingPo.noPo,
+                supplier: existingPo.supplier,
+                date: existingPo.date,
+                status: existingPo.status,
+                grandTotal: existingPo.grandTotal,
+                itemsCount: existingPo.items ? existingPo.items.length : 0,
+              };
+            } else {
+              doc.poFound = false;
+              doc.poNotFoundMessage = 'PO tidak ditemukan, scan atau input terlebih dahulu PO nya.';
+            }
+          } catch (poErr) {
+            doc.poFound = false;
+            doc.poNotFoundMessage = 'PO tidak ditemukan, scan atau input terlebih dahulu PO nya.';
+          }
+        } else {
+          doc.poFound = false;
+          doc.poNotFoundMessage = 'Nomor referensi PO tidak terdeteksi pada dokumen. PO tidak ditemukan, scan atau input terlebih dahulu PO nya.';
+        }
+      }
+    }
+
     res.json({
       success: true,
       totalFiles: filesToProcess.length,
@@ -301,7 +332,9 @@ router.post('/ocr/parse', upload.array('files', 20), async (req, res) => {
 });
 
 /**
- * POST /api/ocr/batch-commit - Simpan daftar PO hasil OCR ke Google Sheets
+ * POST /api/ocr/batch-commit - Simpan/Update hasil OCR ke Google Sheets
+ * - Jika Purchase Delivery Note (GRPO): Update baris PO yang ada
+ * - Jika Purchase Order (PO): Insert baris baru ke sheet 'PO 2026'
  */
 router.post('/ocr/batch-commit', async (req, res) => {
   try {
@@ -309,7 +342,7 @@ router.post('/ocr/batch-commit', async (req, res) => {
     if (!Array.isArray(pos) || pos.length === 0) {
       return res.status(400).json({
         success: false,
-        error: 'Daftar PO yang akan disimpan kosong.',
+        error: 'Daftar dokumen yang akan disimpan kosong.',
       });
     }
 
@@ -317,9 +350,63 @@ router.post('/ocr/batch-commit', async (req, res) => {
     let successCount = 0;
 
     for (const po of pos) {
+      // KASUS 1: PURCHASE DELIVERY NOTE (GRPO) -> UPDATE EXISTING PO BARIS DI SHEET 'PO 2026'
+      if (po.tipeDokumen === 'PURCHASE_DELIVERY_NOTE_GRPO') {
+        const targetPo = (po.noPo || '').trim();
+        if (!targetPo) {
+          results.push({
+            noPo: 'UNKNOWN',
+            tipeDokumen: 'PURCHASE_DELIVERY_NOTE_GRPO',
+            success: false,
+            error: 'PO tidak ditemukan, scan atau input terlebih dahulu PO nya.',
+          });
+          continue;
+        }
+
+        const existing = await sheetsService.getPOByNumber(targetPo);
+        if (!existing) {
+          results.push({
+            noPo: targetPo,
+            tipeDokumen: 'PURCHASE_DELIVERY_NOTE_GRPO',
+            success: false,
+            error: `PO tidak ditemukan, scan atau input terlebih dahulu PO nya. (Target: ${targetPo})`,
+          });
+          continue;
+        }
+
+        const updatePayload = {
+          grpo: po.noGrpo || (po.updateFields && po.updateFields.grpo),
+          lastGrpoDate: po.lastGrpoDate || (po.updateFields && po.updateFields.lastGrpoDate) || sheetsService.getCurrentFormattedDate(),
+          ket: (po.updateFields && po.updateFields.ket) || (po.noGrpo ? `GRPO ${po.noGrpo}` : 'Update Delivery Note'),
+        };
+
+        const updateRes = await sheetsService.updatePOField(targetPo, updatePayload);
+        if (updateRes.success) {
+          successCount++;
+          results.push({
+            noPo: targetPo,
+            tipeDokumen: 'PURCHASE_DELIVERY_NOTE_GRPO',
+            action: 'updated_grpo',
+            noGrpo: po.noGrpo,
+            success: true,
+            rowsUpdated: updateRes.rowsUpdated,
+          });
+        } else {
+          results.push({
+            noPo: targetPo,
+            tipeDokumen: 'PURCHASE_DELIVERY_NOTE_GRPO',
+            success: false,
+            error: updateRes.message || 'Gagal update baris PO.',
+          });
+        }
+        continue;
+      }
+
+      // KASUS 2: NORMAL PURCHASE ORDER (PO) -> APPEND BARIS BARU KE SHEET 'PO 2026'
       if (!po.noPo || !po.supplier || !Array.isArray(po.items) || po.items.length === 0) {
         results.push({
           noPo: po.noPo || 'UNKNOWN',
+          tipeDokumen: 'PURCHASE_ORDER',
           success: false,
           error: 'Data PO tidak lengkap atau item kosong.',
         });
@@ -338,6 +425,8 @@ router.post('/ocr/batch-commit', async (req, res) => {
         successCount++;
         results.push({
           noPo: po.noPo,
+          tipeDokumen: 'PURCHASE_ORDER',
+          action: 'inserted_po',
           success: true,
           itemsCount: po.items.length,
           grandTotal: commitRes.grandTotal,
@@ -345,6 +434,7 @@ router.post('/ocr/batch-commit', async (req, res) => {
       } catch (itemErr) {
         results.push({
           noPo: po.noPo,
+          tipeDokumen: 'PURCHASE_ORDER',
           success: false,
           error: itemErr.message,
         });
