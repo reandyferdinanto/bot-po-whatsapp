@@ -7,6 +7,7 @@ let materialList = [];
 let supplierCache = new Map(); // kode -> { no, kode, nama, supplierUtama, frekuensi, totalQty }
 let supplierList = [];
 let priceCache = new Map(); // kode -> { minPrice, maxPrice, latestPrice, latestSupplier, latestDate, totalOrders }
+let transactionsList = [];
 
 let fuseMaterial = null;
 let fuseSupplier = null;
@@ -137,6 +138,7 @@ async function syncMasterData(sheetsClient) {
     }
 
     const priceList = Array.from(priceCache.values());
+    transactionsList = poList;
     lastSyncedAt = new Date();
 
     // 4. Sinkronisasi ke PostgreSQL jika aktif
@@ -264,14 +266,113 @@ async function searchSupplierRecommendations(query, limit = 10) {
   };
 }
 
+/**
+ * Mencari riwayat pembelian barang dari Supplier X (daftar material, harga min/max/terbaru, dan no PO).
+ */
+async function getSupplierOrderHistory(supplierQuery, limit = 15) {
+  if (!supplierQuery) return null;
+  const q = supplierQuery.trim();
+
+  // 1. Coba PostgreSQL jika aktif
+  if (dbService.isAvailable()) {
+    const pgResult = await dbService.getSupplierItemsFromPg(q, limit);
+    if (pgResult && pgResult.items && pgResult.items.length > 0) {
+      return pgResult;
+    }
+  }
+
+  // 2. Fallback RAM
+  const lowerQ = q.toLowerCase();
+  const matchingTx = transactionsList.filter(t => t.supplier && t.supplier.toLowerCase().includes(lowerQ));
+  if (matchingTx.length === 0) return null;
+
+  const actualSupplierName = matchingTx[0].supplier;
+  const materialMap = new Map();
+
+  for (const tx of matchingTx) {
+    if (!tx.kode || tx.priceUnit <= 0) continue;
+    const k = tx.kode.toUpperCase();
+
+    if (!materialMap.has(k)) {
+      materialMap.set(k, {
+        kode: k,
+        nama: tx.nama || '',
+        prices: [tx.priceUnit],
+        minPrice: tx.priceUnit,
+        maxPrice: tx.priceUnit,
+        latestPrice: tx.priceUnit,
+        latestDate: tx.date || '',
+        poSet: new Set([tx.noPo]),
+      });
+    } else {
+      const entry = materialMap.get(k);
+      entry.prices.push(tx.priceUnit);
+      entry.minPrice = Math.min(entry.minPrice, tx.priceUnit);
+      entry.maxPrice = Math.max(entry.maxPrice, tx.priceUnit);
+      entry.latestPrice = tx.priceUnit;
+      entry.latestDate = tx.date || entry.latestDate;
+      entry.poSet.add(tx.noPo);
+    }
+  }
+
+  const allItems = Array.from(materialMap.values()).map(m => ({
+    kode: m.kode,
+    nama: m.nama,
+    hargaMin: m.minPrice,
+    hargaMax: m.maxPrice,
+    hargaTerbaru: m.latestPrice,
+    tglTerbaru: m.latestDate,
+    poList: Array.from(m.poSet),
+    totalOrders: m.poSet.size,
+  }));
+
+  // Urutkan berdasarkan total order terbanyak
+  allItems.sort((a, b) => b.totalOrders - a.totalOrders);
+
+  return {
+    supplier: actualSupplierName,
+    totalItems: allItems.length,
+    items: allItems.slice(0, limit),
+  };
+}
+
 function getSyncStatus() {
   return {
     isSynced: materialList.length > 0,
     materialCount: materialList.length,
     supplierCount: supplierList.length,
+    transactionsCount: transactionsList.length,
     postgresConnected: dbService.isAvailable(),
     lastSyncedAt,
   };
+}
+
+function getAllMaterials(query = '', page = 1, limit = 50) {
+  let list = materialList;
+  if (query) {
+    const q = query.trim().toLowerCase();
+    list = materialList.filter(m => m.kode.toLowerCase().includes(q) || m.nama.toLowerCase().includes(q));
+  }
+  const total = list.length;
+  const startIndex = (page - 1) * limit;
+  const items = list.slice(startIndex, startIndex + limit).map(enrichItemWithPrice);
+  return { total, page, limit, items };
+}
+
+function getAllSuppliers(query = '', page = 1, limit = 50) {
+  let list = supplierList;
+  if (query) {
+    const q = query.trim().toLowerCase();
+    list = supplierList.filter(s =>
+      s.kode.toLowerCase().includes(q) ||
+      s.nama.toLowerCase().includes(q) ||
+      (s.supplierUtama && s.supplierUtama.toLowerCase().includes(q))
+    );
+  }
+  const total = list.length;
+  const startIndex = (page - 1) * limit;
+  const items = list.slice(startIndex, startIndex + limit).map(enrichItemWithPrice);
+  return { total, page, limit, items };
 }
 
 module.exports = {
@@ -280,5 +381,8 @@ module.exports = {
   searchMaterials,
   getSupplierByCode,
   searchSupplierRecommendations,
+  getSupplierOrderHistory,
   getSyncStatus,
+  getAllMaterials,
+  getAllSuppliers,
 };

@@ -54,12 +54,13 @@ function getSearchMenuText() {
   return `🔍 *MENU PENCARIAN DATA*
 Silakan pilih kategori pencarian:
 
-1️⃣ *1* - Rekomendasi Supplier Utama (dari Material)
-2️⃣ *2* - Cari Master Material (Kode / Nama Barang)
-3️⃣ *3* - Cek Riwayat PO & Status Bayar
+1️⃣ *1* - Rekomendasi Vendor Utama (dari Nama Barang)
+2️⃣ *2* - Cari Master Material (Kode / Nama & Rentang Harga)
+3️⃣ *3* - Cek Riwayat Barang di Supplier X (Barang, Harga Min/Max/Terbaru & No. PO)
+4️⃣ *4* - Cek Status & Detail PO Tertentu
 
 0️⃣ *0* - Kembali ke Menu Utama
-💡 _Ketik angka pilihan (0-3):_`;
+💡 _Ketik angka pilihan (0-4):_`;
 }
 
 /**
@@ -108,6 +109,9 @@ async function handleConversationMessage(chatId, messageText, rawMessage) {
 
     case 'WAIT_SEARCH_MATERIAL':
       return handleSearchMaterialQuery(chatId, text);
+
+    case 'WAIT_SEARCH_SUPPLIER_ITEMS':
+      return handleSearchSupplierItemsQuery(chatId, text);
 
     case 'WAIT_SEARCH_PO':
       return handleSearchPOQuery(chatId, text);
@@ -201,7 +205,7 @@ async function handleSearchMenuChoice(chatId, choice) {
       setSession(chatId, 'WAIT_SEARCH_SUPPLIER');
       await openwaService.sendText(
         chatId,
-        '🏢 *Cari Rekomendasi Supplier*\nKetik nama barang atau kode material yang ingin dicari:\nContoh: `Nipples` atau `RM00355`'
+        '🏢 *Cari Rekomendasi Vendor*\nKetik nama barang atau kode material yang ingin dicari:\nContoh: `Nipples` atau `RM00355`'
       );
       break;
 
@@ -209,15 +213,23 @@ async function handleSearchMenuChoice(chatId, choice) {
       setSession(chatId, 'WAIT_SEARCH_MATERIAL');
       await openwaService.sendText(
         chatId,
-        '📦 *Cari Master Material*\nKetik kode atau nama spesifikasi barang:\nContoh: `Flange` atau `RM00088`'
+        '📦 *Cari Master Material*\nKetik kode atau nama spesifikasi barang:\nContoh: `elbow` atau `gates` atau `OT00736`'
       );
       break;
 
     case '3':
+      setSession(chatId, 'WAIT_SEARCH_SUPPLIER_ITEMS');
+      await openwaService.sendText(
+        chatId,
+        '🏢 *Cek Riwayat Barang di Supplier X*\nKetik nama vendor/supplier yang ingin dicek:\nContoh: `Zen Teknik` atau `Rivindi` atau `Buana Logam`'
+      );
+      break;
+
+    case '4':
       setSession(chatId, 'WAIT_SEARCH_PO');
       await openwaService.sendText(
         chatId,
-        '📋 *Cek Status PO*\nKetik Nomor PO yang ingin dicek:\nContoh: `PO-2026-001`'
+        '📋 *Cek Status PO*\nKetik Nomor PO yang ingin dicek:\nContoh: `2600120` atau `PO-2026-001`'
       );
       break;
 
@@ -227,7 +239,7 @@ async function handleSearchMenuChoice(chatId, choice) {
       break;
 
     default:
-      await openwaService.sendText(chatId, 'Pilihan salah. Ketik angka 1, 2, 3 atau 0 untuk kembali.');
+      await openwaService.sendText(chatId, 'Pilihan salah. Ketik angka 1, 2, 3, 4 atau 0 untuk kembali.');
       break;
   }
 }
@@ -305,6 +317,47 @@ async function handleSearchMaterialQuery(chatId, query) {
   } else {
     text += `\n💡 _Ketik *menu* untuk opsi lainnya._`;
   }
+  await openwaService.sendText(chatId, text);
+}
+
+async function handleSearchSupplierItemsQuery(chatId, query) {
+  clearSession(chatId);
+  await openwaService.sendText(chatId, `🔍 Sedang mencari riwayat pembelian dari vendor "${query}"...`);
+
+  const result = await cacheService.getSupplierOrderHistory(query, 15);
+  if (!result || !result.items || result.items.length === 0) {
+    await openwaService.sendText(
+      chatId,
+      `⚠️ Tidak ditemukan riwayat pembelian untuk vendor "${query}" di sheet transaksi.\n💡 _Ketik *menu* untuk opsi lainnya._`
+    );
+    return;
+  }
+
+  let text = `🏢 *RIWAYAT PEMBELIAN VENDOR: ${result.supplier}*\n`;
+  text += `Ditemukan *${result.totalItems} jenis barang* yang pernah dipesan:\n`;
+
+  for (let i = 0; i < result.items.length; i++) {
+    const item = result.items[i];
+    text += `\n${i + 1}. *[${item.kode}]* ${item.nama}\n`;
+    if (item.hargaMin === item.hargaMax) {
+      text += `   💰 *Harga:* Rp ${item.hargaMin.toLocaleString('id-ID')}\n`;
+    } else {
+      text += `   💰 *Harga:* Rp ${item.hargaMin.toLocaleString('id-ID')} _(Termurah)_ - Rp ${item.hargaMax.toLocaleString('id-ID')} _(Termahal)_\n`;
+    }
+    if (item.hargaTerbaru) {
+      text += `   • *Terbaru:* Rp ${item.hargaTerbaru.toLocaleString('id-ID')}${item.tglTerbaru ? ' (' + item.tglTerbaru + ')' : ''}\n`;
+    }
+    if (item.poList && item.poList.length > 0) {
+      const poDisplay = item.poList.slice(0, 5).join(', ') + (item.poList.length > 5 ? ` (+${item.poList.length - 5} PO lainnya)` : '');
+      text += `   📋 *No. PO:* ${poDisplay} _(${item.totalOrders}x order)_\n`;
+    }
+  }
+
+  if (result.totalItems > result.items.length) {
+    text += `\n_... dan ${result.totalItems - result.items.length} barang lainnya._\n`;
+  }
+
+  text += `\n💡 _Ketik *menu* untuk opsi lainnya._`;
   await openwaService.sendText(chatId, text);
 }
 

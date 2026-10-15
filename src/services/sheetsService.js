@@ -72,12 +72,9 @@ async function appendPOTransaction(poData) {
     const discount = parseFloat(item.diskon) || 0; // Desimal misal 0.1 atau 0
     const ppn = parseFloat(item.ppn) || 0;
 
-    // Hitung nominal total per item
-    const itemTotal = (qty * priceUnit) * (1 - discount) + ppn;
+    // Hitung nominal total per item (nilai angka langsung)
+    const itemTotal = Math.round((qty * priceUnit) * (1 - discount) + ppn);
     grandTotal += itemTotal;
-
-    // Formula spreadsheet: =(I{row}*N{row})*(1-O{row})+P{row}
-    const formulaTotal = `=((I${currentRowIdx}*N${currentRowIdx})*(1-O${currentRowIdx}))+P${currentRowIdx}`;
 
     // Schema 23 Kolom (A - W)
     const row = [
@@ -97,7 +94,7 @@ async function appendPOTransaction(poData) {
       priceUnit,                        // N (13): Price Unit
       discount,                         // O (14): Discount
       ppn,                              // P (15): PPN
-      formulaTotal,                     // Q (16): TOTAL (Formula)
+      itemTotal,                        // Q (16): TOTAL (Nominal Angka)
       '',                               // R (17): No. GRPO
       '',                               // S (18): LAST DATE OF GRPO JOB DONE
       '',                               // T (19): TANGGAL BAYAR
@@ -284,10 +281,154 @@ async function softDeletePO(noPo, reason = '') {
   });
 }
 
+/**
+ * Mengambil seluruh data transaksi dari tab 'PO 2026' Google Sheets.
+ */
+async function getAllTransactions() {
+  const sheets = getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: env.sheets.spreadsheetId,
+    range: "'PO 2026'!A2:W",
+    valueRenderOption: 'FORMATTED_VALUE',
+  });
+
+  const rawRows = res.data.values || [];
+  const rows = [];
+  const poMap = new Map();
+
+  let totalActiveSum = 0;
+  let countOpen = 0;
+  let countClose = 0;
+  let countPending = 0;
+  let countCancelled = 0;
+
+  for (let i = 0; i < rawRows.length; i++) {
+    const r = rawRows[i];
+    if (!r || !r[3]) continue; // Skip jika tidak ada NO. PO
+
+    const rowIndex = i + 2; // Row index di Google Sheets (1-based, starts at row 2)
+    const no = r[0] || '';
+    const status = (r[1] || 'Open').trim();
+    const date = r[2] || '';
+    const noPo = (r[3] || '').trim();
+    const supplier = (r[4] || '').trim();
+    const quotation = r[5] || '';
+    const kode = (r[6] || '').trim().toUpperCase();
+    const nama = r[7] || '';
+    const qty = parseFloat(String(r[8] || '0').replace(/,/g, '')) || 0;
+    const ttd = r[9] || '';
+    const em = r[10] || '';
+    const doNum = r[11] || '';
+    const fktInv = r[12] || '';
+    const priceUnit = parseFloat(String(r[13] || '0').replace(/[^0-9.-]/g, '')) || 0;
+    const discount = parseFloat(String(r[14] || '0').replace(/,/g, '')) || 0;
+    const ppn = parseFloat(String(r[15] || '0').replace(/[^0-9.-]/g, '')) || 0;
+
+    const rawTotal = r[16] || '';
+    let parsedTotal = parseFloat(String(rawTotal).replace(/[^0-9.-]/g, ''));
+    if (isNaN(parsedTotal) || parsedTotal === 0) {
+      parsedTotal = (qty * priceUnit) * (1 - discount) + ppn;
+    }
+
+    const grpo = r[17] || '';
+    const lastGrpoDate = r[18] || '';
+    const tglBayar = r[19] || '';
+    const tglInvoice = r[20] || '';
+    const noInvoice = r[21] || '';
+    const ket = r[22] || '';
+
+    const rowObj = {
+      rowIndex,
+      no,
+      status,
+      date,
+      noPo,
+      supplier,
+      quotation,
+      kode,
+      nama,
+      qty,
+      ttd,
+      em,
+      doNum,
+      fktInv,
+      priceUnit,
+      discount,
+      ppn,
+      total: parsedTotal,
+      rawTotal,
+      grpo,
+      lastGrpoDate,
+      tglBayar,
+      tglInvoice,
+      noInvoice,
+      ket,
+      rawCols: r,
+    };
+
+    rows.push(rowObj);
+
+    if (!poMap.has(noPo)) {
+      poMap.set(noPo, {
+        noPo,
+        supplier,
+        date,
+        status,
+        quotation,
+        grpo,
+        lastGrpoDate,
+        tglBayar,
+        tglInvoice,
+        noInvoice,
+        ket,
+        items: [],
+        grandTotal: 0,
+      });
+    }
+
+    const poEntry = poMap.get(noPo);
+    poEntry.items.push(rowObj);
+    poEntry.grandTotal += parsedTotal;
+
+    const statusLower = status.toLowerCase();
+    if (statusLower === 'cancelled') {
+      countCancelled++;
+    } else {
+      totalActiveSum += parsedTotal;
+      if (statusLower === 'close' || statusLower === 'lunas') {
+        countClose++;
+      } else if (statusLower === 'pending') {
+        countPending++;
+      } else {
+        countOpen++;
+      }
+    }
+  }
+
+  const groupedPOs = Array.from(poMap.values());
+
+  return {
+    rows,
+    pos: groupedPOs,
+    stats: {
+      totalRows: rows.length,
+      totalPOs: groupedPOs.length,
+      totalActiveSum,
+      countOpen,
+      countClose,
+      countPending,
+      countCancelled,
+      spreadsheetId: env.sheets.spreadsheetId,
+      syncedAt: new Date().toISOString(),
+    },
+  };
+}
+
 module.exports = {
   getCurrentFormattedDate,
   appendPOTransaction,
   getPOByNumber,
   updatePOField,
   softDeletePO,
+  getAllTransactions,
 };

@@ -1,23 +1,37 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const env = require('./config/env');
 const { hasValidToken, getSheetsClient } = require('./config/googleAuth');
 const cacheService = require('./services/cacheService');
 const dbService = require('./services/dbService');
 const cronService = require('./services/cronService');
 const { handleWebhook } = require('./handlers/webhookHandler');
+const apiRoutes = require('./routes/apiRoutes');
 
 const app = express();
+
+// CORS Middleware untuk UI Dashboard
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
 
 // Middleware parsing JSON & capture raw body untuk verifikasi HMAC
 app.use(
   express.json({
-    limit: '25mb',
+    limit: '50mb',
     verify: (req, res, buf) => {
       req.rawBody = buf;
     },
   })
 );
-app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Health Check Endpoint
 app.get('/health', (req, res) => {
@@ -32,22 +46,41 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Endpoint Root Info
-app.get('/', (req, res) => {
-  res.send(`
-    <div style="font-family: Arial, sans-serif; padding: 40px; line-height: 1.6;">
-      <h2>🤖 Bot PO WhatsApp & Google Sheets Integration</h2>
-      <p>Status Server: <b style="color: #10b981;">ONLINE</b></p>
-      <p>OpenWA Gateway: <code>${env.openwa.baseUrl}</code> (Session: <code>${env.openwa.sessionId}</code>)</p>
-      <p>Spreadsheet Target: <code>${env.sheets.spreadsheetId}</code></p>
-      <p>PostgreSQL VPS: <code>${dbService.isAvailable() ? 'CONNECTED' : 'STANDBY / RAM MODE'}</code></p>
-      <p>Webhook URL: <code>POST /webhook</code></p>
-    </div>
-  `);
-});
-
 // Webhook Router
 app.post('/webhook', handleWebhook);
+
+// REST API Dashboard Routes
+app.use('/api', apiRoutes);
+
+// Static Client Serving (Production Build dari Vite React)
+const clientDistPath = path.resolve(__dirname, '../client/dist');
+if (fs.existsSync(clientDistPath)) {
+  console.log(`🌐 Melayani UI Dashboard dari: ${clientDistPath}`);
+  app.use(express.static(clientDistPath));
+  // SPA Fallback untuk client-side routing
+  app.use((req, res, next) => {
+    if (req.method !== 'GET') return next();
+    if (req.path.startsWith('/api') || req.path.startsWith('/webhook') || req.path.startsWith('/health')) {
+      return next();
+    }
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+} else {
+  // Endpoint Root Fallback jika belum di-build
+  app.get('/', (req, res) => {
+    res.send(`
+      <div style="font-family: Arial, sans-serif; padding: 40px; line-height: 1.6;">
+        <h2>🤖 Bot PO WhatsApp & Google Sheets Integration</h2>
+        <p>Status Server: <b style="color: #10b981;">ONLINE</b></p>
+        <p>OpenWA Gateway: <code>${env.openwa.baseUrl}</code> (Session: <code>${env.openwa.sessionId}</code>)</p>
+        <p>Spreadsheet Target: <code>${env.sheets.spreadsheetId}</code></p>
+        <p>PostgreSQL VPS: <code>${dbService.isAvailable() ? 'CONNECTED' : 'STANDBY / RAM MODE'}</code></p>
+        <p>REST API: <code>/api/stats</code>, <code>/api/pos</code>, <code>/api/ocr/parse</code></p>
+        <p>Webhook URL: <code>POST /webhook</code></p>
+      </div>
+    `);
+  });
+}
 
 // Inisialisasi Server, Database, Cache & Cron Job
 async function startServer() {

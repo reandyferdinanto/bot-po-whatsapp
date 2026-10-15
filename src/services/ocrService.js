@@ -609,45 +609,288 @@ function parsePOText(text, source = 'tesseract_adaptive_pipeline') {
 }
 
 /**
+ * Mengekstrak teks dari buffer PDF (Mendukung pdf-parse v1 dan v2).
+ */
+async function extractPdfPages(pdfBuffer) {
+  const pdfModule = require('pdf-parse');
+  try {
+    if (pdfModule.PDFParse) {
+      const parser = new pdfModule.PDFParse({ data: pdfBuffer });
+      const res = await parser.getText();
+      const pages = (res.pages && res.pages.length > 0)
+        ? res.pages.map((p, idx) => ({ pageNumber: p.num || idx + 1, text: (p.text || '').trim() }))
+        : [{ pageNumber: 1, text: (res.text || '').trim() }];
+      await parser.destroy();
+      return { totalPages: pages.length, pages, fullText: res.text || '' };
+    } else if (typeof pdfModule === 'function') {
+      const res = await pdfModule(pdfBuffer);
+      return {
+        totalPages: res.numpages || 1,
+        pages: [{ pageNumber: 1, text: (res.text || '').trim() }],
+        fullText: res.text || '',
+      };
+    }
+  } catch (err) {
+    console.error('❌ Error saat ekstrak teks PDF:', err.message);
+    throw err;
+  }
+}
+
+/**
+ * Memperkaya item dengan pencocokan master material dari cache/DB.
+ */
+function enrichItemsWithMaster(items) {
+  if (!items || !Array.isArray(items)) return [];
+
+  return items.map((it, idx) => {
+    let cleanCode = normalizeMaterialCode(it.kode);
+    let matched = cleanCode ? cacheService.findMaterialByCode(cleanCode) : null;
+
+    let suggested = null;
+    if (!matched && it.nama && it.nama.length > 3) {
+      const searchRes = cacheService.searchMaterials(it.nama, 1);
+      const firstMatch = (searchRes && searchRes.items && searchRes.items[0]) || (Array.isArray(searchRes) && searchRes[0]);
+      if (firstMatch) {
+        suggested = {
+          kode: firstMatch.kode,
+          nama: firstMatch.nama,
+          hargaTerakhir: firstMatch.hargaTerakhir,
+        };
+      }
+    }
+
+    const qty = parseFloat(it.qty) || 1;
+    const harga = parseFloat(it.harga) || 0;
+    const diskon = parseFloat(it.diskon) || 0;
+    const ppn = parseFloat(it.ppn) || 0;
+    const itemSub = qty * harga * (1 - diskon);
+    const itemTotal = itemSub + ppn;
+
+    return {
+      key: `item_${idx + 1}`,
+      kode: cleanCode || (suggested ? suggested.kode : (it.kode || 'JASA')),
+      nama: (matched ? matched.nama : null) || it.nama || (suggested ? suggested.nama : 'Material'),
+      qty,
+      harga,
+      diskon,
+      ppn,
+      total: Math.round(itemTotal),
+      matchedMaster: matched ? { kode: matched.kode, nama: matched.nama } : null,
+      suggestedMaster: suggested,
+      isAutoMatched: !!matched || !!suggested,
+    };
+  });
+}
+
+/**
+ * Parsing multi-halaman dokumen PDF (Bisa 1 PO multi-page atau multi-PO per page).
+ *
+ * @param {Buffer} pdfBuffer - Buffer file PDF
+ * @param {Object} options - { filename }
+ * @returns {Promise<Array<Object>>} Daftar PO yang ditemukan
+ */
+async function parseMultiPagePdf(pdfBuffer, options = {}) {
+  const filename = options.filename || 'dokumen.pdf';
+  console.log(`📄 Mengekstrak halaman dari file PDF (${filename})...`);
+
+  const { totalPages, pages, fullText } = await extractPdfPages(pdfBuffer);
+  console.log(`📑 Total halaman PDF terdeteksi: ${totalPages}`);
+
+  if (totalPages <= 1) {
+    const singleParsed = parsePOText(fullText, 'pdf_parse');
+    singleParsed.filename = filename;
+    singleParsed.pageNumber = 1;
+    singleParsed.totalPages = 1;
+    singleParsed.items = enrichItemsWithMaster(singleParsed.items);
+    return [singleParsed];
+  }
+
+  // Multi-page processing
+  const poList = [];
+  let currentPo = null;
+
+  for (let i = 0; i < pages.length; i++) {
+    const page = pages[i];
+    const pageText = page.text;
+    const pageNum = page.pageNumber;
+
+    if (!pageText || pageText.length < 15) {
+      console.log(`ℹ️ Halaman ${pageNum} kosong atau berformat scan.`);
+      continue;
+    }
+
+    const parsedPage = parsePOText(pageText, `pdf_page_${pageNum}`);
+    const isNewPoHeader = parsedPage.noPo && parsedPage.noPo !== 'PO-2026-TEMP' && (!currentPo || parsedPage.noPo !== currentPo.noPo);
+
+    if (isNewPoHeader || !currentPo) {
+      if (currentPo) {
+        currentPo.items = enrichItemsWithMaster(currentPo.items);
+        poList.push(currentPo);
+      }
+      currentPo = {
+        ...parsedPage,
+        filename,
+        pageNumber: pageNum,
+        totalPages,
+        pageRange: `Hal. ${pageNum}`,
+      };
+    } else {
+      // Continuation page: Gabungkan item ke current PO
+      console.log(`📎 Halaman ${pageNum} merupakan halaman lanjutan untuk PO ${currentPo.noPo}`);
+      if (parsedPage.items && parsedPage.items.length > 0) {
+        currentPo.items = [...(currentPo.items || []), ...parsedPage.items];
+      }
+      currentPo.pageRange = `${currentPo.pageRange.split('-')[0]}-${pageNum}`;
+
+      // Update totals jika halaman lanjutan memiliki total akhir
+      if (parsedPage.totals && parsedPage.totals.grandTotal > 0) {
+        currentPo.totals = parsedPage.totals;
+      }
+    }
+  }
+
+  if (currentPo) {
+    currentPo.items = enrichItemsWithMaster(currentPo.items);
+    poList.push(currentPo);
+  }
+
+  // Jika tidak ada PO spesifik terdeteksi per halaman, fallback ke parsing teks keseluruhan
+  if (poList.length === 0) {
+    const fallbackParsed = parsePOText(fullText, 'pdf_parse_full');
+    fallbackParsed.filename = filename;
+    fallbackParsed.pageNumber = 1;
+    fallbackParsed.totalPages = totalPages;
+    fallbackParsed.items = enrichItemsWithMaster(fallbackParsed.items);
+    return [fallbackParsed];
+  }
+
+  return poList;
+}
+
+/**
  * Menjalankan OCR adaptif pada file gambar (bisa buffer atau path string).
  *
  * @param {Buffer|string} imageBuffer
+ * @param {Object} options - { filename, mimeType }
  * @returns {Promise<Object>} Data terstruktur PO atau Delivery Note (GRPO)
  */
-async function parseImageWithOcr(imageBuffer) {
+async function parseImageWithOcr(imageBuffer, options = {}) {
+  const filename = options.filename || 'foto.jpg';
+  const mimeType = options.mimeType || 'image/jpeg';
+
+  // 1. Coba Gemini Vision jika API Key tersedia (Akurasi Tinggi untuk Foto)
+  const env = require('../config/env');
+  if (env.gemini && env.gemini.apiKey) {
+    try {
+      console.log(`🤖 Menganalisis gambar dengan Gemini 1.5 Flash Vision (${filename})...`);
+      const { parseImageWithGemini } = require('./geminiVisionService');
+      const geminiResult = await parseImageWithGemini(imageBuffer, mimeType);
+      geminiResult.filename = filename;
+      geminiResult.items = enrichItemsWithMaster(geminiResult.items);
+      return geminiResult;
+    } catch (gErr) {
+      console.warn(`⚠️ Gemini Vision gagal (${gErr.message}), beralih ke Tesseract OCR lokal...`);
+    }
+  }
+
+  // 2. Fallback ke Tesseract OCR Lokal
   try {
-    console.log('🔍 Menjalankan OCR adaptif dokumen...');
+    console.log(`🔍 Menjalankan Tesseract OCR lokal untuk ${filename}...`);
     const preprocessed = await preprocessDocument(imageBuffer);
 
     const worker = await Tesseract.createWorker(['ind', 'eng']);
     const res = await worker.recognize(preprocessed);
     await worker.terminate();
 
-    return parsePOText(res.data.text, 'tesseract_adaptive_pipeline');
+    const parsed = parsePOText(res.data.text, 'tesseract_adaptive_pipeline');
+    parsed.filename = filename;
+    parsed.items = enrichItemsWithMaster(parsed.items);
+    return parsed;
   } catch (err) {
     console.error('❌ Error saat OCR gambar:', err.message);
     const simpleRes = await Tesseract.recognize(imageBuffer, 'eng');
-    return parsePOText(simpleRes.data.text, 'tesseract_fallback');
+    const parsed = parsePOText(simpleRes.data.text, 'tesseract_fallback');
+    parsed.filename = filename;
+    parsed.items = enrichItemsWithMaster(parsed.items);
+    return parsed;
   }
 }
 
 /**
- * Menjalankan ekstraksi dokumen PDF (teks digital langsung).
+ * Menjalankan ekstraksi dokumen PDF (teks digital langsung - kompatibel satu fungsi).
  *
  * @param {Buffer} pdfBuffer - Buffer file PDF
  * @returns {Promise<Object>} Data terstruktur PO atau Delivery Note (GRPO)
  */
-async function parsePdfDocument(pdfBuffer) {
-  console.log('📄 Mengekstrak teks dari dokumen PDF...');
-  const data = await pdfParse(pdfBuffer);
-  const text = data.text || '';
+async function parsePdfDocument(pdfBuffer, options = {}) {
+  const poList = await parseMultiPagePdf(pdfBuffer, options);
+  return poList[0] || parsePOText('', 'pdf_empty');
+}
 
-  return parsePOText(text, 'pdf_parse');
+/**
+ * Memproses sekumpulan file (Multi-File & Multi-Page OCR Batch Engine).
+ *
+ * @param {Array<{ filename: string, buffer: Buffer, mimeType: string }>} files
+ * @returns {Promise<Array<Object>>} Daftar seluruh PO hasil ekstraksi
+ */
+async function parseBatchDocuments(files) {
+  console.log(`🚀 Memulai Batch Parsing untuk ${files.length} dokumen...`);
+  const results = [];
+  let counter = 1;
+
+  for (const file of files) {
+    const { filename, buffer, mimeType } = file;
+    const isPdf = (mimeType && mimeType.includes('pdf')) || (filename && filename.toLowerCase().endsWith('.pdf'));
+
+    try {
+      if (isPdf) {
+        const parsedPos = await parseMultiPagePdf(buffer, { filename });
+        for (const po of parsedPos) {
+          results.push({
+            id: `doc_${Date.now()}_${counter++}`,
+            ...po,
+            fileType: 'pdf',
+            status: 'ready',
+            selected: true,
+          });
+        }
+      } else {
+        const parsedImg = await parseImageWithOcr(buffer, { filename, mimeType });
+        results.push({
+          id: `doc_${Date.now()}_${counter++}`,
+          ...parsedImg,
+          fileType: 'image',
+          status: 'ready',
+          selected: true,
+        });
+      }
+    } catch (err) {
+      console.error(`❌ Gagal memproses ${filename}:`, err.message);
+      results.push({
+        id: `doc_${Date.now()}_${counter++}`,
+        filename,
+        fileType: isPdf ? 'pdf' : 'image',
+        noPo: 'PO-ERROR',
+        supplier: '-',
+        date: '',
+        items: [],
+        status: 'error',
+        errorMessage: err.message,
+        selected: false,
+      });
+    }
+  }
+
+  return results;
 }
 
 module.exports = {
+  extractPdfPages,
+  parseMultiPagePdf,
   parseImageWithOcr,
   parsePdfDocument,
+  parseBatchDocuments,
   parsePOText,
   normalizeMaterialCode,
+  enrichItemsWithMaster,
 };

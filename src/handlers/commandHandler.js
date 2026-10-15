@@ -69,6 +69,46 @@ Silakan pilih menu di bawah:
       await openwaService.sendText(chatId, replyCari);
       return true;
 
+    case 'supplier':
+    case 'vendor':
+      if (!args) {
+        await openwaService.sendText(chatId, '⚠️ Format: `!supplier <nama_vendor>`\nContoh: `!supplier Zen Teknik` atau `!supplier Rivindi`');
+        return true;
+      }
+      await openwaService.sendText(chatId, `🔍 Sedang mencari riwayat pembelian dari vendor "${args}"...`);
+      const vResult = await cacheService.getSupplierOrderHistory(args, 15);
+      if (!vResult || !vResult.items || vResult.items.length === 0) {
+        await openwaService.sendText(chatId, `⚠️ Tidak ditemukan riwayat pembelian untuk vendor "${args}".`);
+        return true;
+      }
+
+      let vText = `🏢 *RIWAYAT PEMBELIAN VENDOR: ${vResult.supplier}*\n`;
+      vText += `Ditemukan *${vResult.totalItems} jenis barang* yang pernah dipesan:\n`;
+
+      for (let i = 0; i < vResult.items.length; i++) {
+        const item = vResult.items[i];
+        vText += `\n${i + 1}. *[${item.kode}]* ${item.nama}\n`;
+        if (item.hargaMin === item.hargaMax) {
+          vText += `   💰 *Harga:* Rp ${item.hargaMin.toLocaleString('id-ID')}\n`;
+        } else {
+          vText += `   💰 *Harga:* Rp ${item.hargaMin.toLocaleString('id-ID')} _(Termurah)_ - Rp ${item.hargaMax.toLocaleString('id-ID')} _(Termahal)_\n`;
+        }
+        if (item.hargaTerbaru) {
+          vText += `   • *Terbaru:* Rp ${item.hargaTerbaru.toLocaleString('id-ID')}${item.tglTerbaru ? ' (' + item.tglTerbaru + ')' : ''}\n`;
+        }
+        if (item.poList && item.poList.length > 0) {
+          const poDisplay = item.poList.slice(0, 5).join(', ') + (item.poList.length > 5 ? ` (+${item.poList.length - 5} PO lainnya)` : '');
+          vText += `   📋 *No. PO:* ${poDisplay} _(${item.totalOrders}x order)_\n`;
+        }
+      }
+
+      if (vResult.totalItems > vResult.items.length) {
+        vText += `\n_... dan ${vResult.totalItems - vResult.items.length} barang lainnya._\n`;
+      }
+
+      await openwaService.sendText(chatId, vText);
+      return true;
+
     case 'cekpo':
       if (!args) {
         await openwaService.sendText(chatId, '⚠️ Format: `!cekpo <nomor_po>`\nContoh: `!cekpo PO-2026-001`');

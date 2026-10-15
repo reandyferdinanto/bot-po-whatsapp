@@ -350,6 +350,56 @@ async function getPOFromPg(noPo) {
   }
 }
 
+/**
+ * Mengambil daftar barang yang pernah diorder dari Supplier X beserta harga min, max, terbaru, dan no PO.
+ */
+async function getSupplierItemsFromPg(supplierQuery, limit = 15) {
+  if (!isDbConnected && !(await migrateTables())) return null;
+
+  try {
+    const qPattern = `%${supplierQuery.trim()}%`;
+    const res = await pool.query(`
+      SELECT 
+        t.supplier,
+        t.kode_material as "kode",
+        t.nama_material as "nama",
+        MIN(t.price_unit)::numeric as "hargaMin",
+        MAX(t.price_unit)::numeric as "hargaMax",
+        COUNT(DISTINCT t.no_po)::int as "totalOrders",
+        ARRAY_AGG(DISTINCT t.no_po) as "poList",
+        (ARRAY_AGG(t.price_unit ORDER BY t.id DESC))[1]::numeric as "hargaTerbaru",
+        (ARRAY_AGG(t.tanggal ORDER BY t.id DESC))[1] as "tglTerbaru"
+      FROM transactions_po t
+      WHERE t.supplier ILIKE $1 AND t.price_unit > 0
+      GROUP BY t.supplier, t.kode_material, t.nama_material
+      ORDER BY COUNT(DISTINCT t.no_po) DESC, MAX(t.id) DESC
+      LIMIT $2;
+    `, [qPattern, limit]);
+
+    if (res.rows.length === 0) return null;
+
+    const items = res.rows.map(r => ({
+      kode: r.kode,
+      nama: r.nama,
+      hargaMin: parseFloat(r.hargaMin) || 0,
+      hargaMax: parseFloat(r.hargaMax) || 0,
+      hargaTerbaru: parseFloat(r.hargaTerbaru) || 0,
+      tglTerbaru: r.tglTerbaru || '',
+      poList: r.poList || [],
+      totalOrders: r.totalOrders || (r.poList ? r.poList.length : 1),
+    }));
+
+    return {
+      supplier: res.rows[0].supplier,
+      totalItems: items.length,
+      items,
+    };
+  } catch (err) {
+    console.error('❌ Gagal query riwayat supplier dari PostgreSQL:', err.message);
+    return null;
+  }
+}
+
 function isAvailable() {
   return isDbConnected;
 }
@@ -361,5 +411,6 @@ module.exports = {
   searchSupplierFromPg,
   searchMaterialFromPg,
   getPOFromPg,
+  getSupplierItemsFromPg,
   isAvailable,
 };
