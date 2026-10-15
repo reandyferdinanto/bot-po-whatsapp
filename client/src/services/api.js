@@ -52,6 +52,21 @@ export async function triggerSync() {
   return res.data;
 }
 
+export async function syncAllSheets() {
+  const res = await api.post('/sync-all', {}, { timeout: 300000 }); // allow up to 5 mins for all sheets
+  return res.data;
+}
+
+export async function getHistoricalStats() {
+  const res = await api.get('/stats/historical');
+  return res.data;
+}
+
+export async function getHistoricalPOs(params = {}) {
+  const res = await api.get('/pos/historical', { params });
+  return res.data;
+}
+
 export async function parseOcrFiles(files) {
   const formData = new FormData();
   for (const f of files) {

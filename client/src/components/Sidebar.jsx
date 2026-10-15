@@ -6,6 +6,7 @@ import {
   AiOutlineAppstore,
   AiOutlineShop,
   AiOutlineCluster,
+  AiOutlineBarChart,
 } from 'react-icons/ai';
 
 export default function Sidebar({ activeNav, onNavigate, stats, isDark }) {
@@ -21,13 +22,21 @@ export default function Sidebar({ activeNav, onNavigate, stats, isDark }) {
       sub: 'Data Transaksi (Kolom A - W)',
     },
     {
+      key: 'analytics',
+      path: '/statistik',
+      label: 'Statistik Multi-Tahun',
+      icon: <AiOutlineBarChart style={{ fontSize: 16, color: '#8b5cf6' }} />,
+      badge: <Tag color="purple" style={{ margin: 0, fontWeight: 'bold' }}>2017-2026</Tag>,
+      sub: 'Analisis Belanja & 10 Tahun PO',
+      highlight: true,
+    },
+    {
       key: 'multi-ocr',
       path: '/multi-ocr',
       label: '⚡ Smart Multi-OCR',
       icon: <AiOutlineScan style={{ fontSize: 16, color: '#0ea5e9' }} />,
       badge: <Tag color="blue" style={{ margin: 0, fontWeight: 'bold' }}>MULTI-PAGE</Tag>,
       sub: 'Input Multi-PDF & Foto PO',
-      highlight: true,
     },
     {
       key: 'material',

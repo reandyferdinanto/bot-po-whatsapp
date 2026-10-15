@@ -77,7 +77,7 @@ async function migrateTables() {
         CREATE INDEX IF NOT EXISTS idx_sup_nama ON master_suppliers (nama);
       `);
 
-      // 4. Tabel Transaksi PO 2026
+      // 4. Tabel Transaksi PO (Mendukung Multi-Tahun 2017 - 2026)
       await client.query(`
         CREATE TABLE IF NOT EXISTS transactions_po (
           id SERIAL PRIMARY KEY,
@@ -101,9 +101,15 @@ async function migrateTables() {
           tgl_invoice VARCHAR(50),
           no_invoice VARCHAR(100),
           ket TEXT,
+          sheet_name VARCHAR(50) DEFAULT 'PO 2026',
+          tahun VARCHAR(10) DEFAULT '2026',
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         CREATE INDEX IF NOT EXISTS idx_po_nopo ON transactions_po (no_po);
+        ALTER TABLE transactions_po ADD COLUMN IF NOT EXISTS sheet_name VARCHAR(50) DEFAULT 'PO 2026';
+        ALTER TABLE transactions_po ADD COLUMN IF NOT EXISTS tahun VARCHAR(10) DEFAULT '2026';
+        CREATE INDEX IF NOT EXISTS idx_po_tahun ON transactions_po (tahun);
+        CREATE INDEX IF NOT EXISTS idx_po_sheet ON transactions_po (sheet_name);
       `);
 
       // 5. Tabel Riwayat Harga Material (Min, Max, Terakhir)
@@ -180,13 +186,15 @@ async function syncFromSheetsToPg(materials, suppliers, poItems = [], priceList 
           INSERT INTO transactions_po (
             row_index, no_urut, status, tanggal, no_po, supplier, quotation,
             kode_material, nama_material, qty, price_unit, discount, ppn,
-            total, no_grpo, last_grpo_date, tgl_bayar, tgl_invoice, no_invoice, ket
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20);
+            total, no_grpo, last_grpo_date, tgl_bayar, tgl_invoice, no_invoice, ket,
+            sheet_name, tahun
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22);
         `, [
           p.rowIndex || 0, p.no || '', p.status || 'Open', p.date || '', p.noPo || '',
           p.supplier || '', p.quotation || '', p.kode || '', p.nama || '', p.qty || 0,
           p.priceUnit || 0, p.discount || 0, p.ppn || 0, p.total || 0, p.grpo || '',
-          p.lastGrpoDate || '', p.tglBayar || '', p.tglInvoice || '', p.noInvoice || '', p.ket || ''
+          p.lastGrpoDate || '', p.tglBayar || '', p.tglInvoice || '', p.noInvoice || '', p.ket || '',
+          p.sheetName || 'PO 2026', p.year || '2026'
         ]);
       }
     }

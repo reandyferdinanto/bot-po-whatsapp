@@ -9,6 +9,10 @@ let supplierList = [];
 let priceCache = new Map(); // kode -> { minPrice, maxPrice, latestPrice, latestSupplier, latestDate, totalOrders }
 let transactionsList = [];
 
+let allYearsTransactions = []; // Seluruh baris transaksi dari 2017 hingga 2026
+let historicalStatsSummary = null; // Rangkuman statistik multi-tahun (2017-2026)
+let sheetsSyncedList = []; // Daftar nama sheet yang disinkronkan
+
 let fuseMaterial = null;
 let fuseSupplier = null;
 let lastSyncedAt = null;
@@ -467,8 +471,407 @@ function getAllSuppliers(query = '', page = 1, limit = 25) {
   return { total, page, limit, items };
 }
 
+/**
+ * Sinkronisasi seluruh tab PO dari tahun 2017 hingga 2026, database Material, dan database Supplier Material.
+ */
+async function syncAllSheets(sheetsClient) {
+  try {
+    console.log('🔄 Memulai Sinkronisasi Multi-Tahun (PO 2017 s/d PO 2026 & Master)...');
+
+    // 1. Ambil metadata seluruh sheet yang ada di spreadsheet
+    let allSheetTitles = [];
+    try {
+      const meta = await sheetsClient.spreadsheets.get({
+        spreadsheetId: env.sheets.spreadsheetId,
+      });
+      allSheetTitles = (meta.data.sheets || []).map((s) => s.properties.title);
+      console.log(`📋 Ditemukan ${allSheetTitles.length} tab di Google Sheets:`, allSheetTitles.join(', '));
+    } catch (metaErr) {
+      console.warn('⚠️ Gagal ambil metadata sheets, gunakan daftar fallback:', metaErr.message);
+    }
+
+    // Filter sheet PO (e.g. "PO 2017", "PO 2018", ..., "PO 2026")
+    let poSheetNames = allSheetTitles.filter((t) => /^PO\s*(?:20\d{2})/i.test(t));
+    if (poSheetNames.length === 0) {
+      poSheetNames = [
+        'PO 2017', 'PO 2018', 'PO 2019', 'PO 2020', 'PO 2021',
+        'PO 2022', 'PO 2023', 'PO 2024', 'PO 2025', 'PO 2026',
+      ];
+    }
+    if (!poSheetNames.some((t) => /2026/i.test(t))) {
+      poSheetNames.push('PO 2026');
+    }
+
+    // Sort ascending by year (2017 -> 2026)
+    poSheetNames.sort((a, b) => {
+      const yA = parseInt((a.match(/\d{4}/) || [0])[0], 10);
+      const yB = parseInt((b.match(/\d{4}/) || [0])[0], 10);
+      return yA - yB;
+    });
+
+    console.log(`📑 Tab PO yang akan disinkronkan (${poSheetNames.length}):`, poSheetNames.join(', '));
+
+    // 2. Fetch Master Data & Semua Tab PO
+    const masterRanges = [
+      "'database Material'!A2:C",
+      "'database Supplier Material'!A2:F",
+    ];
+    const poRanges = poSheetNames.map((name) => `'${name}'!A2:W`);
+    const allRanges = [...masterRanges, ...poRanges];
+
+    let valueRanges = [];
+    try {
+      const batchRes = await sheetsClient.spreadsheets.values.batchGet({
+        spreadsheetId: env.sheets.spreadsheetId,
+        ranges: allRanges,
+      });
+      valueRanges = batchRes.data.valueRanges || [];
+    } catch (batchErr) {
+      console.warn('⚠️ batchGet gagal, fallback mengambil satu-per-satu:', batchErr.message);
+      for (const r of allRanges) {
+        try {
+          const single = await sheetsClient.spreadsheets.values.get({
+            spreadsheetId: env.sheets.spreadsheetId,
+            range: r,
+          });
+          valueRanges.push(single.data);
+        } catch (sErr) {
+          console.warn(`Skip range ${r}:`, sErr.message);
+          valueRanges.push({ values: [] });
+        }
+      }
+    }
+
+    // 3. Process database Material (Index 0)
+    const matRows = (valueRanges[0] && valueRanges[0].values) || [];
+    materialCache.clear();
+    materialList = matRows
+      .filter((row) => row && row[1])
+      .map((row) => ({
+        no: row[0] || '',
+        kode: (row[1] || '').trim(),
+        nama: (row[2] || '').trim(),
+      }));
+
+    for (const item of materialList) {
+      materialCache.set(item.kode.toUpperCase(), item);
+    }
+    fuseMaterial = new Fuse(materialList, {
+      keys: ['kode', 'nama'],
+      threshold: 0.35,
+      ignoreLocation: true,
+    });
+
+    // 4. Process database Supplier Material (Index 1)
+    const supRows = (valueRanges[1] && valueRanges[1].values) || [];
+    supplierCache.clear();
+    supplierList = supRows
+      .filter((row) => row && row[1])
+      .map((row) => ({
+        no: row[0] || '',
+        kode: (row[1] || '').trim(),
+        nama: (row[2] || '').trim(),
+        supplierUtama: (row[3] || '').trim(),
+        frekuensi: parseInt(row[4], 10) || 0,
+        totalQty: parseFloat(row[5]) || 0,
+      }));
+
+    for (const item of supplierList) {
+      supplierCache.set(item.kode.toUpperCase(), item);
+    }
+    fuseSupplier = new Fuse(supplierList, {
+      keys: ['kode', 'nama', 'supplierUtama'],
+      threshold: 0.35,
+      ignoreLocation: true,
+    });
+
+    // 5. Process Seluruh Tab PO (Index 2 ke atas)
+    allYearsTransactions = [];
+    const yearlyBreakdown = [];
+    let grandTotalSpendAll = 0;
+    const globalPoSet = new Set();
+    priceCache.clear();
+
+    const supplierAggregateMap = new Map();
+    const materialAggregateMap = new Map();
+
+    for (let sIdx = 0; sIdx < poSheetNames.length; sIdx++) {
+      const sheetName = poSheetNames[sIdx];
+      const rangeIdx = sIdx + 2;
+      const vData = valueRanges[rangeIdx];
+      const rawRows = (vData && vData.values) || [];
+
+      const yearMatch = sheetName.match(/\d{4}/);
+      const year = yearMatch ? yearMatch[0] : '2026';
+
+      let yearSpend = 0;
+      let countOpen = 0;
+      let countClose = 0;
+      let countPending = 0;
+      let countCancelled = 0;
+      const yearPoSet = new Set();
+      const currentSheetItems = [];
+
+      for (let r = 0; r < rawRows.length; r++) {
+        const row = rawRows[r];
+        if (!row || !row[3]) continue;
+
+        const noPo = (row[3] || '').trim();
+        const status = (row[1] || 'Open').trim();
+        const kode = (row[6] || '').trim().toUpperCase();
+        const nama = (row[7] || '').trim();
+        const qty = parseFloat(String(row[8] || '0').replace(/,/g, '')) || 0;
+        const priceUnit = parseFloat(String(row[13] || '0').replace(/[^0-9.-]/g, '')) || 0;
+        const discount = parseFloat(String(row[14] || '0').replace(/,/g, '')) || 0;
+        const ppn = parseFloat(String(row[15] || '0').replace(/[^0-9.-]/g, '')) || 0;
+
+        let total = parseFloat(String(row[16] || '0').replace(/[^0-9.-]/g, ''));
+        if (isNaN(total) || total === 0) {
+          total = Math.round(qty * priceUnit * (1 - discount) + ppn);
+        }
+
+        const supplier = (row[4] || '').trim();
+
+        const itemObj = {
+          rowIndex: r + 2,
+          sheetName,
+          year,
+          no: row[0] || '',
+          status,
+          date: row[2] || '',
+          noPo,
+          supplier,
+          quotation: row[5] || '',
+          kode,
+          nama,
+          qty,
+          priceUnit,
+          discount,
+          ppn,
+          total,
+          grpo: row[17] || '',
+          lastGrpoDate: row[18] || '',
+          tglBayar: row[19] || '',
+          tglInvoice: row[20] || '',
+          noInvoice: row[21] || '',
+          ket: row[22] || '',
+        };
+
+        currentSheetItems.push(itemObj);
+        allYearsTransactions.push(itemObj);
+        yearPoSet.add(noPo);
+        globalPoSet.add(noPo);
+
+        const stLower = status.toLowerCase();
+        if (stLower === 'cancelled') {
+          countCancelled++;
+        } else {
+          yearSpend += total;
+          grandTotalSpendAll += total;
+          if (stLower === 'close' || stLower === 'lunas') {
+            countClose++;
+          } else if (stLower === 'pending') {
+            countPending++;
+          } else {
+            countOpen++;
+          }
+
+          if (supplier) {
+            const sKey = supplier.toLowerCase();
+            if (!supplierAggregateMap.has(sKey)) {
+              supplierAggregateMap.set(sKey, {
+                supplierName: supplier,
+                totalSpend: 0,
+                poCount: new Set(),
+                totalQty: 0,
+              });
+            }
+            const sEntry = supplierAggregateMap.get(sKey);
+            sEntry.totalSpend += total;
+            sEntry.totalQty += qty;
+            sEntry.poCount.add(noPo);
+          }
+
+          if (kode) {
+            if (!materialAggregateMap.has(kode)) {
+              materialAggregateMap.set(kode, {
+                kode,
+                nama,
+                totalQty: 0,
+                orderCount: 0,
+                totalSpend: 0,
+              });
+            }
+            const mEntry = materialAggregateMap.get(kode);
+            mEntry.totalQty += qty;
+            mEntry.orderCount++;
+            mEntry.totalSpend += total;
+          }
+        }
+
+        if (kode && priceUnit > 0) {
+          if (!priceCache.has(kode)) {
+            priceCache.set(kode, {
+              kode,
+              nama,
+              minPrice: priceUnit,
+              maxPrice: priceUnit,
+              latestPrice: priceUnit,
+              latestSupplier: supplier,
+              latestDate: row[2] || '',
+              totalOrders: 1,
+            });
+          } else {
+            const pInfo = priceCache.get(kode);
+            pInfo.minPrice = Math.min(pInfo.minPrice, priceUnit);
+            pInfo.maxPrice = Math.max(pInfo.maxPrice, priceUnit);
+            pInfo.latestPrice = priceUnit;
+            pInfo.latestSupplier = supplier || pInfo.latestSupplier;
+            pInfo.latestDate = row[2] || pInfo.latestDate;
+            pInfo.totalOrders++;
+          }
+        }
+      }
+
+      if (year === '2026') {
+        transactionsList = currentSheetItems;
+      }
+
+      yearlyBreakdown.push({
+        year,
+        sheetName,
+        totalRows: currentSheetItems.length,
+        totalPOs: yearPoSet.size,
+        totalSpend: Math.round(yearSpend),
+        countOpen,
+        countClose,
+        countPending,
+        countCancelled,
+      });
+    }
+
+    const topSuppliersAllTime = Array.from(supplierAggregateMap.values())
+      .map((s) => ({
+        supplierName: s.supplierName,
+        totalSpend: Math.round(s.totalSpend),
+        totalOrders: s.poCount.size,
+        totalQty: Math.round(s.totalQty),
+      }))
+      .sort((a, b) => b.totalSpend - a.totalSpend)
+      .slice(0, 10);
+
+    const topMaterialsAllTime = Array.from(materialAggregateMap.values())
+      .sort((a, b) => b.orderCount - a.orderCount || b.totalQty - a.totalQty)
+      .slice(0, 10);
+
+    const priceList = Array.from(priceCache.values());
+    lastSyncedAt = new Date();
+    sheetsSyncedList = poSheetNames;
+
+    historicalStatsSummary = {
+      totalYears: yearlyBreakdown.length,
+      totalAllRows: allYearsTransactions.length,
+      totalAllPOs: globalPoSet.size,
+      totalAllSpend: Math.round(grandTotalSpendAll),
+      averageSpendPerYear: Math.round(grandTotalSpendAll / (yearlyBreakdown.length || 1)),
+      yearlyBreakdown,
+      topSuppliersAllTime,
+      topMaterialsAllTime,
+      sheetsSynced: poSheetNames,
+      lastSyncedAt,
+    };
+
+    if (dbService.isAvailable()) {
+      await dbService.syncFromSheetsToPg(materialList, supplierList, allYearsTransactions, priceList);
+    }
+
+    console.log(
+      `✅ SINKRONISASI LENGKAP SUKSES! ${poSheetNames.length} Tab PO (${poSheetNames[0]} - ${poSheetNames[poSheetNames.length - 1]}), ` +
+      `${allYearsTransactions.length} Total Baris, Rp ${grandTotalSpendAll.toLocaleString('id-ID')} Total Belanja.`
+    );
+
+    return {
+      success: true,
+      totalSheets: poSheetNames.length,
+      sheets: poSheetNames,
+      totalAllRows: allYearsTransactions.length,
+      totalAllPOs: globalPoSet.size,
+      totalAllSpend: Math.round(grandTotalSpendAll),
+      totalMaterials: materialList.length,
+      totalSuppliers: supplierList.length,
+      totalPrices: priceList.length,
+      yearlyBreakdown,
+      lastSyncedAt,
+    };
+  } catch (err) {
+    console.error('❌ Gagal sinkronisasi seluruh sheet:', err.message);
+    throw err;
+  }
+}
+
+function getHistoricalStats() {
+  if (historicalStatsSummary) {
+    return historicalStatsSummary;
+  }
+  const currentTotal = transactionsList.reduce(
+    (sum, t) => sum + (t.status?.toLowerCase() !== 'cancelled' ? (t.total || 0) : 0),
+    0
+  );
+  return {
+    totalYears: 1,
+    totalAllRows: transactionsList.length,
+    totalAllPOs: new Set(transactionsList.map((t) => t.noPo)).size,
+    totalAllSpend: currentTotal,
+    averageSpendPerYear: currentTotal,
+    yearlyBreakdown: [
+      {
+        year: '2026',
+        sheetName: 'PO 2026',
+        totalRows: transactionsList.length,
+        totalPOs: new Set(transactionsList.map((t) => t.noPo)).size,
+        totalSpend: currentTotal,
+        countOpen: transactionsList.filter((t) => t.status === 'Open').length,
+        countClose: transactionsList.filter((t) => t.status === 'Close').length,
+        countPending: transactionsList.filter((t) => t.status === 'Pending').length,
+        countCancelled: transactionsList.filter((t) => t.status === 'Cancelled').length,
+      },
+    ],
+    topSuppliersAllTime: [],
+    topMaterialsAllTime: [],
+    sheetsSynced: ['PO 2026'],
+    lastSyncedAt,
+  };
+}
+
+function getHistoricalTransactions(options = {}) {
+  const { year, search, page = 1, limit = 50 } = options;
+  let list = allYearsTransactions.length > 0 ? allYearsTransactions : transactionsList;
+
+  if (year && year !== 'ALL') {
+    list = list.filter((t) => t.year === String(year) || t.sheetName?.includes(String(year)));
+  }
+
+  if (search) {
+    const q = search.trim().toLowerCase();
+    list = list.filter(
+      (t) =>
+        (t.noPo && t.noPo.toLowerCase().includes(q)) ||
+        (t.supplier && t.supplier.toLowerCase().includes(q)) ||
+        (t.kode && t.kode.toLowerCase().includes(q)) ||
+        (t.nama && t.nama.toLowerCase().includes(q)) ||
+        (t.grpo && t.grpo.toLowerCase().includes(q))
+    );
+  }
+
+  const total = list.length;
+  const startIndex = (page - 1) * limit;
+  const items = list.slice(startIndex, startIndex + limit);
+  return { total, page, limit, items };
+}
+
 module.exports = {
   syncMasterData,
+  syncAllSheets,
   findMaterialByCode,
   searchMaterials,
   getSupplierByCode,
@@ -477,4 +880,6 @@ module.exports = {
   getSyncStatus,
   getAllMaterials,
   getAllSuppliers,
+  getHistoricalStats,
+  getHistoricalTransactions,
 };

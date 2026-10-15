@@ -13,7 +13,8 @@ import MultiOcrPanel from './components/MultiOcrPanel';
 import MaterialsTable from './components/MaterialsTable';
 import SuppliersTable from './components/SuppliersTable';
 import SystemTopologyPanel from './components/SystemTopologyPanel';
-import { getStats, getPOs, createPO, updatePO, cancelPO, triggerSync } from './services/api';
+import HistoricalStatsView from './components/HistoricalStatsView';
+import { getStats, getPOs, createPO, updatePO, cancelPO, triggerSync, syncAllSheets } from './services/api';
 
 export default function App() {
   const location = useLocation();
@@ -27,6 +28,7 @@ export default function App() {
   const [rows, setRows] = useState([]);
   const [selectedRow, setSelectedRow] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -38,6 +40,7 @@ export default function App() {
 
   // Derive activeNav based on current URL path
   const getActiveNavFromPath = (pathname) => {
+    if (pathname === '/statistik' || pathname === '/analytics') return 'analytics';
     if (pathname === '/multi-ocr') return 'multi-ocr';
     if (pathname === '/database-material' || pathname === '/material') return 'material';
     if (pathname === '/database-supplier' || pathname === '/supplier') return 'supplier';
@@ -83,6 +86,28 @@ export default function App() {
       message.error(`Gagal sinkronisasi: ${err.message}`);
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleSyncAll = async () => {
+    setIsSyncingAll(true);
+    message.loading({
+      content: 'Sedang menyinkronkan seluruh sheet (PO 2017 s/d PO 2026)...',
+      key: 'sync-all-header',
+      duration: 0,
+    });
+    try {
+      const res = await syncAllSheets();
+      message.destroy('sync-all-header');
+      if (res.success) {
+        message.success(`Berhasil menyinkronkan ${res.totalSheets} tab sheet (${res.totalAllRows} baris)!`);
+        await loadData();
+      }
+    } catch (err) {
+      message.destroy('sync-all-header');
+      message.error(`Gagal sinkronisasi seluruh sheet: ${err.message}`);
+    } finally {
+      setIsSyncingAll(false);
     }
   };
 
@@ -154,7 +179,9 @@ export default function App() {
             activeNav={activeNav}
             stats={stats}
             isSyncing={isSyncing}
+            isSyncingAll={isSyncingAll}
             onSync={handleManualSync}
+            onSyncAll={handleSyncAll}
             onOpenCreateModal={() => setCreateModalOpen(true)}
             onOpenOcrTab={() => navigate('/multi-ocr')}
             isDark={isDark}
@@ -241,6 +268,16 @@ export default function App() {
                     </div>
                   </>
                 }
+              />
+
+              {/* Halaman Statistik Multi-Tahun (2017 - 2026) */}
+              <Route
+                path="/statistik"
+                element={<HistoricalStatsView isDark={isDark} />}
+              />
+              <Route
+                path="/analytics"
+                element={<Navigate to="/statistik" replace />}
               />
 
               {/* Halaman 2: Smart Multi-OCR */}

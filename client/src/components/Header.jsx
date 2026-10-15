@@ -7,13 +7,17 @@ import {
   AiOutlineBulb,
   AiFillBulb,
   AiOutlineTable,
+  AiOutlineThunderbolt,
+  AiOutlineBarChart,
 } from 'react-icons/ai';
 
 export default function Header({
   activeNav,
   stats,
   isSyncing,
+  isSyncingAll,
   onSync,
+  onSyncAll,
   onOpenCreateModal,
   onOpenOcrTab,
   isDark,
@@ -25,6 +29,12 @@ export default function Header({
       tag: 'Live CRUD Active',
       tagColor: 'green',
       icon: <AiOutlineTable style={{ color: '#059669' }} />,
+    },
+    analytics: {
+      title: 'Statistik & Analisis Multi-Tahun (PO 2017 s/d PO 2026)',
+      tag: '10 Tahun Historis',
+      tagColor: 'purple',
+      icon: <AiOutlineBarChart style={{ color: '#7c3aed' }} />,
     },
     'multi-ocr': {
       title: '⚡ Smart Multi-OCR: Ekstraksi Dokumen PO Multi-Page & Multi-File',
@@ -89,14 +99,35 @@ export default function Header({
 
       {/* Right: Actions & Theme Toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {/* Sync Button */}
+        {/* Sync All Multi-Year Button */}
+        <Button
+          type="primary"
+          icon={<AiOutlineThunderbolt style={{ animation: isSyncingAll ? 'antRotate 1s infinite linear' : 'none' }} />}
+          onClick={onSyncAll}
+          loading={isSyncingAll}
+          style={{
+            fontSize: 12,
+            borderRadius: 8,
+            backgroundColor: '#7c3aed',
+            borderColor: '#7c3aed',
+            fontWeight: 700,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            boxShadow: '0 2px 6px rgba(124, 58, 237, 0.25)',
+          }}
+        >
+          ⚡ Sync Semua Sheet (2017-2026)
+        </Button>
+
+        {/* Sync Button 2026 */}
         <Button
           icon={<AiOutlineSync style={{ animation: isSyncing ? 'antRotate 1s infinite linear' : 'none' }} />}
           onClick={onSync}
           loading={isSyncing}
           style={{ fontSize: 12, borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 4 }}
         >
-          Tarik Data Sheets
+          Tarik Sheet 2026
         </Button>
 
         {/* Multi-OCR Action */}

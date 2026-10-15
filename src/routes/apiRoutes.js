@@ -227,6 +227,9 @@ router.get('/suppliers', (req, res) => {
 /**
  * POST /api/sync - Manual Sync Master Data dari Google Sheets
  */
+/**
+ * POST /api/sync - Manual Sync Master Data Sheet 2026
+ */
 router.post('/sync', async (req, res) => {
   try {
     if (!hasValidToken()) {
@@ -241,6 +244,58 @@ router.post('/sync', async (req, res) => {
     res.json({ success: true, result });
   } catch (err) {
     console.error('❌ Gagal sinkronisasi manual:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/sync-all - Sinkronisasi Seluruh Tab PO (2017 s/d 2026) & Master Data
+ */
+router.post('/sync-all', async (req, res) => {
+  try {
+    if (!hasValidToken()) {
+      return res.status(401).json({
+        success: false,
+        error: 'Google OAuth2 Token belum siap. Jalankan node auth-google.js di terminal.',
+      });
+    }
+
+    const sheetsClient = getSheetsClient();
+    const result = await cacheService.syncAllSheets(sheetsClient);
+    res.json({ success: true, result });
+  } catch (err) {
+    console.error('❌ Gagal sinkronisasi seluruh sheet:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/stats/historical - Mengambil statistik multi-tahun (2017 s/d 2026) dari cache lokal (<5ms)
+ */
+router.get('/stats/historical', (req, res) => {
+  try {
+    const data = cacheService.getHistoricalStats();
+    res.json({ success: true, ...data });
+  } catch (err) {
+    console.error('❌ Error /api/stats/historical:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/pos/historical - Mengambil transaksi historis multi-tahun dari cache lokal (<5ms)
+ */
+router.get('/pos/historical', (req, res) => {
+  try {
+    const year = req.query.year || 'ALL';
+    const search = req.query.search || '';
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 50;
+
+    const result = cacheService.getHistoricalTransactions({ year, search, page, limit });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('❌ Error /api/pos/historical:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
