@@ -427,6 +427,7 @@ async function getAllSuppliers(query = '', page = 1, limit = 25) {
     const priceInfo = priceCache.get(matKey);
 
     if (!supEntry.materialsMap.has(matKey)) {
+      const poSet = new Set(tx.noPo ? [tx.noPo] : []);
       supEntry.materialsMap.set(matKey, {
         kode: tx.kode,
         nama: tx.nama || (priceInfo ? priceInfo.nama : ''),
@@ -436,6 +437,8 @@ async function getAllSuppliers(query = '', page = 1, limit = 25) {
         hargaMax: tx.priceUnit > 0 ? tx.priceUnit : (priceInfo ? priceInfo.maxPrice : 0),
         hargaTerbaru: tx.priceUnit > 0 ? tx.priceUnit : (priceInfo ? priceInfo.latestPrice : 0),
         tglTerbaru: tx.date || (priceInfo ? priceInfo.latestDate : ''),
+        latestPo: tx.noPo || '',
+        poSet,
         totalOrders: 1,
       });
       supEntry.totalFrequency += 1;
@@ -448,6 +451,11 @@ async function getAllSuppliers(query = '', page = 1, limit = 25) {
         mat.hargaTerbaru = tx.priceUnit;
         mat.tglTerbaru = tx.date || mat.tglTerbaru;
       }
+      if (tx.noPo) {
+        mat.poSet = mat.poSet || new Set();
+        mat.poSet.add(tx.noPo);
+        mat.latestPo = tx.noPo;
+      }
       mat.totalOrders = (mat.totalOrders || 0) + 1;
       mat.totalQty = (mat.totalQty || 0) + (tx.qty || 0);
       supEntry.totalQty += tx.qty || 0;
@@ -456,7 +464,11 @@ async function getAllSuppliers(query = '', page = 1, limit = 25) {
 
   // Convert ke array supplier dan hitung referensi harga keseluruhan supplier
   let list = Array.from(supplierMap.values()).map((sup) => {
-    const materials = Array.from(sup.materialsMap.values());
+    const materials = Array.from(sup.materialsMap.values()).map((m) => ({
+      ...m,
+      latestPo: m.latestPo || (m.poSet ? Array.from(m.poSet)[0] : ''),
+      poList: m.poSet ? Array.from(m.poSet) : [],
+    }));
     materials.sort((a, b) => (b.frekuensi || b.totalOrders || 0) - (a.frekuensi || a.totalOrders || 0));
 
     let minP = 0;

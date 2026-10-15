@@ -432,6 +432,8 @@ async function getAllSuppliersFromPg(query = '', page = 1, limit = 25) {
           MAX(t.price_unit)::numeric as "hargaMax",
           (ARRAY_AGG(t.price_unit ORDER BY t.id DESC))[1]::numeric as "hargaTerbaru",
           (ARRAY_AGG(t.tanggal ORDER BY t.id DESC))[1] as "tglTerbaru",
+          (ARRAY_AGG(t.no_po ORDER BY t.id DESC))[1] as "latestPo",
+          ARRAY_AGG(DISTINCT t.no_po) as "poList",
           COUNT(DISTINCT t.no_po)::int as "frekuensi",
           SUM(t.qty)::numeric as "totalQty",
           SUM(t.total)::numeric as "itemTotalSpend"
@@ -457,6 +459,8 @@ async function getAllSuppliersFromPg(query = '', page = 1, limit = 25) {
             'hargaMax', sm."hargaMax",
             'hargaTerbaru', sm."hargaTerbaru",
             'tglTerbaru', sm."tglTerbaru",
+            'latestPo', sm."latestPo",
+            'poList', sm."poList",
             'frekuensi', sm."frekuensi",
             'totalQty', sm."totalQty"
           ) ORDER BY sm."frekuensi" DESC

@@ -89,46 +89,37 @@ export default function SuppliersTable({ isDark }) {
       ),
     },
     {
-      title: 'Harga Terendah (Min)',
-      dataIndex: 'hargaMin',
-      key: 'hargaMin',
-      width: 160,
-      align: 'right',
-      render: (val) => (
-        <span style={{ fontWeight: 700, color: '#059669', fontFamily: 'monospace' }}>
-          {formatRupiah(val)}
-        </span>
-      ),
-    },
-    {
-      title: 'Harga Termahal (Max)',
-      dataIndex: 'hargaMax',
-      key: 'hargaMax',
-      width: 160,
-      align: 'right',
-      render: (val) => (
-        <span style={{ fontWeight: 700, color: '#ea580c', fontFamily: 'monospace' }}>
-          {formatRupiah(val)}
-        </span>
-      ),
-    },
-    {
-      title: 'Harga Terakhir (Last Price)',
-      key: 'hargaTerbaru',
-      width: 190,
-      align: 'right',
-      render: (_, r) => (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-          <span style={{ fontWeight: 800, color: '#2563eb', fontFamily: 'monospace' }}>
-            {formatRupiah(r.hargaTerbaru)}
-          </span>
-          {r.tglTerbaru && (
-            <span style={{ fontSize: 10, color: '#64748b' }}>
-              Tgl: {r.tglTerbaru}
-            </span>
-          )}
-        </div>
-      ),
+      title: 'Harga Terakhir & Keterangan No. PO',
+      key: 'hargaTerakhir',
+      width: 260,
+      render: (_, r) => {
+        if (!r.hargaTerbaru || r.hargaTerbaru <= 0) {
+          return <span style={{ color: '#94a3b8', fontSize: 11 }}>Belum ada histori harga</span>;
+        }
+
+        const poNumber = r.latestPo || (r.poList && r.poList[0]) || '';
+        const poExtra = r.poList && r.poList.length > 1 ? ` (+${r.poList.length - 1} PO lainnya)` : '';
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 11 }}>
+            <div>
+              <span style={{ fontSize: 13, fontWeight: 800, color: '#2563eb', fontFamily: 'monospace' }}>
+                {formatRupiah(r.hargaTerbaru)}
+              </span>
+              {r.tglTerbaru && (
+                <span style={{ fontSize: 10, color: '#64748b', marginLeft: 6 }}>
+                  ({r.tglTerbaru})
+                </span>
+              )}
+            </div>
+            {poNumber ? (
+              <div style={{ fontSize: 11, color: '#047857' }}>
+                📋 <strong>No. PO:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{poNumber}{poExtra}</span>
+              </div>
+            ) : null}
+          </div>
+        );
+      },
     },
     {
       title: 'Frekuensi PO',
@@ -194,7 +185,7 @@ export default function SuppliersTable({ isDark }) {
                 {name}
               </div>
               <div style={{ fontSize: 11, color: '#64748b' }}>
-                {isExpanded ? '▼ Menampilkan material & referensi harga' : '▶ Klik untuk melihat daftar material & harga'}
+                {isExpanded ? '▼ Menampilkan material & harga terakhir' : '▶ Klik untuk melihat daftar material & No. PO'}
               </div>
             </div>
           </div>
@@ -238,41 +229,10 @@ export default function SuppliersTable({ isDark }) {
       ),
     },
     {
-      title: 'Rentang Referensi Harga',
-      key: 'priceRange',
-      width: 250,
-      render: (_, record) => {
-        if (!record.supplierLatestPrice && !record.supplierMinPrice) {
-          return <span style={{ color: '#94a3b8', fontSize: 11 }}>Belum ada histori harga</span>;
-        }
-        return (
-          <div style={{ fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <div>
-              <span style={{ color: '#64748b' }}>Terbaru: </span>
-              <strong style={{ color: '#2563eb', fontFamily: 'monospace' }}>
-                {formatRupiah(record.supplierLatestPrice || record.supplierMinPrice)}
-              </strong>
-            </div>
-            {record.supplierMinPrice > 0 && record.supplierMaxPrice > 0 && (
-              <div style={{ color: '#64748b' }}>
-                <span style={{ color: '#059669', fontWeight: 600, fontFamily: 'monospace' }}>
-                  {formatRupiah(record.supplierMinPrice)}
-                </span>
-                {' - '}
-                <span style={{ color: '#ea580c', fontWeight: 600, fontFamily: 'monospace' }}>
-                  {formatRupiah(record.supplierMaxPrice)}
-                </span>
-              </div>
-            )}
-          </div>
-        );
-      },
-    },
-    {
       title: 'Total Kuantitas Dipesan',
       dataIndex: 'totalQty',
       key: 'totalQty',
-      width: 160,
+      width: 170,
       align: 'right',
       render: (qty) => (
         <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 13, color: isDark ? '#f8fafc' : '#0f172a' }}>
@@ -354,7 +314,7 @@ export default function SuppliersTable({ isDark }) {
             </Tag>
           </div>
           <p style={{ margin: '2px 0 0 0', fontSize: 11, color: '#64748b' }}>
-            Klik baris supplier untuk membuka daftar material yang biasa dibeli beserta referensi harga terendah, termahal, dan harga terakhir.
+            Klik baris supplier untuk membuka daftar material yang biasa dibeli beserta harga terakhir dan No. PO.
           </p>
         </div>
 
