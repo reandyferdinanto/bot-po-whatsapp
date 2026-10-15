@@ -27,6 +27,8 @@ import {
   AiOutlinePlus,
   AiOutlineSearch,
   AiOutlineSync,
+  AiOutlineClose,
+  AiOutlineReload,
 } from 'react-icons/ai';
 import { parseOcrFiles, commitBatchOCR, getPODetail } from '../services/api';
 
@@ -117,7 +119,28 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
   };
 
   const handleRemoveDoc = (id) => {
-    setParsedDocuments((prev) => prev.filter((d) => d.id !== id));
+    setParsedDocuments((prev) => {
+      const remaining = prev.filter((d) => d.id !== id);
+      const removedDoc = prev.find((d) => d.id === id);
+      if (removedDoc && !remaining.some((d) => d.filename === removedDoc.filename)) {
+        setUploadedFiles((fPrev) => fPrev.filter((f) => f.name !== removedDoc.filename));
+      }
+      return remaining;
+    });
+  };
+
+  // Hapus per 1 berkas yang diunggah
+  const handleRemoveUploadedFile = (fileName) => {
+    setUploadedFiles((prev) => prev.filter((f) => f.name !== fileName));
+    setParsedDocuments((prev) => prev.filter((d) => d.filename !== fileName));
+    message.info(`Berkas "${fileName}" dihapus dari antrian.`);
+  };
+
+  // Reset / Batalkan seluruh upload berkas
+  const handleResetUpload = () => {
+    setUploadedFiles([]);
+    setParsedDocuments([]);
+    message.info('Area upload dan antrian dokumen berhasil dikosongkan.');
   };
 
   // Re-check PO reference manually from UI
@@ -192,7 +215,21 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
           : `PO ${docData.noPo} berhasil disimpan ke Google Sheets 'PO 2026'!`;
 
         message.success(actionMsg);
-        setParsedDocuments((prev) => prev.filter((d) => d.id !== docData.id));
+        const remaining = parsedDocuments.filter((d) => d.id !== docData.id);
+        setParsedDocuments(remaining);
+
+        // Hapus file dari uploadedFiles jika tidak ada dokumen lain dari file tersebut
+        const stillHasDocs = remaining.some((d) => d.filename === docData.filename);
+        if (!stillHasDocs) {
+          setUploadedFiles((prev) => prev.filter((f) => f.name !== docData.filename));
+        }
+
+        // Jika semua dokumen telah disimpan, kosongkan area upload agar user segera bisa upload baru
+        if (remaining.length === 0) {
+          setUploadedFiles([]);
+          message.success('Semua dokumen telah tersimpan! Area upload siap untuk dokumen baru.');
+        }
+
         if (onPoCommitted) onPoCommitted();
       } else {
         const errorMsg = res.results?.[0]?.error || 'Gagal menyimpan dokumen.';
@@ -234,7 +271,18 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
           key: 'commit-proc',
         });
         const successfulNoPos = new Set(res.results.filter((r) => r.success).map((r) => r.noPo));
-        setParsedDocuments((prev) => prev.filter((d) => !successfulNoPos.has(d.noPo)));
+        const remaining = parsedDocuments.filter((d) => !successfulNoPos.has(d.noPo));
+        setParsedDocuments(remaining);
+
+        // Jika semua dokumen berhasil disimpan, reset upload area
+        if (remaining.length === 0) {
+          setUploadedFiles([]);
+          message.success('Semua dokumen berhasil disimpan! Area upload telah di-reset untuk berkas baru.');
+        } else {
+          const remainingFilenames = new Set(remaining.map((d) => d.filename));
+          setUploadedFiles((prev) => prev.filter((f) => remainingFilenames.has(f.name)));
+        }
+
         if (onPoCommitted) onPoCommitted();
       }
     } catch (err) {
@@ -377,7 +425,77 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
             cursor: isProcessing ? 'wait' : 'pointer',
           }}
         >
-          {uploadedFiles.length === 0 && !isProcessing ? (
+          {isProcessing ? (
+            <div
+              style={{
+                padding: '26px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 14,
+              }}
+            >
+              {/* Animated Scanner Visual Box */}
+              <div
+                style={{
+                  width: 140,
+                  height: 90,
+                  borderRadius: 10,
+                  border: '2px dashed #0284c7',
+                  backgroundColor: isDark ? 'rgba(2, 132, 199, 0.15)' : '#f0f9ff',
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 14px rgba(2, 132, 199, 0.2)',
+                  animation: 'ocrPulseCard 1.8s infinite ease-in-out',
+                  overflow: 'hidden',
+                }}
+              >
+                <AiOutlineScan style={{ fontSize: 44, color: '#0284c7' }} />
+                {/* Animated Glowing Laser Scanning Beam */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    height: 3,
+                    background: 'linear-gradient(90deg, transparent, #00f2fe, #38bdf8, #00f2fe, transparent)',
+                    boxShadow: '0 0 10px #00f2fe, 0 0 18px #38bdf8',
+                    animation: 'ocrLaserScan 1.6s infinite ease-in-out',
+                  }}
+                />
+              </div>
+
+              {/* Text & Stage Indicators */}
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  <AiOutlineSync style={{ animation: 'antRotate 1.2s infinite linear' }} />
+                  <span>Sedang Mengekstrak Teks Dokumen via OCR Otomatis...</span>
+                </div>
+                <p style={{ margin: '4px 0 0 0', fontSize: 11, color: mutedColor }}>
+                  Memindai {uploadedFiles.length} berkas (mendeteksi nomor PO, supplier, tabel barang, &amp; verifikasi GRPO). Mohon tunggu...
+                </p>
+              </div>
+
+              {/* Animated Scanning Wave Bars */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, height: 14 }}>
+                {[0.1, 0.4, 0.7, 0.2, 0.5, 0.8, 0.3, 0.6].map((delay, i) => (
+                  <span
+                    key={i}
+                    style={{
+                      width: 4,
+                      height: '100%',
+                      backgroundColor: '#0284c7',
+                      borderRadius: 2,
+                      animation: `ocrScanBar 1.2s infinite ease-in-out ${delay}s`,
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : uploadedFiles.length === 0 ? (
             <div style={{ padding: '16px 10px' }}>
               <p className="ant-upload-drag-icon" style={{ margin: '0 0 12px 0' }}>
                 <AiOutlineCloudUpload style={{ fontSize: 48, color: '#0284c7' }} />
@@ -402,37 +520,44 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
               </p>
             </div>
           ) : (
-            <div style={{ padding: '10px 14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 14 }}>
-                {isProcessing ? (
-                  <>
-                    <AiOutlineSync style={{ fontSize: 30, color: '#0284c7', animation: 'antRotate 1s infinite linear' }} />
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: '#0284c7' }}>
-                        Sedang Mengekstrak Teks Dokumen via OCR Otomatis...
-                      </div>
-                      <div style={{ fontSize: 11, color: mutedColor }}>
-                        Memindai teks digital, tabel item, dan nomor PO.
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <AiOutlineCheckCircle style={{ fontSize: 30, color: '#059669' }} />
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: '#059669' }}>
-                        ✓ {uploadedFiles.length} Dokumen Berhasil Diunggah &amp; Diekstrak
-                      </div>
-                      <div style={{ fontSize: 11, color: mutedColor }}>
-                        Klik atau tarik file tambahan ke sini untuk menambah antrian scan OCR.
-                      </div>
-                    </div>
-                  </>
-                )}
+            <div style={{ padding: '8px 12px' }}>
+              {/* Header Manajemen Berkas Terupload */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 12,
+                  borderBottom: `1px solid ${borderColor}`,
+                  paddingBottom: 8,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <AiOutlineCheckCircle style={{ fontSize: 20, color: '#059669' }} />
+                  <span style={{ fontWeight: 800, fontSize: 13, color: textColor }}>
+                    {uploadedFiles.length} Berkas Berhasil Di-scan OCR
+                  </span>
+                  <span style={{ fontSize: 11, color: mutedColor }}>
+                    (Klik tanda silang ✕ untuk membatalkan berkas tertentu)
+                  </span>
+                </div>
+
+                <Button
+                  danger
+                  size="small"
+                  icon={<AiOutlineReload />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleResetUpload();
+                  }}
+                  style={{ fontSize: 11, borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                >
+                  Reset / Ganti File
+                </Button>
               </div>
 
-              {/* Badges Dokumen yang Terupload dengan Pembeda Ikon Jelas */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8, maxWidth: 840, margin: '0 auto' }}>
+              {/* Badges Dokumen yang Terupload dengan Pembeda Ikon Jelas & Tombol Hapus Satuan */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8, maxWidth: 860, margin: '0 auto' }}>
                 {uploadedFiles.map((f, idx) => (
                   <div
                     key={idx}
@@ -440,7 +565,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                       display: 'flex',
                       alignItems: 'center',
                       gap: 8,
-                      padding: '6px 12px',
+                      padding: '5px 10px',
                       borderRadius: 8,
                       backgroundColor: f.isPdf
                         ? (isDark ? 'rgba(239, 68, 68, 0.2)' : '#fef2f2')
@@ -460,7 +585,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                           fontSize: 12,
                           fontWeight: 700,
                           color: textColor,
-                          maxWidth: 200,
+                          maxWidth: 180,
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
@@ -479,8 +604,36 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                     >
                       {f.isPdf ? 'PDF' : 'GAMBAR'}
                     </Tag>
+
+                    {/* Tombol Hapus Per 1 Berkas */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveUploadedFile(f.name);
+                      }}
+                      title={`Hapus berkas ${f.name}`}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '2px 4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#ef4444',
+                        borderRadius: 4,
+                      }}
+                    >
+                      <AiOutlineClose style={{ fontSize: 13 }} />
+                    </button>
                   </div>
                 ))}
+              </div>
+
+              {/* Hint Tarik File Tambahan */}
+              <div style={{ marginTop: 12, fontSize: 11, color: '#0284c7', fontWeight: 600 }}>
+                + Tarik atau klik di sini untuk menambahkan berkas dokumen lainnya
               </div>
             </div>
           )}
