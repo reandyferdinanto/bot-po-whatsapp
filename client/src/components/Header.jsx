@@ -1,13 +1,13 @@
 import React from 'react';
 import { Button, Tag, Tooltip } from 'antd';
 import {
-  SyncOutlined,
-  PlusOutlined,
-  ScanOutlined,
-  BulbOutlined,
-  BulbFilled,
-  TableOutlined,
-} from '@ant-design/icons';
+  AiOutlineSync,
+  AiOutlinePlus,
+  AiOutlineScan,
+  AiOutlineBulb,
+  AiFillBulb,
+  AiOutlineTable,
+} from 'react-icons/ai';
 
 export default function Header({
   activeNav,
@@ -24,31 +24,31 @@ export default function Header({
       title: 'Data Transaksi: Sheet "PO 2026"',
       tag: 'Live CRUD Active',
       tagColor: 'green',
-      icon: <TableOutlined style={{ color: '#059669' }} />,
+      icon: <AiOutlineTable style={{ color: '#059669' }} />,
     },
     'multi-ocr': {
       title: '⚡ Smart Multi-OCR: Ekstraksi Dokumen PO Multi-Page & Multi-File',
       tag: 'High-Precision OCR',
       tagColor: 'blue',
-      icon: <ScanOutlined style={{ color: '#0284c7' }} />,
+      icon: <AiOutlineScan style={{ color: '#0284c7' }} />,
     },
     material: {
       title: 'Katalog Master Material: Sheet "database Material"',
       tag: '1.506 Master Items',
       tagColor: 'purple',
-      icon: <TableOutlined style={{ color: '#7c3aed' }} />,
+      icon: <AiOutlineTable style={{ color: '#7c3aed' }} />,
     },
     supplier: {
       title: 'Rekomendasi Vendor: Sheet "database Supplier Material"',
       tag: '1.506 Vendor History',
       tagColor: 'orange',
-      icon: <TableOutlined style={{ color: '#ea580c' }} />,
+      icon: <AiOutlineTable style={{ color: '#ea580c' }} />,
     },
     topology: {
       title: 'Status Infrastruktur: OpenWA WhatsApp & Google Sheets API v4',
       tag: 'System Healthy',
       tagColor: 'success',
-      icon: <TableOutlined style={{ color: '#16a34a' }} />,
+      icon: <AiOutlineTable style={{ color: '#16a34a' }} />,
     },
   };
 
@@ -91,10 +91,10 @@ export default function Header({
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         {/* Sync Button */}
         <Button
-          icon={<SyncOutlined spin={isSyncing} />}
+          icon={<AiOutlineSync style={{ animation: isSyncing ? 'antRotate 1s infinite linear' : 'none' }} />}
           onClick={onSync}
           loading={isSyncing}
-          style={{ fontSize: 12, borderRadius: 8 }}
+          style={{ fontSize: 12, borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 4 }}
         >
           Tarik Data Sheets
         </Button>
@@ -102,7 +102,7 @@ export default function Header({
         {/* Multi-OCR Action */}
         <Button
           type="default"
-          icon={<ScanOutlined />}
+          icon={<AiOutlineScan />}
           onClick={onOpenOcrTab}
           style={{
             fontSize: 12,
@@ -110,6 +110,9 @@ export default function Header({
             borderColor: '#0284c7',
             color: '#0284c7',
             fontWeight: 600,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
           }}
         >
           ⚡ Multi-OCR Input
@@ -118,7 +121,7 @@ export default function Header({
         {/* Buat PO Baru (Formik Modal) */}
         <Button
           type="primary"
-          icon={<PlusOutlined />}
+          icon={<AiOutlinePlus />}
           onClick={onOpenCreateModal}
           style={{
             fontSize: 12,
@@ -126,6 +129,9 @@ export default function Header({
             backgroundColor: '#047857',
             borderColor: '#047857',
             fontWeight: 600,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
           }}
         >
           + Tambah PO Manual
@@ -137,7 +143,7 @@ export default function Header({
         <Tooltip title={isDark ? 'Beralih ke Light Mode' : 'Beralih ke Dark Mode'}>
           <Button
             type="text"
-            icon={isDark ? <BulbFilled style={{ color: '#fbbf24' }} /> : <BulbOutlined style={{ color: '#64748b' }} />}
+            icon={isDark ? <AiFillBulb style={{ color: '#fbbf24', fontSize: 16 }} /> : <AiOutlineBulb style={{ color: '#64748b', fontSize: 16 }} />}
             onClick={toggleTheme}
             style={{ borderRadius: 8 }}
           />

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal, Button, Input, InputNumber, AutoComplete, Table, Space, message, Tag } from 'antd';
 import { Formik, FieldArray } from 'formik';
 import * as Yup from 'yup';
-import { PlusOutlined, DeleteOutlined, CalculatorOutlined } from '@ant-design/icons';
+import { AiOutlinePlus, AiOutlineDelete, AiOutlineCalculator } from 'react-icons/ai';
 import { getMaterials } from '../services/api';
 
 const PoSchema = Yup.object().shape({
@@ -207,7 +207,7 @@ export default function CreatePoModal({ visible, onCancel, onSuccess, isDark }) 
                                   type="text"
                                   danger
                                   size="small"
-                                  icon={<DeleteOutlined />}
+                                  icon={<AiOutlineDelete />}
                                   onClick={() => remove(index)}
                                 >
                                   Hapus
@@ -307,7 +307,7 @@ export default function CreatePoModal({ visible, onCancel, onSuccess, isDark }) 
 
                       <Button
                         type="dashed"
-                        icon={<PlusOutlined />}
+                        icon={<AiOutlinePlus />}
                         onClick={() =>
                           push({
                             kode: '',
@@ -319,7 +319,7 @@ export default function CreatePoModal({ visible, onCancel, onSuccess, isDark }) 
                             ket: '',
                           })
                         }
-                        style={{ marginTop: 4 }}
+                        style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
                       >
                         + Tambah Baris Barang Lagi
                       </Button>

@@ -1,12 +1,12 @@
 import React from 'react';
 import { Tag } from 'antd';
 import {
-  TableOutlined,
-  ScanOutlined,
-  AppstoreOutlined,
-  ShopOutlined,
-  ClusterOutlined,
-} from '@ant-design/icons';
+  AiOutlineTable,
+  AiOutlineScan,
+  AiOutlineAppstore,
+  AiOutlineShop,
+  AiOutlineCluster,
+} from 'react-icons/ai';
 
 export default function Sidebar({ activeNav, onNavigate, stats, isDark }) {
   const totalRows = stats?.totalRows || 0;
@@ -16,7 +16,7 @@ export default function Sidebar({ activeNav, onNavigate, stats, isDark }) {
       key: 'po2026',
       path: '/po-2026',
       label: 'Sheet: PO 2026',
-      icon: <TableOutlined style={{ fontSize: 16 }} />,
+      icon: <AiOutlineTable style={{ fontSize: 16 }} />,
       badge: <Tag color="green" style={{ margin: 0, fontFamily: 'monospace' }}>{totalRows} Baris</Tag>,
       sub: 'Data Transaksi (Kolom A - W)',
     },
@@ -24,7 +24,7 @@ export default function Sidebar({ activeNav, onNavigate, stats, isDark }) {
       key: 'multi-ocr',
       path: '/multi-ocr',
       label: '⚡ Smart Multi-OCR',
-      icon: <ScanOutlined style={{ fontSize: 16, color: '#0ea5e9' }} />,
+      icon: <AiOutlineScan style={{ fontSize: 16, color: '#0ea5e9' }} />,
       badge: <Tag color="blue" style={{ margin: 0, fontWeight: 'bold' }}>MULTI-PAGE</Tag>,
       sub: 'Input Multi-PDF & Foto PO',
       highlight: true,
@@ -33,7 +33,7 @@ export default function Sidebar({ activeNav, onNavigate, stats, isDark }) {
       key: 'material',
       path: '/database-material',
       label: 'database Material',
-      icon: <AppstoreOutlined style={{ fontSize: 16 }} />,
+      icon: <AiOutlineAppstore style={{ fontSize: 16 }} />,
       badge: <Tag style={{ margin: 0, fontFamily: 'monospace' }}>1.506</Tag>,
       sub: 'Master Katalog & Harga',
     },
@@ -41,7 +41,7 @@ export default function Sidebar({ activeNav, onNavigate, stats, isDark }) {
       key: 'supplier',
       path: '/database-supplier',
       label: 'database Supplier Mat.',
-      icon: <ShopOutlined style={{ fontSize: 16 }} />,
+      icon: <AiOutlineShop style={{ fontSize: 16 }} />,
       badge: <Tag style={{ margin: 0, fontFamily: 'monospace' }}>1.506</Tag>,
       sub: 'Rekomendasi Vendor & Qty',
     },
@@ -49,7 +49,7 @@ export default function Sidebar({ activeNav, onNavigate, stats, isDark }) {
       key: 'topology',
       path: '/status-sistem',
       label: 'Status Sistem & Bot WA',
-      icon: <ClusterOutlined style={{ fontSize: 16 }} />,
+      icon: <AiOutlineCluster style={{ fontSize: 16 }} />,
       badge: <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block' }}></span>,
       sub: 'OpenWA & Sheets Telemetry',
     },
@@ -101,7 +101,7 @@ export default function Sidebar({ activeNav, onNavigate, stats, isDark }) {
               boxShadow: '0 2px 6px rgba(4,120,87,0.3)',
             }}
           >
-            <TableOutlined style={{ fontSize: 20 }} />
+            <AiOutlineTable style={{ fontSize: 20 }} />
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

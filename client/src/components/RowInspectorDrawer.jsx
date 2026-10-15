@@ -1,13 +1,13 @@
 import React from 'react';
 import { Button, Tag, Divider, Empty } from 'antd';
 import {
-  EditOutlined,
-  CloseCircleOutlined,
-  FileTextOutlined,
-  ShopOutlined,
-  InboxOutlined,
-  CreditCardOutlined,
-} from '@ant-design/icons';
+  AiOutlineEdit,
+  AiOutlineCloseCircle,
+  AiOutlineFileText,
+  AiOutlineShop,
+  AiOutlineInbox,
+  AiOutlineCreditCard,
+} from 'react-icons/ai';
 
 export default function RowInspectorDrawer({
   selectedRow,
@@ -72,7 +72,7 @@ export default function RowInspectorDrawer({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <FileTextOutlined style={{ color: '#2563eb' }} />
+          <AiOutlineFileText style={{ color: '#2563eb', fontSize: 16 }} />
           <span style={{ fontWeight: 700, fontSize: 13, color: textColor }}>
             Inspeksi Baris
           </span>
@@ -94,19 +94,19 @@ export default function RowInspectorDrawer({
       >
         <Button
           type="primary"
-          icon={<EditOutlined />}
+          icon={<AiOutlineEdit />}
           onClick={() => onEditPo(selectedRow)}
           disabled={isCancelled}
-          style={{ flex: 1, fontSize: 12, borderRadius: 6, backgroundColor: '#2563eb' }}
+          style={{ flex: 1, fontSize: 12, borderRadius: 6, backgroundColor: '#2563eb', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
         >
           Edit Baris PO
         </Button>
         <Button
           danger
-          icon={<CloseCircleOutlined />}
+          icon={<AiOutlineCloseCircle />}
           onClick={() => onCancelPo(selectedRow)}
           disabled={isCancelled}
-          style={{ flex: 1, fontSize: 12, borderRadius: 6 }}
+          style={{ flex: 1, fontSize: 12, borderRadius: 6, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
         >
           Batalkan PO
         </Button>
@@ -124,7 +124,7 @@ export default function RowInspectorDrawer({
           }}
         >
           <div style={{ fontWeight: 700, color: textColor, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <ShopOutlined style={{ color: '#059669' }} /> Identitas Dokumen
+            <AiOutlineShop style={{ color: '#059669', fontSize: 16 }} /> Identitas Dokumen
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -160,7 +160,7 @@ export default function RowInspectorDrawer({
           }}
         >
           <div style={{ fontWeight: 700, color: textColor, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <CreditCardOutlined style={{ color: '#7c3aed' }} /> Detail Barang & Nilai
+            <AiOutlineCreditCard style={{ color: '#7c3aed', fontSize: 16 }} /> Detail Barang & Nilai
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div>
@@ -205,7 +205,7 @@ export default function RowInspectorDrawer({
           }}
         >
           <div style={{ fontWeight: 700, color: textColor, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <InboxOutlined style={{ color: '#d97706' }} /> Gudang &amp; Penerimaan
+            <AiOutlineInbox style={{ color: '#d97706', fontSize: 16 }} /> Gudang &amp; Penerimaan
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>

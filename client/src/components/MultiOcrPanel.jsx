@@ -19,19 +19,19 @@ import {
 import { Formik, FieldArray } from 'formik';
 import * as Yup from 'yup';
 import {
-  InboxOutlined,
-  ScanOutlined,
-  CheckCircleOutlined,
-  CloudUploadOutlined,
-  FilePdfOutlined,
-  FileImageOutlined,
-  DeleteOutlined,
-  EditOutlined,
-  CalculatorOutlined,
-  SaveOutlined,
-  ExclamationCircleOutlined,
-  PlusOutlined,
-} from '@ant-design/icons';
+  AiOutlineInbox,
+  AiOutlineScan,
+  AiOutlineCheckCircle,
+  AiOutlineCloudUpload,
+  AiOutlineFilePdf,
+  AiOutlineFileImage,
+  AiOutlineDelete,
+  AiOutlineEdit,
+  AiOutlineCalculator,
+  AiOutlineSave,
+  AiOutlineExclamationCircle,
+  AiOutlinePlus,
+} from 'react-icons/ai';
 import { parseOcrFiles, commitBatchOCR } from '../services/api';
 
 const { Dragger } = Upload;
@@ -198,7 +198,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                 fontSize: 18,
               }}
             >
-              <ScanOutlined />
+              <AiOutlineScan />
             </span>
             <div>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: textColor, letterSpacing: '-0.3px' }}>
@@ -229,7 +229,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
               fontWeight: 600,
             }}
           >
-            <CheckCircleOutlined style={{ color: '#059669' }} /> 1 PDF Multi-Halaman: Ekstrak seluruh halaman &amp; multi-PO
+            <AiOutlineCheckCircle style={{ color: '#059669' }} /> 1 PDF Multi-Halaman: Ekstrak seluruh halaman &amp; multi-PO
           </span>
           <span
             style={{
@@ -244,7 +244,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
               fontWeight: 600,
             }}
           >
-            <CheckCircleOutlined style={{ color: '#059669' }} /> Multi-File Upload: Sekaligus scan PDF + Foto JPG/PNG
+            <AiOutlineCheckCircle style={{ color: '#059669' }} /> Multi-File Upload: Sekaligus scan PDF + Foto JPG/PNG
           </span>
           <span
             style={{
@@ -259,7 +259,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
               fontWeight: 600,
             }}
           >
-            <CheckCircleOutlined style={{ color: '#059669' }} /> Auto-Match 1.506 Master Material &amp; Histori Harga
+            <AiOutlineCheckCircle style={{ color: '#059669' }} /> Auto-Match 1.506 Master Material &amp; Histori Harga
           </span>
           <span
             style={{
@@ -274,7 +274,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
               fontWeight: 600,
             }}
           >
-            <CheckCircleOutlined style={{ color: '#059669' }} /> Validasi Perhitungan Qty x Harga = Total &amp; PPN
+            <AiOutlineCheckCircle style={{ color: '#059669' }} /> Validasi Perhitungan Qty x Harga = Total &amp; PPN
           </span>
         </div>
       </div>
@@ -302,7 +302,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
           }}
         >
           <p className="ant-upload-drag-icon">
-            <CloudUploadOutlined style={{ fontSize: 44, color: '#0284c7' }} />
+            <AiOutlineCloudUpload style={{ fontSize: 44, color: '#0284c7' }} />
           </p>
           <p style={{ fontSize: 15, fontWeight: 700, color: textColor, margin: '8px 0 4px 0' }}>
             Klik atau Tarik Dokumen PDF / Foto PO ke Area Ini
@@ -320,7 +320,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
             <Button
               type="primary"
               size="large"
-              icon={<ScanOutlined />}
+              icon={<AiOutlineScan />}
               loading={isProcessing}
               onClick={handleStartBatchOcr}
               style={{
@@ -328,6 +328,9 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                 borderColor: '#0284c7',
                 fontWeight: 700,
                 borderRadius: 8,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
               }}
             >
               ⚡ Mulai Ekstraksi OCR ({fileList.length} Dokumen)
@@ -375,7 +378,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
               </Button>
               <Button
                 type="primary"
-                icon={<SaveOutlined />}
+                icon={<AiOutlineSave />}
                 loading={isCommitting}
                 onClick={handleCommitSelected}
                 style={{
@@ -383,6 +386,9 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                   borderColor: '#047857',
                   fontWeight: 700,
                   borderRadius: 8,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
                 }}
               >
                 ✓ Simpan {selectedCount} PO Terpilih ke Google Sheets 'PO 2026'
@@ -439,11 +445,11 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                               onChange={() => toggleSelectDoc(doc.id)}
                             />
                             {doc.fileType === 'pdf' ? (
-                              <Tag color="red" icon={<FilePdfOutlined />} style={{ fontWeight: 600 }}>
+                              <Tag color="red" icon={<AiOutlineFilePdf />} style={{ fontWeight: 600 }}>
                                 {doc.filename} {doc.pageRange ? `(${doc.pageRange})` : ''}
                               </Tag>
                             ) : (
-                              <Tag color="purple" icon={<FileImageOutlined />} style={{ fontWeight: 600 }}>
+                              <Tag color="purple" icon={<AiOutlineFileImage />} style={{ fontWeight: 600 }}>
                                 {doc.filename}
                               </Tag>
                             )}
@@ -462,7 +468,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                             <Button
                               type="text"
                               danger
-                              icon={<DeleteOutlined />}
+                              icon={<AiOutlineDelete />}
                               onClick={() => handleRemoveDoc(doc.id)}
                               title="Hapus dari antrian"
                             />
@@ -606,96 +612,100 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                                         <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 700, color: '#2563eb', fontFamily: 'monospace' }}>
                                           {formatRupiah(itSub)}
                                         </td>
-                                        <td style={{ textAlign: 'center' }}>
-                                          {values.items.length > 1 && (
-                                            <Button
-                                              type="text"
-                                              danger
-                                              size="small"
-                                              icon={<DeleteOutlined />}
-                                              onClick={() => remove(itIdx)}
-                                            />
-                                          )}
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
+                                         <td style={{ textAlign: 'center' }}>
+                                           {values.items.length > 1 && (
+                                             <Button
+                                               type="text"
+                                               danger
+                                               size="small"
+                                               icon={<AiOutlineDelete />}
+                                               onClick={() => remove(itIdx)}
+                                             />
+                                           )}
+                                         </td>
+                                       </tr>
+                                     );
+                                   })}
+                                 </tbody>
+                               </table>
 
-                              <div style={{ padding: 6, backgroundColor: isDark ? '#1e293b' : '#fafafa', display: 'flex', justifyContent: 'flex-start' }}>
-                                <Button
-                                  type="link"
-                                  size="small"
-                                  icon={<PlusOutlined />}
-                                  onClick={() =>
-                                    push({
-                                      kode: '',
-                                      nama: '',
-                                      qty: 1,
-                                      harga: 0,
-                                      diskon: 0,
-                                      ppn: 0,
-                                    })
-                                  }
-                                >
-                                  + Tambah Item
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-                        </FieldArray>
+                               <div style={{ padding: 6, backgroundColor: isDark ? '#1e293b' : '#fafafa', display: 'flex', justifyContent: 'flex-start' }}>
+                                 <Button
+                                   type="link"
+                                   size="small"
+                                   icon={<AiOutlinePlus />}
+                                   onClick={() =>
+                                     push({
+                                       kode: '',
+                                       nama: '',
+                                       qty: 1,
+                                       harga: 0,
+                                       diskon: 0,
+                                       ppn: 0,
+                                     })
+                                   }
+                                   style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                 >
+                                   + Tambah Item
+                                 </Button>
+                               </div>
+                             </div>
+                           )}
+                         </FieldArray>
 
-                        {/* Bottom Summary & Math Cross-Check Bar */}
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            backgroundColor: isDark ? '#1e293b' : '#f8fafc',
-                            border: `1px solid ${borderColor}`,
-                            borderRadius: 8,
-                            padding: '8px 14px',
-                            fontSize: 11,
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <span style={{ color: '#059669', fontWeight: 600 }}>
-                              ✓ Subtotal: {formatRupiah(subTotal)}
-                            </span>
-                            <span style={{ color: '#0284c7', fontWeight: 600 }}>
-                              ✓ PPN: {formatRupiah(totalPpn)}
-                            </span>
-                            <span style={{ color: '#7c3aed', fontWeight: 700 }}>
-                              ✓ Grand Total: {formatRupiah(grandTotal)}
-                            </span>
+                         {/* Bottom Summary & Math Cross-Check Bar */}
+                         <div
+                           style={{
+                             display: 'flex',
+                             alignItems: 'center',
+                             justifyContent: 'space-between',
+                             backgroundColor: isDark ? '#1e293b' : '#f8fafc',
+                             border: `1px solid ${borderColor}`,
+                             borderRadius: 8,
+                             padding: '8px 14px',
+                             fontSize: 11,
+                           }}
+                         >
+                           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                             <span style={{ color: '#059669', fontWeight: 600 }}>
+                               ✓ Subtotal: {formatRupiah(subTotal)}
+                             </span>
+                             <span style={{ color: '#0284c7', fontWeight: 600 }}>
+                               ✓ PPN: {formatRupiah(totalPpn)}
+                             </span>
+                             <span style={{ color: '#7c3aed', fontWeight: 700 }}>
+                               ✓ Grand Total: {formatRupiah(grandTotal)}
+                             </span>
+                           </div>
+
+                            <Button
+                              type="primary"
+                              htmlType="submit"
+                              icon={<AiOutlineSave />}
+                              loading={isCommitting}
+                              style={{
+                                backgroundColor: '#047857',
+                                borderColor: '#047857',
+                                fontSize: 11,
+                                fontWeight: 700,
+                                borderRadius: 6,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                              }}
+                            >
+                              Simpan PO Ini ke Google Sheets
+                            </Button>
                           </div>
-
-                          <Button
-                            type="primary"
-                            htmlType="submit"
-                            icon={<SaveOutlined />}
-                            loading={isCommitting}
-                            style={{
-                              backgroundColor: '#047857',
-                              borderColor: '#047857',
-                              fontSize: 11,
-                              fontWeight: 700,
-                              borderRadius: 6,
-                            }}
-                          >
-                            Simpan PO Ini ke Google Sheets
-                          </Button>
-                        </div>
-                      </form>
-                    );
-                  }}
-                </Formik>
-              </Card>
-            ))}
+                        </form>
+                      );
+                    }}
+                  </Formik>
+                </Card>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
+        )}
+      </div>
+    );
+  }

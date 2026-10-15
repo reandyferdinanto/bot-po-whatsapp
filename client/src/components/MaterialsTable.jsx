@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Input, Tag, Card, Button } from 'antd';
-import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
+import { AiOutlineSearch, AiOutlineReload } from 'react-icons/ai';
 import { getMaterials } from '../services/api';
 
 export default function MaterialsTable({ isDark }) {
@@ -128,7 +128,7 @@ export default function MaterialsTable({ isDark }) {
 
         <div style={{ display: 'flex', gap: 10 }}>
           <Input
-            prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+            prefix={<AiOutlineSearch style={{ color: '#94a3b8' }} />}
             placeholder="Cari Kode atau Nama Material..."
             value={search}
             onChange={(e) => {
@@ -138,7 +138,7 @@ export default function MaterialsTable({ isDark }) {
             allowClear
             style={{ width: 280, borderRadius: 8, fontSize: 12 }}
           />
-          <Button icon={<ReloadOutlined />} onClick={loadMaterials} style={{ borderRadius: 8 }} />
+          <Button icon={<AiOutlineReload />} onClick={loadMaterials} style={{ borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} />
         </div>
       </div>
 

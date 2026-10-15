@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, Button, Input, message } from 'antd';
-import { ExclamationCircleOutlined } from '@ant-design/icons';
+import { AiOutlineExclamationCircle } from 'react-icons/ai';
 
 export default function CancelPoModal({ visible, poRow, onCancel, onSuccess }) {
   const [reason, setReason] = useState('');
@@ -26,7 +26,7 @@ export default function CancelPoModal({ visible, poRow, onCancel, onSuccess }) {
     <Modal
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#ef4444' }}>
-          <ExclamationCircleOutlined />
+          <AiOutlineExclamationCircle style={{ fontSize: 18 }} />
           <span style={{ fontWeight: 700 }}>Batalkan Transaksi: PO {poRow.noPo}</span>
         </div>
       }

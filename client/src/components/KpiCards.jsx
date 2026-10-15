@@ -1,10 +1,10 @@
 import React from 'react';
 import {
-  TableOutlined,
-  DollarOutlined,
-  ClockCircleOutlined,
-  CheckCircleOutlined,
-} from '@ant-design/icons';
+  AiOutlineTable,
+  AiOutlineDollar,
+  AiOutlineClockCircle,
+  AiOutlineCheckCircle,
+} from 'react-icons/ai';
 
 export default function KpiCards({ stats, isDark }) {
   const formatRupiah = (val) => {
@@ -23,7 +23,7 @@ export default function KpiCards({ stats, isDark }) {
       subVal: `${stats?.totalPOs || 0} Dokumen PO`,
       subColor: '#059669',
       note: 'Kolom A s/d W (23 Atribut)',
-      icon: <TableOutlined style={{ fontSize: 22, color: '#059669' }} />,
+      icon: <AiOutlineTable style={{ fontSize: 22, color: '#059669' }} />,
       iconBg: isDark ? 'rgba(5, 150, 105, 0.2)' : '#ecfdf5',
     },
     {
@@ -32,7 +32,7 @@ export default function KpiCards({ stats, isDark }) {
       subVal: 'Exclude Cancelled',
       subColor: '#2563eb',
       note: 'Akumulasi Kolom Q (Exclude Cancelled)',
-      icon: <DollarOutlined style={{ fontSize: 22, color: '#2563eb' }} />,
+      icon: <AiOutlineDollar style={{ fontSize: 22, color: '#2563eb' }} />,
       iconBg: isDark ? 'rgba(37, 99, 235, 0.2)' : '#eff6ff',
     },
     {
@@ -41,7 +41,7 @@ export default function KpiCards({ stats, isDark }) {
       subVal: `${stats?.countOpen || 0} Open • ${stats?.countPending || 0} Pending`,
       subColor: '#d97706',
       note: 'Menunggu GRPO / Bayar',
-      icon: <ClockCircleOutlined style={{ fontSize: 22, color: '#d97706' }} />,
+      icon: <AiOutlineClockCircle style={{ fontSize: 22, color: '#d97706' }} />,
       iconBg: isDark ? 'rgba(217, 119, 6, 0.2)' : '#fffbeb',
     },
     {
@@ -50,7 +50,7 @@ export default function KpiCards({ stats, isDark }) {
       subVal: `${stats?.countCancelled || 0} Cancelled`,
       subColor: '#7c3aed',
       note: 'GRPO & Bayar Terisi',
-      icon: <CheckCircleOutlined style={{ fontSize: 22, color: '#7c3aed' }} />,
+      icon: <AiOutlineCheckCircle style={{ fontSize: 22, color: '#7c3aed' }} />,
       iconBg: isDark ? 'rgba(124, 58, 237, 0.2)' : '#f5f3ff',
     },
   ];

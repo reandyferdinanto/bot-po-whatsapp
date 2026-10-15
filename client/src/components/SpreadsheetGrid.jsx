@@ -1,10 +1,10 @@
 import React, { useRef } from 'react';
 import { Tag, Button, Input } from 'antd';
 import {
-  SearchOutlined,
-  MenuUnfoldOutlined,
-  MenuFoldOutlined,
-} from '@ant-design/icons';
+  AiOutlineSearch,
+  AiOutlineMenuUnfold,
+  AiOutlineMenuFold,
+} from 'react-icons/ai';
 
 const COLUMNS_DEF = [
   { letter: 'A', name: 'NO.', width: 48, align: 'center', key: 'no' },
@@ -107,7 +107,7 @@ export default function SpreadsheetGrid({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <Input
-            prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+            prefix={<AiOutlineSearch style={{ color: '#94a3b8' }} />}
             placeholder="Cari No PO, Supplier, Material, GRPO..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
@@ -195,9 +195,9 @@ export default function SpreadsheetGrid({
 
           <Button
             size="small"
-            icon={isDrawerOpen ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
+            icon={isDrawerOpen ? <AiOutlineMenuFold /> : <AiOutlineMenuUnfold />}
             onClick={onToggleDrawer}
-            style={{ fontSize: 11, borderRadius: 6 }}
+            style={{ fontSize: 11, borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 4 }}
           >
             {isDrawerOpen ? 'Tutup Detail' : 'Buka Detail'}
           </Button>

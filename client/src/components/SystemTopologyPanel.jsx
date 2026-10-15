@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { Card, Tag, Button, Input, message, Alert } from 'antd';
 import {
-  ClusterOutlined,
-  SendOutlined,
-  SyncOutlined,
-  CheckCircleOutlined,
-  CloudServerOutlined,
-  DatabaseOutlined,
-  ApiOutlined,
-} from '@ant-design/icons';
+  AiOutlineCluster,
+  AiOutlineSend,
+  AiOutlineSync,
+  AiOutlineCheckCircle,
+  AiOutlineCloudServer,
+  AiOutlineDatabase,
+  AiOutlineApi,
+} from 'react-icons/ai';
 import { sendTestWhatsApp, triggerSync } from '../services/api';
 
 export default function SystemTopologyPanel({ stats, onRefresh, isDark }) {
@@ -73,7 +73,7 @@ export default function SystemTopologyPanel({ stats, onRefresh, isDark }) {
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontWeight: 700, color: textColor, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <ApiOutlined style={{ color: '#059669' }} /> 1. OpenWA Gateway
+              <AiOutlineApi style={{ color: '#059669', fontSize: 16 }} /> 1. OpenWA Gateway
             </span>
             <Tag color="success">ONLINE</Tag>
           </div>
@@ -102,7 +102,7 @@ export default function SystemTopologyPanel({ stats, onRefresh, isDark }) {
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontWeight: 700, color: textColor, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <CloudServerOutlined style={{ color: '#2563eb' }} /> 2. Google Sheets API v4
+              <AiOutlineCloudServer style={{ color: '#2563eb', fontSize: 16 }} /> 2. Google Sheets API v4
             </span>
             <Tag color="blue">CONNECTED</Tag>
           </div>
@@ -131,7 +131,7 @@ export default function SystemTopologyPanel({ stats, onRefresh, isDark }) {
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontWeight: 700, color: textColor, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <DatabaseOutlined style={{ color: '#7c3aed' }} /> 3. Database &amp; Cache
+              <AiOutlineDatabase style={{ color: '#7c3aed', fontSize: 16 }} /> 3. Database &amp; Cache
             </span>
             <Tag color="purple">HYBRID</Tag>
           </div>
@@ -160,7 +160,7 @@ export default function SystemTopologyPanel({ stats, onRefresh, isDark }) {
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontWeight: 700, color: textColor, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <SyncOutlined style={{ color: '#d97706' }} /> 4. Cron Auto-Sync
+              <AiOutlineSync style={{ color: '#d97706', fontSize: 16 }} /> 4. Cron Auto-Sync
             </span>
             <Tag color="orange">CRON 30M</Tag>
           </div>
@@ -170,10 +170,10 @@ export default function SystemTopologyPanel({ stats, onRefresh, isDark }) {
           <Button
             size="small"
             type="primary"
-            icon={<SyncOutlined spin={syncing} />}
+            icon={<AiOutlineSync style={{ animation: syncing ? 'antRotate 1s infinite linear' : 'none' }} />}
             loading={syncing}
             onClick={handleManualSync}
-            style={{ marginTop: 4, borderRadius: 6, backgroundColor: '#047857' }}
+            style={{ marginTop: 4, borderRadius: 6, backgroundColor: '#047857', display: 'inline-flex', alignItems: 'center', gap: 4 }}
           >
             Sinkronkan Sekarang
           </Button>
@@ -226,7 +226,7 @@ export default function SystemTopologyPanel({ stats, onRefresh, isDark }) {
           <div style={{ display: 'flex', alignItems: 'flex-end', height: '100%' }}>
             <Button
               type="primary"
-              icon={<SendOutlined />}
+              icon={<AiOutlineSend />}
               loading={sending}
               onClick={handleSendTestWa}
               style={{
@@ -236,6 +236,10 @@ export default function SystemTopologyPanel({ stats, onRefresh, isDark }) {
                 fontWeight: 600,
                 borderRadius: 8,
                 marginTop: 20,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
               }}
             >
               Kirim Pesan
