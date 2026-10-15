@@ -130,12 +130,12 @@ async function appendPOTransaction(poData) {
 /**
  * Mencari PO berdasarkan Nomor PO pada tab 'PO 2026' (atau arsip jika tidak ada).
  */
-async function getPOByNumber(noPo) {
+async function getPOByNumber(noPo, forceFreshFromSheets = false) {
   if (!noPo) return null;
   const cleanNo = noPo.trim().toUpperCase();
 
-  // 1. Coba baca dari PostgreSQL lokal (<5ms)
-  if (dbService.isAvailable()) {
+  // 1. Coba baca dari PostgreSQL lokal (<5ms) hanya jika tidak diminta data fresh
+  if (!forceFreshFromSheets && dbService.isAvailable()) {
     try {
       const pgPo = await dbService.getPOFromPg(cleanNo);
       if (pgPo) return pgPo;
@@ -144,7 +144,7 @@ async function getPOByNumber(noPo) {
     }
   }
 
-  // 2. Fallback baca langsung dari Google Sheets
+  // 2. Baca langsung dari Google Sheets
   const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: env.sheets.spreadsheetId,
@@ -160,7 +160,7 @@ async function getPOByNumber(noPo) {
 
     if (rowNoPo === cleanNo) {
       matchingItems.push({
-        rowIndex: i + 1, // 1-based
+        rowIndex: i + 1, // 1-based baris fisik spreadsheet
         no: row[0] || '',
         status: row[1] || 'Open',
         date: row[2] || '',
@@ -210,9 +210,17 @@ async function getPOByNumber(noPo) {
 
 /**
  * Memperbarui field status, GRPO, atau pembayaran pada seluruh baris item suatu PO.
+ * Update tertarget langsung ke Kolom R s/d W:
+ * Kolom R: No. GRPO
+ * Kolom S: LAST DATE OF GRPO JOB DONE
+ * Kolom T: TANGGAL BAYAR
+ * Kolom U: TANGGAL INVOICE
+ * Kolom V: NO. INVOICE
+ * Kolom W: KET
  */
 async function updatePOField(noPo, updateData) {
-  const existing = await getPOByNumber(noPo);
+  // Selalu ambil live data dari Google Sheets agar rowIndex 100% tepat
+  const existing = await getPOByNumber(noPo, true);
   if (!existing || existing.items.length === 0) {
     return { success: false, message: `PO ${noPo} tidak ditemukan di sheet 'PO 2026'.` };
   }
@@ -223,37 +231,34 @@ async function updatePOField(noPo, updateData) {
   for (const it of existing.items) {
     const rIdx = it.rowIndex;
 
+    // 1. Update Status jika ada (Kolom B)
     if (updateData.status) {
       updateRequests.push({
         range: `'PO 2026'!B${rIdx}`,
         values: [[updateData.status]],
       });
     }
-    if (updateData.grpo !== undefined) {
-      updateRequests.push({
-        range: `'PO 2026'!R${rIdx}:S${rIdx}`,
-        values: [[updateData.grpo, updateData.lastGrpoDate || getCurrentFormattedDate()]],
-      });
-    }
-    if (updateData.tglBayar !== undefined) {
-      updateRequests.push({
-        range: `'PO 2026'!T${rIdx}`,
-        values: [[updateData.tglBayar]],
-      });
-    }
-    if (updateData.noInvoice !== undefined || updateData.tglInvoice !== undefined) {
-      updateRequests.push({
-        range: `'PO 2026'!U${rIdx}:V${rIdx}`,
-        values: [[updateData.tglInvoice || getCurrentFormattedDate(), updateData.noInvoice || '']],
-      });
-    }
+
+    // 2. Update tertarget persis ke Kolom R s/d W (6 Kolom: No. GRPO, LAST DATE OF GRPO, TGL BAYAR, TGL INVOICE, NO. INVOICE, KET)
+    const valGrpo = updateData.grpo !== undefined ? updateData.grpo : (it.grpo || '');
+    const valLastDate = updateData.lastGrpoDate !== undefined
+      ? updateData.lastGrpoDate
+      : (updateData.grpo ? (it.lastGrpoDate || getCurrentFormattedDate()) : (it.lastGrpoDate || ''));
+    const valTglBayar = updateData.tglBayar !== undefined ? updateData.tglBayar : (it.tglBayar || '');
+    const valTglInvoice = updateData.tglInvoice !== undefined ? updateData.tglInvoice : (it.tglInvoice || '');
+    const valNoInvoice = updateData.noInvoice !== undefined ? updateData.noInvoice : (it.noInvoice || '');
+
+    let valKet = it.ket || '';
     if (updateData.ket) {
-      const newKet = it.ket ? `${it.ket}; ${updateData.ket}` : updateData.ket;
-      updateRequests.push({
-        range: `'PO 2026'!W${rIdx}`,
-        values: [[newKet]],
-      });
+      if (!valKet.includes(updateData.ket)) {
+        valKet = valKet ? `${valKet}; ${updateData.ket}` : updateData.ket;
+      }
     }
+
+    updateRequests.push({
+      range: `'PO 2026'!R${rIdx}:W${rIdx}`,
+      values: [[valGrpo, valLastDate, valTglBayar, valTglInvoice, valNoInvoice, valKet]],
+    });
   }
 
   await sheets.spreadsheets.values.batchUpdate({

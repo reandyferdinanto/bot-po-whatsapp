@@ -10,6 +10,7 @@ import {
   message,
   Checkbox,
   Alert,
+  Segmented,
 } from 'antd';
 import { Formik, FieldArray } from 'formik';
 import * as Yup from 'yup';
@@ -51,7 +52,6 @@ const SinglePoSchema = Yup.object().shape({
 
 const DeliveryNoteSchema = Yup.object().shape({
   noPo: Yup.string().trim().required('Nomor PO referensi wajib diisi'),
-  noGrpo: Yup.string().trim().required('Nomor GRPO wajib diisi'),
 });
 
 export default function MultiOcrPanel({ onPoCommitted, isDark }) {
@@ -68,6 +68,18 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const handleSwitchDocType = (docId, newType) => {
+    setParsedDocuments((prev) =>
+      prev.map((d) => {
+        if (d.id !== docId) return d;
+        return {
+          ...d,
+          tipeDokumen: newType,
+        };
+      })
+    );
   };
 
   // Langsung jalankan scan OCR saat dokumen berhasil dipilih/diunggah
@@ -730,6 +742,10 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                         noPo: doc.noPo || '',
                         noGrpo: doc.noGrpo || '',
                         lastGrpoDate: doc.lastGrpoDate || '',
+                        tglBayar: doc.tglBayar || '',
+                        tglInvoice: doc.tglInvoice || '',
+                        noInvoice: doc.noInvoice || '',
+                        ket: doc.ket || (doc.updateFields && doc.updateFields.ket) || doc.remarks || (doc.noGrpo ? `GRPO ${doc.noGrpo}` : ''),
                         supplier: doc.supplier || '',
                         receivedBy: doc.receivedBy || '',
                         remarks: doc.remarks || '',
@@ -751,9 +767,11 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                               justifyContent: 'space-between',
                               borderBottom: `1px solid ${borderColor}`,
                               paddingBottom: 10,
+                              flexWrap: 'wrap',
+                              gap: 10,
                             }}
                           >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                               <Checkbox
                                 checked={doc.selected && doc.poFound !== false}
                                 disabled={doc.poFound === false}
@@ -768,9 +786,15 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                                   {doc.filename}
                                 </Tag>
                               )}
-                              <Tag color="orange" style={{ fontWeight: 700 }}>
-                                📦 PURCHASE DELIVERY NOTE (GRPO)
-                              </Tag>
+                              <Segmented
+                                size="small"
+                                value={doc.tipeDokumen}
+                                onChange={(val) => handleSwitchDocType(doc.id, val)}
+                                options={[
+                                  { label: '📦 GRPO (Update Kolom R-W)', value: 'PURCHASE_DELIVERY_NOTE_GRPO' },
+                                  { label: '📄 PO Baru (Input Baru)', value: 'PURCHASE_ORDER' },
+                                ]}
+                              />
                               <Tag color="blue" style={{ fontWeight: 600, fontFamily: 'monospace' }}>
                                 No. GRPO: {values.noGrpo || '-'}
                               </Tag>
@@ -797,7 +821,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                                   </span>
                                 </div>
                               }
-                              description="Dokumen ini akan mengupdate baris PO terkait pada sheet 'PO 2026' (Kolom R: No. GRPO & Kolom S: Tanggal Selesai)."
+                              description="Dokumen ini akan mengupdate baris PO terkait pada sheet 'PO 2026' (Kolom R s/d W: No. GRPO, Tanggal Selesai, Pembayaran, Invoice, & Keterangan)."
                             />
                           ) : (
                             <Alert
@@ -817,13 +841,13 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                             />
                           )}
 
-                          {/* Delivery Note Fields */}
-                          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1.2fr 1fr 1.2fr', gap: 10 }}>
+                          {/* Header Identitas Delivery Note */}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1.6fr', gap: 10 }}>
                             <div>
                               <label style={{ fontSize: 11, fontWeight: 700, color: mutedColor }}>
-                                TARGET NOMOR PO (REFERENSI) *
+                                TARGET NOMOR PO (REFERENSI YANG DI-UPDATE) *
                               </label>
-                              <div style={{ display: 'flex', gap: 6 }}>
+                              <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
                                 <Input
                                   name="noPo"
                                   value={values.noPo}
@@ -844,33 +868,6 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
 
                             <div>
                               <label style={{ fontSize: 11, fontWeight: 700, color: mutedColor }}>
-                                NOMOR GRPO GUDANG *
-                              </label>
-                              <Input
-                                name="noGrpo"
-                                value={values.noGrpo}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                                placeholder="Contoh: 2600055"
-                                style={{ fontWeight: 700, fontFamily: 'monospace' }}
-                              />
-                            </div>
-
-                            <div>
-                              <label style={{ fontSize: 11, fontWeight: 700, color: mutedColor }}>
-                                TGL SELESAI / TERIMA
-                              </label>
-                              <Input
-                                name="lastGrpoDate"
-                                value={values.lastGrpoDate}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                                placeholder="DD/MM/YYYY"
-                              />
-                            </div>
-
-                            <div>
-                              <label style={{ fontSize: 11, fontWeight: 700, color: mutedColor }}>
                                 SUPPLIER / VENDOR
                               </label>
                               <Input
@@ -878,34 +875,102 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                                 value={values.supplier}
                                 onChange={handleChange}
                                 onBlur={handleBlur}
+                                style={{ marginTop: 4 }}
                               />
                             </div>
                           </div>
 
-                          {/* Penerima & Catatan KET */}
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
-                            <div>
-                              <label style={{ fontSize: 11, fontWeight: 700, color: mutedColor }}>
-                                PENERIMA BARANG
-                              </label>
-                              <Input
-                                name="receivedBy"
-                                placeholder="Nama staf gudang (e.g. Untung)"
-                                value={values.receivedBy}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                              />
+                          {/* 6 KOLOM TERFOKUS SESUAI GOOGLE SHEET: KOLOM R s/d W */}
+                          <div
+                            style={{
+                              border: `1px solid ${isDark ? '#374151' : '#fde68a'}`,
+                              borderRadius: 8,
+                              padding: 12,
+                              backgroundColor: isDark ? 'rgba(245, 158, 11, 0.08)' : '#fffbeb',
+                            }}
+                          >
+                            <div style={{ fontSize: 12, fontWeight: 700, color: '#b45309', marginBottom: 10 }}>
+                              📝 Kolom yang Diperbarui pada Baris PO Terkait di Sheet 'PO 2026' (Kolom R s/d W):
                             </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
+                              <div>
+                                <label style={{ fontSize: 11, fontWeight: 700, color: mutedColor }}>
+                                  No. GRPO (Kolom R) *
+                                </label>
+                                <Input
+                                  name="noGrpo"
+                                  value={values.noGrpo}
+                                  onChange={handleChange}
+                                  onBlur={handleBlur}
+                                  placeholder="Contoh: 2600055"
+                                  style={{ fontWeight: 700, fontFamily: 'monospace' }}
+                                />
+                              </div>
 
-                            <div>
-                              <label style={{ fontSize: 11, fontWeight: 700, color: mutedColor }}>
-                                CATATAN UPDATE (KOLOM W - KET)
-                              </label>
-                              <Input
-                                value={values.updateFields?.ket || values.remarks || `GRPO ${values.noGrpo}`}
-                                onChange={(e) => setFieldValue('updateFields.ket', e.target.value)}
-                                placeholder="Keterangan GRPO & catatan penerimaan barang"
-                              />
+                              <div>
+                                <label style={{ fontSize: 11, fontWeight: 700, color: mutedColor }}>
+                                  LAST DATE OF GRPO JOB DONE (Kolom S)
+                                </label>
+                                <Input
+                                  name="lastGrpoDate"
+                                  value={values.lastGrpoDate}
+                                  onChange={handleChange}
+                                  onBlur={handleBlur}
+                                  placeholder="DD/MM/YYYY"
+                                />
+                              </div>
+
+                              <div>
+                                <label style={{ fontSize: 11, fontWeight: 700, color: mutedColor }}>
+                                  TANGGAL BAYAR (Kolom T)
+                                </label>
+                                <Input
+                                  name="tglBayar"
+                                  value={values.tglBayar}
+                                  onChange={handleChange}
+                                  onBlur={handleBlur}
+                                  placeholder="DD/MM/YYYY (Opsional)"
+                                />
+                              </div>
+
+                              <div>
+                                <label style={{ fontSize: 11, fontWeight: 700, color: mutedColor }}>
+                                  TANGGAL INVOICE (Kolom U)
+                                </label>
+                                <Input
+                                  name="tglInvoice"
+                                  value={values.tglInvoice}
+                                  onChange={handleChange}
+                                  onBlur={handleBlur}
+                                  placeholder="DD/MM/YYYY (Opsional)"
+                                />
+                              </div>
+
+                              <div>
+                                <label style={{ fontSize: 11, fontWeight: 700, color: mutedColor }}>
+                                  NO. INVOICE (Kolom V)
+                                </label>
+                                <Input
+                                  name="noInvoice"
+                                  value={values.noInvoice}
+                                  onChange={handleChange}
+                                  onBlur={handleBlur}
+                                  placeholder="INV-2026/xxx (Opsional)"
+                                />
+                              </div>
+
+                              <div>
+                                <label style={{ fontSize: 11, fontWeight: 700, color: mutedColor }}>
+                                  KET (Kolom W)
+                                </label>
+                                <Input
+                                  name="ket"
+                                  value={values.ket}
+                                  onChange={handleChange}
+                                  onBlur={handleBlur}
+                                  placeholder="Keterangan penerimaan barang"
+                                />
+                              </div>
                             </div>
                           </div>
 
@@ -945,7 +1010,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                           >
                             <span style={{ color: doc.poFound ? '#047857' : '#b45309', fontWeight: 600 }}>
                               {doc.poFound
-                                ? `✓ Siap mengupdate baris PO ${values.noPo} di sheet 'PO 2026'`
+                                ? `✓ Siap mengupdate baris PO ${values.noPo} di sheet 'PO 2026' (Kolom R s/d W)`
                                 : '⚠️ PO tidak ditemukan, scan atau input terlebih dahulu PO nya.'}
                             </span>
 
@@ -967,7 +1032,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                               }}
                             >
                               {doc.poFound
-                                ? `✓ Update Baris PO ${values.noPo} dengan No. GRPO ${values.noGrpo}`
+                                ? `✓ Update Baris PO ${values.noPo} (Kolom R-W)`
                                 : 'PO Tidak Ditemukan'}
                             </Button>
                           </div>
@@ -1023,8 +1088,8 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                       return (
                         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                           {/* Top Card Row */}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${borderColor}`, paddingBottom: 10 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${borderColor}`, paddingBottom: 10, flexWrap: 'wrap', gap: 10 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                               <Checkbox
                                 checked={doc.selected}
                                 onChange={() => toggleSelectDoc(doc.id)}
@@ -1038,11 +1103,22 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                                   {doc.filename}
                                 </Tag>
                               )}
+                              <Segmented
+                                size="small"
+                                value={doc.tipeDokumen}
+                                onChange={(val) => {
+                                  handleSwitchDocType(doc.id, val);
+                                  if (val === 'PURCHASE_DELIVERY_NOTE_GRPO' && doc.noPo) {
+                                    handleCheckPoReference(doc.id, doc.noPo);
+                                  }
+                                }}
+                                options={[
+                                  { label: '📄 PO Baru (Input Baru)', value: 'PURCHASE_ORDER' },
+                                  { label: '📦 GRPO (Update Kolom R-W)', value: 'PURCHASE_DELIVERY_NOTE_GRPO' },
+                                ]}
+                              />
                               <Tag color={doc.tipePo === 'PO_JASA' ? 'orange' : 'green'} style={{ fontWeight: 700 }}>
                                 {doc.tipePo === 'PO_JASA' ? 'PO JASA' : 'PO MATERIAL'}
-                              </Tag>
-                              <Tag color="cyan" style={{ fontWeight: 600 }}>
-                                Input Baris Baru
                               </Tag>
                               {doc.totalPages && doc.totalPages > 1 && (
                                 <Tag color="blue">Multi-Halaman: {doc.totalPages} Hal</Tag>

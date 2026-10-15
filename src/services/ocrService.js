@@ -618,7 +618,7 @@ function parsePOText(text, source = 'tesseract_adaptive_pipeline') {
     };
   }
 
-  const isDeliveryNote = /Purchase\s*Delivery\s*Note|Delivery\s*Note|Surat\s*Jalan/i.test(text);
+  const isDeliveryNote = /Purchase\s*Delivery\s*Note|Delivery\s*Note|Surat\s*Jalan|Delivery\s*Order|\bGRPO\b|\bGR[-_ ]?PO\b|Goods\s*Receipt|Penerimaan\s*Barang|Bukti\s*Penerimaan|Tanda\s*Terima\s*Barang|Receiving\s*Report/i.test(text);
   if (isDeliveryNote) {
     return parseDeliveryNoteText(text, source);
   }

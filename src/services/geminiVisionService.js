@@ -20,22 +20,31 @@ async function parseImageWithGemini(imageBuffer, mimeType = 'image/jpeg') {
   const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
   const prompt = `
-Anda adalah asisten AI ekstraksi dokumen Purchase Order (PO).
-Tugas Anda adalah membaca gambar dokumen PO ini dan mengekstrak data penting ke dalam format JSON yang valid.
+Anda adalah asisten AI ahli ekstraksi dokumen procurement Purchase Order (PO) dan Purchase Delivery Note (Surat Jalan / GRPO / Goods Receipt).
+Tugas Anda adalah membaca gambar dokumen ini, mengenali tipe dokumen secara akurat, dan mengekstrak data penting ke dalam format JSON yang valid.
 
 Aturan Ekstraksi:
-1. "noPo": Nomor resmi dokumen PO (contoh: PO-2026-001).
-2. "supplier": Nama vendor/supplier atau nama perusahaan tujuan pesanan.
-3. "date": Tanggal PO dalam format DD/MM/YYYY.
-4. "quotation": Nomor penawaran / quotation jika ada, atau kosong string "".
-5. "items": Daftar barang yang dipesan. Untuk setiap item:
+1. "tipeDokumen": Wajib tentukan salah satu:
+   - "PURCHASE_DELIVERY_NOTE_GRPO" jika dokumen adalah Purchase Delivery Note / Surat Jalan / GRPO / Goods Receipt / Bukti Penerimaan Barang / Delivery Order gudang.
+   - "PURCHASE_ORDER" jika dokumen adalah Purchase Order pemesanan barang atau jasa.
+
+2. "noPo": Nomor resmi PO referensi (contoh: 2600120 atau PO-2026-001).
+   PENTING: Pada Purchase Delivery Note / GRPO, cari nomor PO referensi yang biasanya tertera di bawah tanggal atau berlabel "PO#", "PO :", "Ref PO", "Based on PO", atau "Purchase Orders".
+3. "noGrpo": Nomor dokumen GRPO / Nomor Surat Jalan (misal 2600055).
+4. "supplier": Nama vendor / supplier / pengirim barang.
+5. "date": Tanggal dokumen dalam format DD/MM/YYYY.
+6. "lastGrpoDate": Tanggal selesai / penerimaan barang (DD/MM/YYYY).
+7. "receivedBy": Nama staf penerima gudang jika ada.
+8. "remarks": Catatan khusus / remarks pada dokumen.
+9. "quotation": Nomor penawaran / quotation jika ada.
+10. "items": Daftar barang yang tercantum pada dokumen. Untuk setiap item:
    - "kode": Kode item material jika tertera (misal RM00355, OT00120, dll), atau null jika tidak ada.
-   - "nama": Nama barang / spesifikasi material lengkap.
-   - "qty": Jumlah kuantitas (angka bulat/desimal).
-   - "harga": Harga satuan barang per unit (angka murni tanpa simbol mata uang/titik ribuan).
-   - "diskon": Nilai diskon jika ada (default: 0).
-   - "ppn": Nilai PPN jika ada (default: 0).
-   - "ket": Catatan khusus jika ada, atau "".
+   - "nama": Nama barang / spesifikasi lengkap.
+   - "qty": Jumlah kuantitas (angka).
+   - "uom": Satuan barang (Pcs, Ea, Unit, Btg, Set, dll).
+   - "harga": Harga satuan per unit (hanya jika ada pada PO, default: 0).
+   - "diskon": Nilai diskon desimal/persen (default: 0).
+   - "ppn": Nilai PPN (default: 0).
 
 PENTING:
 Kembalikan HANYA teks JSON murni (dimulai dengan { dan diakhiri dengan }). Jangan gunakan markdown code block (seperti \`\`\`json).
@@ -84,8 +93,39 @@ Kembalikan HANYA teks JSON murni (dimulai dengan { dan diakhiri dengan }). Janga
     }
   }
 
+  const isDelivery = parsedData.tipeDokumen === 'PURCHASE_DELIVERY_NOTE_GRPO'
+    || /Purchase\s*Delivery\s*Note|Delivery\s*Note|Surat\s*Jalan|\bGRPO\b|Goods\s*Receipt|Penerimaan/i.test(JSON.stringify(parsedData));
+
+  if (isDelivery) {
+    const noGrpo = parsedData.noGrpo || parsedData.noPo || '';
+    const targetPo = (parsedData.noPo && parsedData.noPo !== noGrpo) ? parsedData.noPo : '';
+    const itemsSummary = (parsedData.items || []).map(it => `${it.qty || 1} ${it.uom || 'Ea'} ${it.kode || ''}`).filter(Boolean).join(', ');
+    const ketText = `GRPO ${noGrpo}`
+      + (parsedData.receivedBy ? ` (Diterima: ${parsedData.receivedBy})` : '')
+      + (itemsSummary ? ` [${itemsSummary}]` : '')
+      + (parsedData.remarks ? ` - ${parsedData.remarks}` : '');
+
+    return {
+      source: 'gemini_vision',
+      tipeDokumen: 'PURCHASE_DELIVERY_NOTE_GRPO',
+      noGrpo,
+      noPo: targetPo || parsedData.noPo || '',
+      lastGrpoDate: parsedData.lastGrpoDate || parsedData.date || '',
+      supplier: parsedData.supplier || 'Supplier',
+      receivedBy: parsedData.receivedBy || '',
+      remarks: parsedData.remarks || '',
+      items: parsedData.items || [],
+      updateFields: {
+        grpo: noGrpo,
+        lastGrpoDate: parsedData.lastGrpoDate || parsedData.date || '',
+        ket: ketText,
+      },
+    };
+  }
+
   return {
     source: 'gemini_vision',
+    tipeDokumen: 'PURCHASE_ORDER',
     noPo: parsedData.noPo || 'PO-2026-TEMP',
     supplier: parsedData.supplier || 'Supplier',
     date: parsedData.date || '',

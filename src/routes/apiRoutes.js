@@ -377,7 +377,10 @@ router.post('/ocr/batch-commit', async (req, res) => {
         const updatePayload = {
           grpo: po.noGrpo || (po.updateFields && po.updateFields.grpo),
           lastGrpoDate: po.lastGrpoDate || (po.updateFields && po.updateFields.lastGrpoDate) || sheetsService.getCurrentFormattedDate(),
-          ket: (po.updateFields && po.updateFields.ket) || (po.noGrpo ? `GRPO ${po.noGrpo}` : 'Update Delivery Note'),
+          tglBayar: po.tglBayar !== undefined ? po.tglBayar : ((po.updateFields && po.updateFields.tglBayar) || ''),
+          tglInvoice: po.tglInvoice !== undefined ? po.tglInvoice : ((po.updateFields && po.updateFields.tglInvoice) || ''),
+          noInvoice: po.noInvoice !== undefined ? po.noInvoice : ((po.updateFields && po.updateFields.noInvoice) || ''),
+          ket: po.ket !== undefined ? po.ket : ((po.updateFields && po.updateFields.ket) || (po.noGrpo ? `GRPO ${po.noGrpo}` : 'Update Delivery Note')),
         };
 
         const updateRes = await sheetsService.updatePOField(targetPo, updatePayload);
