@@ -1,22 +1,20 @@
 import React from 'react';
-import { Badge, Tag } from 'antd';
+import { Tag } from 'antd';
 import {
   TableOutlined,
   ScanOutlined,
   AppstoreOutlined,
   ShopOutlined,
   ClusterOutlined,
-  CheckCircleFilled,
-  ClockCircleOutlined,
 } from '@ant-design/icons';
 
-export default function Sidebar({ activeNav, setActiveNav, stats, isDark }) {
+export default function Sidebar({ activeNav, onNavigate, stats, isDark }) {
   const totalRows = stats?.totalRows || 0;
-  const isCronActive = true;
 
   const navItems = [
     {
       key: 'po2026',
+      path: '/po-2026',
       label: 'Sheet: PO 2026',
       icon: <TableOutlined style={{ fontSize: 16 }} />,
       badge: <Tag color="green" style={{ margin: 0, fontFamily: 'monospace' }}>{totalRows} Baris</Tag>,
@@ -24,6 +22,7 @@ export default function Sidebar({ activeNav, setActiveNav, stats, isDark }) {
     },
     {
       key: 'multi-ocr',
+      path: '/multi-ocr',
       label: '⚡ Smart Multi-OCR',
       icon: <ScanOutlined style={{ fontSize: 16, color: '#0ea5e9' }} />,
       badge: <Tag color="blue" style={{ margin: 0, fontWeight: 'bold' }}>MULTI-PAGE</Tag>,
@@ -32,6 +31,7 @@ export default function Sidebar({ activeNav, setActiveNav, stats, isDark }) {
     },
     {
       key: 'material',
+      path: '/database-material',
       label: 'database Material',
       icon: <AppstoreOutlined style={{ fontSize: 16 }} />,
       badge: <Tag style={{ margin: 0, fontFamily: 'monospace' }}>1.506</Tag>,
@@ -39,6 +39,7 @@ export default function Sidebar({ activeNav, setActiveNav, stats, isDark }) {
     },
     {
       key: 'supplier',
+      path: '/database-supplier',
       label: 'database Supplier Mat.',
       icon: <ShopOutlined style={{ fontSize: 16 }} />,
       badge: <Tag style={{ margin: 0, fontFamily: 'monospace' }}>1.506</Tag>,
@@ -46,6 +47,7 @@ export default function Sidebar({ activeNav, setActiveNav, stats, isDark }) {
     },
     {
       key: 'topology',
+      path: '/status-sistem',
       label: 'Status Sistem & Bot WA',
       icon: <ClusterOutlined style={{ fontSize: 16 }} />,
       badge: <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block' }}></span>,
@@ -75,6 +77,7 @@ export default function Sidebar({ activeNav, setActiveNav, stats, isDark }) {
       <div>
         {/* Brand Header */}
         <div
+          onClick={() => onNavigate && onNavigate('/po-2026')}
           style={{
             height: 64,
             padding: '0 18px',
@@ -82,6 +85,7 @@ export default function Sidebar({ activeNav, setActiveNav, stats, isDark }) {
             alignItems: 'center',
             gap: 12,
             borderBottom: `1px solid ${borderColor}`,
+            cursor: 'pointer',
           }}
         >
           <div
@@ -125,7 +129,7 @@ export default function Sidebar({ activeNav, setActiveNav, stats, isDark }) {
               marginBottom: 8,
             }}
           >
-            Navigasi Dashboard
+            Navigasi Halaman
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -147,7 +151,7 @@ export default function Sidebar({ activeNav, setActiveNav, stats, isDark }) {
               return (
                 <div
                   key={item.key}
-                  onClick={() => setActiveNav(item.key)}
+                  onClick={() => onNavigate && onNavigate(item.path)}
                   style={{
                     padding: '9px 12px',
                     borderRadius: 10,

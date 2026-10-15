@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider, theme as antTheme, message } from 'antd';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -15,7 +16,9 @@ import SystemTopologyPanel from './components/SystemTopologyPanel';
 import { getStats, getPOs, createPO, updatePO, cancelPO, triggerSync } from './services/api';
 
 export default function App() {
-  const [activeNav, setActiveNav] = useState('po2026');
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [isDark, setIsDark] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(true);
 
@@ -32,6 +35,17 @@ export default function App() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [targetPoRow, setTargetPoRow] = useState(null);
+
+  // Derive activeNav based on current URL path
+  const getActiveNavFromPath = (pathname) => {
+    if (pathname === '/multi-ocr') return 'multi-ocr';
+    if (pathname === '/database-material' || pathname === '/material') return 'material';
+    if (pathname === '/database-supplier' || pathname === '/supplier') return 'supplier';
+    if (pathname === '/status-sistem' || pathname === '/topology') return 'topology';
+    return 'po2026';
+  };
+
+  const activeNav = getActiveNavFromPath(location.pathname);
 
   const loadData = async () => {
     setIsSyncing(true);
@@ -75,7 +89,7 @@ export default function App() {
   const handleCreatePoSuccess = async (values) => {
     await createPO(values);
     await loadData();
-    setActiveNav('po2026');
+    navigate('/po-2026');
   };
 
   const handleEditPoSuccess = async (noPo, values) => {
@@ -125,10 +139,10 @@ export default function App() {
           color: isDark ? '#f8fafc' : '#0f172a',
         }}
       >
-        {/* Sidebar */}
+        {/* Sidebar with Route Navigation */}
         <Sidebar
           activeNav={activeNav}
-          setActiveNav={setActiveNav}
+          onNavigate={(path) => navigate(path)}
           stats={stats}
           isDark={isDark}
         />
@@ -142,12 +156,12 @@ export default function App() {
             isSyncing={isSyncing}
             onSync={handleManualSync}
             onOpenCreateModal={() => setCreateModalOpen(true)}
-            onOpenOcrTab={() => setActiveNav('multi-ocr')}
+            onOpenOcrTab={() => navigate('/multi-ocr')}
             isDark={isDark}
             toggleTheme={toggleTheme}
           />
 
-          {/* Main Body */}
+          {/* Main Body Routed Views */}
           <main
             style={{
               flex: 1,
@@ -158,63 +172,129 @@ export default function App() {
               gap: 14,
             }}
           >
-            {/* TAB 1: Transaksi PO 2026 (Spreadsheet View) */}
-            {activeNav === 'po2026' && (
-              <>
-                <KpiCards stats={stats} isDark={isDark} />
-                <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: 12 }}>
-                  <SpreadsheetGrid
-                    rows={rows}
-                    selectedRow={selectedRow}
-                    onSelectRow={setSelectedRow}
-                    onEditPo={openEditModal}
-                    onCancelPo={openCancelModal}
-                    statusFilter={statusFilter}
-                    onStatusFilterChange={setStatusFilter}
-                    searchQuery={searchQuery}
-                    onSearchChange={setSearchQuery}
-                    isDrawerOpen={isDrawerOpen}
-                    onToggleDrawer={() => setIsDrawerOpen((prev) => !prev)}
+            <Routes>
+              {/* Halaman 1: PO 2026 (Root & /po-2026) */}
+              <Route
+                path="/"
+                element={
+                  <>
+                    <KpiCards stats={stats} isDark={isDark} />
+                    <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: 12 }}>
+                      <SpreadsheetGrid
+                        rows={rows}
+                        selectedRow={selectedRow}
+                        onSelectRow={setSelectedRow}
+                        onEditPo={openEditModal}
+                        onCancelPo={openCancelModal}
+                        statusFilter={statusFilter}
+                        onStatusFilterChange={setStatusFilter}
+                        searchQuery={searchQuery}
+                        onSearchChange={setSearchQuery}
+                        isDrawerOpen={isDrawerOpen}
+                        onToggleDrawer={() => setIsDrawerOpen((prev) => !prev)}
+                        isDark={isDark}
+                      />
+
+                      {isDrawerOpen && (
+                        <RowInspectorDrawer
+                          selectedRow={selectedRow}
+                          onEditPo={openEditModal}
+                          onCancelPo={openCancelModal}
+                          onClose={() => setIsDrawerOpen(false)}
+                          isDark={isDark}
+                        />
+                      )}
+                    </div>
+                  </>
+                }
+              />
+              <Route
+                path="/po-2026"
+                element={
+                  <>
+                    <KpiCards stats={stats} isDark={isDark} />
+                    <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: 12 }}>
+                      <SpreadsheetGrid
+                        rows={rows}
+                        selectedRow={selectedRow}
+                        onSelectRow={setSelectedRow}
+                        onEditPo={openEditModal}
+                        onCancelPo={openCancelModal}
+                        statusFilter={statusFilter}
+                        onStatusFilterChange={setStatusFilter}
+                        searchQuery={searchQuery}
+                        onSearchChange={setSearchQuery}
+                        isDrawerOpen={isDrawerOpen}
+                        onToggleDrawer={() => setIsDrawerOpen((prev) => !prev)}
+                        isDark={isDark}
+                      />
+
+                      {isDrawerOpen && (
+                        <RowInspectorDrawer
+                          selectedRow={selectedRow}
+                          onEditPo={openEditModal}
+                          onCancelPo={openCancelModal}
+                          onClose={() => setIsDrawerOpen(false)}
+                          isDark={isDark}
+                        />
+                      )}
+                    </div>
+                  </>
+                }
+              />
+
+              {/* Halaman 2: Smart Multi-OCR */}
+              <Route
+                path="/multi-ocr"
+                element={
+                  <MultiOcrPanel
+                    onPoCommitted={() => {
+                      loadData();
+                    }}
                     isDark={isDark}
                   />
-
-                  {isDrawerOpen && (
-                    <RowInspectorDrawer
-                      selectedRow={selectedRow}
-                      onEditPo={openEditModal}
-                      onCancelPo={openCancelModal}
-                      onClose={() => setIsDrawerOpen(false)}
-                      isDark={isDark}
-                    />
-                  )}
-                </div>
-              </>
-            )}
-
-            {/* TAB 2: Smart Multi-OCR & Multi-Page Document Input Engine */}
-            {activeNav === 'multi-ocr' && (
-              <MultiOcrPanel
-                onPoCommitted={() => {
-                  loadData();
-                }}
-                isDark={isDark}
+                }
               />
-            )}
 
-            {/* TAB 3: database Material */}
-            {activeNav === 'material' && <MaterialsTable isDark={isDark} />}
-
-            {/* TAB 4: database Supplier Material */}
-            {activeNav === 'supplier' && <SuppliersTable isDark={isDark} />}
-
-            {/* TAB 5: System Topology & Telemetry */}
-            {activeNav === 'topology' && (
-              <SystemTopologyPanel
-                stats={stats}
-                onRefresh={loadData}
-                isDark={isDark}
+              {/* Halaman 3: database Material */}
+              <Route
+                path="/database-material"
+                element={<MaterialsTable isDark={isDark} />}
               />
-            )}
+              <Route
+                path="/material"
+                element={<Navigate to="/database-material" replace />}
+              />
+
+              {/* Halaman 4: database Supplier Material */}
+              <Route
+                path="/database-supplier"
+                element={<SuppliersTable isDark={isDark} />}
+              />
+              <Route
+                path="/supplier"
+                element={<Navigate to="/database-supplier" replace />}
+              />
+
+              {/* Halaman 5: Status Sistem & Bot WA */}
+              <Route
+                path="/status-sistem"
+                element={
+                  <SystemTopologyPanel
+                    stats={stats}
+                    onRefresh={loadData}
+                    isDark={isDark}
+                  />
+                }
+              />
+              <Route
+                path="/topology"
+                element={<Navigate to="/status-sistem" replace />}
+              />
+
+              {/* Fallback to /po-2026 */}
+              <Route path="*" element={<Navigate to="/po-2026" replace />} />
+            </Routes>
           </main>
         </div>
 
