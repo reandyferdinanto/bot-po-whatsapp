@@ -273,11 +273,24 @@ router.delete('/api/pos/:noPo', async (req, res) => {
 /**
  * GET /api/materials - Katalog Master Material (1.506 baris)
  */
-router.get('/materials', (req, res) => {
+router.get('/materials', async (req, res) => {
   try {
     const query = req.query.q || '';
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 50;
+
+    if (query) {
+      const searchRes = await cacheService.searchMaterials(query, limit);
+      if (searchRes && searchRes.items && searchRes.items.length > 0) {
+        return res.json({
+          success: true,
+          total: searchRes.total,
+          page: 1,
+          limit,
+          items: searchRes.items,
+        });
+      }
+    }
 
     const result = cacheService.getAllMaterials(query, page, limit);
     res.json({ success: true, ...result });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Button, Input, InputNumber, AutoComplete, Table, Space, message, Tag } from 'antd';
+import { Modal, Button, Input, InputNumber, AutoComplete, Table, Space, message, Tag, Checkbox } from 'antd';
 import { Formik, FieldArray } from 'formik';
 import * as Yup from 'yup';
 import { AiOutlinePlus, AiOutlineDelete, AiOutlineCalculator } from 'react-icons/ai';
@@ -29,16 +29,49 @@ export default function CreatePoModal({ visible, onCancel, onSuccess, isDark }) 
   };
 
   const handleSearchMaterials = async (query) => {
-    if (!query || query.length < 2) return;
+    if (!query || query.trim().length === 0) return;
     try {
-      const res = await getMaterials({ q: query, limit: 10 });
-      if (res.items) {
+      const res = await getMaterials({ q: query.trim(), limit: 15 });
+      if (res && res.items) {
         setMaterialOptions(
-          res.items.map((m) => ({
-            value: m.kode,
-            label: `[${m.kode}] ${m.nama}`,
-            material: m,
-          }))
+          res.items.map((m) => {
+            const lastPrice = Number(m.hargaTerakhir || m.hargaTerbaru || 0);
+            return {
+              value: m.kode,
+              label: (
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '4px 2px',
+                    borderBottom: '1px solid #f1f5f9',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, overflow: 'hidden' }}>
+                    <Tag color="cyan" style={{ fontFamily: 'monospace', fontWeight: 700, margin: 0, flexShrink: 0 }}>
+                      {m.kode}
+                    </Tag>
+                    <span style={{ fontWeight: 600, color: '#1e293b', whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.35 }}>
+                      {m.nama}
+                    </span>
+                  </div>
+                  {lastPrice > 0 ? (
+                    <div style={{ textAlign: 'right', flexShrink: 0, paddingLeft: 8 }}>
+                      <span style={{ fontSize: 10, color: '#64748b', display: 'block', lineHeight: 1 }}>Harga Terakhir</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#059669', fontFamily: 'monospace' }}>
+                        Rp {lastPrice.toLocaleString('id-ID')}
+                      </span>
+                    </div>
+                  ) : (
+                    <Tag style={{ margin: 0, color: '#94a3b8', fontSize: 10 }}>Belum ada histori</Tag>
+                  )}
+                </div>
+              ),
+              material: m,
+            };
+          })
         );
       }
     } catch (err) {
@@ -58,7 +91,7 @@ export default function CreatePoModal({ visible, onCancel, onSuccess, isDark }) 
       }
       open={visible}
       onCancel={onCancel}
-      width={860}
+      width={920}
       footer={null}
       destroyOnClose
     >
@@ -75,6 +108,7 @@ export default function CreatePoModal({ visible, onCancel, onSuccess, isDark }) 
               qty: 1,
               harga: 0,
               diskon: 0,
+              usePpn: false,
               ppn: 0,
               ket: '',
             },
@@ -83,7 +117,19 @@ export default function CreatePoModal({ visible, onCancel, onSuccess, isDark }) 
         validationSchema={PoSchema}
         onSubmit={async (values, { setSubmitting, resetForm }) => {
           try {
-            await onSuccess(values);
+            const payload = {
+              ...values,
+              items: values.items.map((it) => {
+                const itemSub = (it.qty || 0) * (it.harga || 0) * (1 - (it.diskon || 0));
+                const finalPpn = it.usePpn ? Math.round(itemSub * 0.11) : Number(it.ppn || 0);
+                return {
+                  ...it,
+                  ppn: finalPpn,
+                  total: Math.round(itemSub + finalPpn),
+                };
+              }),
+            };
+            await onSuccess(payload);
             message.success(`Berhasil menambahkan PO ${values.noPo} ke Google Sheets!`);
             resetForm();
             onCancel();
@@ -101,7 +147,8 @@ export default function CreatePoModal({ visible, onCancel, onSuccess, isDark }) 
           values.items.forEach((it) => {
             const itemSub = (it.qty || 0) * (it.harga || 0) * (1 - (it.diskon || 0));
             subTotal += itemSub;
-            totalPpn += Number(it.ppn || 0);
+            const currentPpn = it.usePpn ? Math.round(itemSub * 0.11) : Number(it.ppn || 0);
+            totalPpn += currentPpn;
           });
           const grandTotal = subTotal + totalPpn;
 
@@ -183,7 +230,9 @@ export default function CreatePoModal({ visible, onCancel, onSuccess, isDark }) 
                   {({ push, remove }) => (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       {values.items.map((item, index) => {
-                        const itemSub = (item.qty || 0) * (item.harga || 0) * (1 - (item.diskon || 0)) + Number(item.ppn || 0);
+                        const itemSubBase = (item.qty || 0) * (item.harga || 0) * (1 - (item.diskon || 0));
+                        const itemPpn = item.usePpn ? Math.round(itemSubBase * 0.11) : Number(item.ppn || 0);
+                        const itemTotal = itemSubBase + itemPpn;
 
                         return (
                           <div
@@ -215,21 +264,38 @@ export default function CreatePoModal({ visible, onCancel, onSuccess, isDark }) 
                               )}
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8 }}>
+                            {/* Baris 1: Kode Material (Dropdown Diperlebar & Auto-fill Harga) + Nama Material */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 10 }}>
                               <div>
-                                <label style={{ fontSize: 11, color: '#64748b' }}>Kode Material</label>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 2 }}>
+                                  Kode Material
+                                </label>
                                 <AutoComplete
                                   options={materialOptions}
-                                  placeholder="RM00355"
+                                  placeholder="Ketik kode/nama..."
                                   value={item.kode}
                                   onSearch={handleSearchMaterials}
+                                  popupMatchSelectWidth={false}
+                                  dropdownMatchSelectWidth={false}
+                                  popupStyle={{ minWidth: 550, maxWidth: 750 }}
+                                  dropdownStyle={{ minWidth: 550, maxWidth: 750 }}
                                   onSelect={(val, option) => {
                                     setFieldValue(`items.${index}.kode`, val);
                                     if (option.material?.nama) {
                                       setFieldValue(`items.${index}.nama`, option.material.nama);
                                     }
-                                    if (option.material?.hargaTerakhir) {
-                                      setFieldValue(`items.${index}.harga`, option.material.hargaTerakhir);
+                                    const lastPrice = Number(option.material?.hargaTerakhir || option.material?.hargaTerbaru || 0);
+                                    if (lastPrice > 0) {
+                                      setFieldValue(`items.${index}.harga`, lastPrice);
+                                      if (item.usePpn) {
+                                        const sub = (item.qty || 1) * lastPrice * (1 - (item.diskon || 0));
+                                        setFieldValue(`items.${index}.ppn`, Math.round(sub * 0.11));
+                                      }
+                                      message.success({
+                                        content: `Harga terakhir [${val}] otomatis terisi: Rp ${lastPrice.toLocaleString('id-ID')}`,
+                                        key: `price-${index}`,
+                                        duration: 2.5,
+                                      });
                                     }
                                   }}
                                   onChange={(val) => setFieldValue(`items.${index}.kode`, val.toUpperCase())}
@@ -238,7 +304,9 @@ export default function CreatePoModal({ visible, onCancel, onSuccess, isDark }) 
                               </div>
 
                               <div>
-                                <label style={{ fontSize: 11, color: '#64748b' }}>Nama Material / Spesifikasi *</label>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 2 }}>
+                                  Nama Material / Spesifikasi *
+                                </label>
                                 <Input
                                   placeholder="Hex Nipples 1/2 Stainless Steel 304"
                                   value={item.nama}
@@ -247,25 +315,42 @@ export default function CreatePoModal({ visible, onCancel, onSuccess, isDark }) 
                               </div>
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '100px 150px 100px 120px 1fr', gap: 8 }}>
+                            {/* Baris 2: Qty, Harga Satuan, Diskon, Checklist PPN 11%, Subtotal */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '95px 170px 95px 135px 1fr', gap: 10, alignItems: 'center' }}>
                               <div>
-                                <label style={{ fontSize: 11, color: '#64748b' }}>Qty *</label>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 2 }}>
+                                  Qty *
+                                </label>
                                 <InputNumber
                                   min={0.01}
                                   value={item.qty}
-                                  onChange={(val) => setFieldValue(`items.${index}.qty`, val || 0)}
+                                  onChange={(val) => {
+                                    const q = val || 0;
+                                    setFieldValue(`items.${index}.qty`, q);
+                                    if (item.usePpn) {
+                                      const sub = q * (item.harga || 0) * (1 - (item.diskon || 0));
+                                      setFieldValue(`items.${index}.ppn`, Math.round(sub * 0.11));
+                                    }
+                                  }}
                                   style={{ width: '100%' }}
                                 />
                               </div>
 
                               <div>
-                                <label style={{ fontSize: 11, color: '#64748b' }}>Harga Satuan (Rp) *</label>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 2 }}>
+                                  Harga Satuan (Rp) *
+                                </label>
                                 <InputNumber
                                   min={0}
                                   step={1000}
                                   value={item.harga}
                                   onChange={(val) => {
-                                    setFieldValue(`items.${index}.harga`, val || 0);
+                                    const h = val || 0;
+                                    setFieldValue(`items.${index}.harga`, h);
+                                    if (item.usePpn) {
+                                      const sub = (item.qty || 0) * h * (1 - (item.diskon || 0));
+                                      setFieldValue(`items.${index}.ppn`, Math.round(sub * 0.11));
+                                    }
                                   }}
                                   formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
                                   parser={(val) => val.replace(/\./g, '')}
@@ -274,30 +359,55 @@ export default function CreatePoModal({ visible, onCancel, onSuccess, isDark }) 
                               </div>
 
                               <div>
-                                <label style={{ fontSize: 11, color: '#64748b' }}>Diskon (%)</label>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 2 }}>
+                                  Diskon (%)
+                                </label>
                                 <InputNumber
                                   min={0}
                                   max={100}
                                   value={(item.diskon || 0) * 100}
-                                  onChange={(val) => setFieldValue(`items.${index}.diskon`, (val || 0) / 100)}
+                                  onChange={(val) => {
+                                    const d = (val || 0) / 100;
+                                    setFieldValue(`items.${index}.diskon`, d);
+                                    if (item.usePpn) {
+                                      const sub = (item.qty || 0) * (item.harga || 0) * (1 - d);
+                                      setFieldValue(`items.${index}.ppn`, Math.round(sub * 0.11));
+                                    }
+                                  }}
                                   style={{ width: '100%' }}
                                 />
                               </div>
 
                               <div>
-                                <label style={{ fontSize: 11, color: '#64748b' }}>PPN (Rp)</label>
-                                <InputNumber
-                                  min={0}
-                                  value={item.ppn}
-                                  onChange={(val) => setFieldValue(`items.${index}.ppn`, val || 0)}
-                                  style={{ width: '100%' }}
-                                />
+                                <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 2 }}>
+                                  PPN (11%)
+                                </label>
+                                <div style={{ height: 32, display: 'flex', alignItems: 'center' }}>
+                                  <Checkbox
+                                    checked={item.usePpn}
+                                    onChange={(e) => {
+                                      const checked = e.target.checked;
+                                      setFieldValue(`items.${index}.usePpn`, checked);
+                                      const sub = (item.qty || 0) * (item.harga || 0) * (1 - (item.diskon || 0));
+                                      setFieldValue(`items.${index}.ppn`, checked ? Math.round(sub * 0.11) : 0);
+                                    }}
+                                  >
+                                    <span style={{ fontSize: 12, fontWeight: 600, color: item.usePpn ? '#047857' : '#64748b' }}>
+                                      {item.usePpn ? 'PPN 11%' : 'Tanpa PPN'}
+                                    </span>
+                                  </Checkbox>
+                                </div>
+                                {item.usePpn && (
+                                  <div style={{ fontSize: 10, color: '#047857', fontFamily: 'monospace', marginTop: -2 }}>
+                                    +{formatRupiah(itemPpn)}
+                                  </div>
+                                )}
                               </div>
 
                               <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'right' }}>
                                 <span style={{ fontSize: 10, color: '#64748b' }}>Subtotal Item:</span>
                                 <span style={{ fontWeight: 700, color: '#2563eb', fontFamily: 'monospace', fontSize: 13 }}>
-                                  {formatRupiah(itemSub)}
+                                  {formatRupiah(itemTotal)}
                                 </span>
                               </div>
                             </div>
@@ -315,6 +425,7 @@ export default function CreatePoModal({ visible, onCancel, onSuccess, isDark }) 
                             qty: 1,
                             harga: 0,
                             diskon: 0,
+                            usePpn: false,
                             ppn: 0,
                             ket: '',
                           })
