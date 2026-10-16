@@ -5,6 +5,7 @@ const cacheService = require('../services/cacheService');
 const ocrService = require('../services/ocrService');
 const openwaService = require('../services/openwaService');
 const dbService = require('../services/dbService');
+const kursService = require('../services/kursService');
 const { hasValidToken, getSheetsClient } = require('../config/googleAuth');
 const env = require('../config/env');
 
@@ -27,6 +28,13 @@ router.get('/stats', async (req, res) => {
     }
     const syncStatus = cacheService.getSyncStatus();
 
+    let kursUsd = null;
+    try {
+      kursUsd = await kursService.getKursUsd();
+    } catch (kErr) {
+      console.warn('⚠️ Gagal mengambil kurs USD saat /api/stats:', kErr.message);
+    }
+
     res.json({
       success: true,
       stats: {
@@ -39,6 +47,7 @@ router.get('/stats', async (req, res) => {
         countCancelled: sheetData.stats.countCancelled || 0,
         spreadsheetId: env.sheets.spreadsheetId,
         syncedAt: syncStatus.lastSyncedAt || new Date().toISOString(),
+        kursUsd,
       },
       system: {
         googleAuth: hasValidToken(),
@@ -50,6 +59,44 @@ router.get('/stats', async (req, res) => {
     });
   } catch (err) {
     console.error('❌ Error /api/stats:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/kurs/usd - Mengambil data Kurs Tengah USD Bank Indonesia dari Ortax
+ */
+router.get('/kurs/usd', async (req, res) => {
+  try {
+    const forceRefresh = req.query.refresh === 'true';
+    const kurs = await kursService.getKursUsd({ forceRefresh });
+    const history = await kursService.getKursHistory(14);
+    res.json({
+      success: true,
+      data: kurs,
+      history,
+    });
+  } catch (err) {
+    console.error('❌ Error /api/kurs/usd:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/kurs/usd/refresh - Memaksa scraping ulang Kurs Tengah USD sekarang
+ */
+router.post('/kurs/usd/refresh', async (req, res) => {
+  try {
+    const kurs = await kursService.getKursUsd({ forceRefresh: true });
+    const history = await kursService.getKursHistory(14);
+    res.json({
+      success: true,
+      message: 'Kurs USD berhasil diperbarui dari Ortax',
+      data: kurs,
+      history,
+    });
+  } catch (err) {
+    console.error('❌ Error /api/kurs/usd/refresh:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });

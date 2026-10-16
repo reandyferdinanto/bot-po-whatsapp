@@ -2,8 +2,10 @@ const cron = require('node-cron');
 const env = require('../config/env');
 const { hasValidToken, getSheetsClient } = require('../config/googleAuth');
 const cacheService = require('./cacheService');
+const kursService = require('./kursService');
 
 let syncTask = null;
+let kursTask = null;
 
 /**
  * Menjalankan Cron Job untuk sinkronisasi berkala dari Google Sheets ke PostgreSQL / Cache RAM.
@@ -33,6 +35,17 @@ function initCron() {
     }
   });
 
+  // Auto-sync Kurs Tengah USD dari Ortax setiap jam pada jam kerja (08:00 - 18:00 WIB)
+  kursTask = cron.schedule('15 8-18 * * *', async () => {
+    console.log(`\n⏰ [CRON ${new Date().toLocaleTimeString('id-ID')}] Memeriksa pembaruan Kurs Tengah USD dari Ortax...`);
+    try {
+      const kurs = await kursService.getKursUsd({ forceRefresh: true });
+      console.log(`✅ [CRON] Kurs USD berhasil diperbarui: Rp ${kurs.kursTengah} (${kurs.tanggal})`);
+    } catch (kErr) {
+      console.warn('⚠️ [CRON] Gagal auto-update Kurs USD:', kErr.message);
+    }
+  });
+
   return syncTask;
 }
 
@@ -43,6 +56,10 @@ function stopCron() {
   if (syncTask) {
     syncTask.stop();
     syncTask = null;
+  }
+  if (kursTask) {
+    kursTask.stop();
+    kursTask = null;
   }
 }
 

@@ -89,4 +89,14 @@ export async function sendTestWhatsApp(chatId, text) {
   return res.data;
 }
 
+export async function getKursUsd(refresh = false) {
+  const res = await api.get('/kurs/usd', { params: { refresh: !!refresh } });
+  return res.data;
+}
+
+export async function refreshKursUsd() {
+  const res = await api.post('/kurs/usd/refresh');
+  return res.data;
+}
+
 export default api;

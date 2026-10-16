@@ -10,6 +10,7 @@ import {
   AiOutlineThunderbolt,
   AiOutlineBarChart,
 } from 'react-icons/ai';
+import UsdRateTicker from './UsdRateTicker';
 
 export default function Header({
   activeNav,
@@ -22,6 +23,9 @@ export default function Header({
   onOpenOcrTab,
   isDark,
   toggleTheme,
+  kurs,
+  isRefreshingKurs,
+  onRefreshKurs,
 }) {
   const titles = {
     po2026: {
@@ -99,6 +103,16 @@ export default function Header({
 
       {/* Right: Actions & Theme Toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {/* Live USD Rate Ticker (Ortax) */}
+        <UsdRateTicker
+          kurs={kurs || stats?.kursUsd}
+          loading={isRefreshingKurs}
+          onRefresh={onRefreshKurs}
+          isDark={isDark}
+        />
+
+        <div style={{ width: 1, height: 20, backgroundColor: borderColor, margin: '0 2px' }} />
+
         {/* Sync All Multi-Year Button */}
         <Button
           type="primary"

@@ -8,10 +8,18 @@ import {
   AiOutlineCloudServer,
   AiOutlineDatabase,
   AiOutlineApi,
+  AiOutlineGlobal,
 } from 'react-icons/ai';
 import { sendTestWhatsApp, triggerSync } from '../services/api';
 
-export default function SystemTopologyPanel({ stats, onRefresh, isDark }) {
+export default function SystemTopologyPanel({
+  stats,
+  onRefresh,
+  isDark,
+  kurs,
+  onRefreshKurs,
+  isRefreshingKurs,
+}) {
   const [chatId, setChatId] = useState('');
   const [testMessage, setTestMessage] = useState('Halo! Ini pesan tes integrasi Bot PO WhatsApp x Google Sheets.');
   const [sending, setSending] = useState(false);
@@ -176,6 +184,50 @@ export default function SystemTopologyPanel({ stats, onRefresh, isDark }) {
             style={{ marginTop: 4, borderRadius: 6, backgroundColor: '#047857', display: 'inline-flex', alignItems: 'center', gap: 4 }}
           >
             Sinkronkan Sekarang
+          </Button>
+        </div>
+
+        {/* Ortax Kurs BI Scraper */}
+        <div
+          style={{
+            backgroundColor: cardBg,
+            borderRadius: 12,
+            border: `1px solid ${borderColor}`,
+            padding: 16,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontWeight: 700, color: textColor, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <AiOutlineGlobal style={{ color: '#0284c7', fontSize: 16 }} /> 5. Kurs BI Ortax Scraper
+            </span>
+            <Tag color="cyan">LIVE USD</Tag>
+          </div>
+          <div style={{ fontSize: 11, color: mutedColor }}>
+            Target: <code>datacenter.ortax.org/ortax/kursbi/list</code>
+          </div>
+          <div style={{ fontSize: 11, color: textColor }}>
+            Kurs Tengah USD: <b style={{ fontFamily: 'monospace', color: '#0284c7' }}>Rp {kurs?.kursTengah || '17.948,00'}</b> ({kurs?.tanggal || 'Hari ini'})
+          </div>
+          <Button
+            size="small"
+            type="default"
+            icon={<AiOutlineSync style={{ animation: isRefreshingKurs ? 'antRotate 1s infinite linear' : 'none' }} />}
+            loading={isRefreshingKurs}
+            onClick={onRefreshKurs}
+            style={{
+              marginTop: 4,
+              borderRadius: 6,
+              borderColor: '#0284c7',
+              color: '#0284c7',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            Perbarui Kurs Sekarang
           </Button>
         </div>
       </div>

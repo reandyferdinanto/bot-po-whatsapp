@@ -170,6 +170,29 @@ Silakan pilih menu di bawah:
       }
       return true;
 
+    case 'kurs':
+    case 'kursbi':
+    case 'usd':
+      try {
+        const kursService = require('../services/kursService');
+        const k = await kursService.getKursUsd();
+        const trendEmoji = k.trend === 'up' ? '📈 Naik' : (k.trend === 'down' ? '📉 Turun' : '➖ Stabil');
+        const selisihDisplay = k.selisih && k.selisih !== '0,00' ? ` (${k.trend === 'up' ? '+' : '-'}${k.selisih})` : '';
+        let replyKurs = `💵 *KURS TENGAH BI (USD) - ORTAX*\n`;
+        replyKurs += `📅 *Tanggal:* ${k.tanggal}\n`;
+        replyKurs += `─────────────────────────\n`;
+        replyKurs += `🎯 *Kurs Tengah : Rp ${k.kursTengah}* ${selisihDisplay}\n`;
+        replyKurs += `🔺 *Kurs Jual   : Rp ${k.kursJual}*\n`;
+        replyKurs += `🔻 *Kurs Beli   : Rp ${k.kursBeli}*\n`;
+        replyKurs += `📊 *Trend       : ${trendEmoji}*\n`;
+        replyKurs += `─────────────────────────\n`;
+        replyKurs += `ℹ️ _Sumber: Bank Indonesia via Ortax_`;
+        await openwaService.sendText(chatId, replyKurs);
+      } catch (kErr) {
+        await openwaService.sendText(chatId, `❌ Gagal mengambil kurs USD: ${kErr.message}`);
+      }
+      return true;
+
     default:
       return false;
   }

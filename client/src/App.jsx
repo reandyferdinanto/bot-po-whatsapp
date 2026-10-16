@@ -14,7 +14,7 @@ import MaterialsTable from './components/MaterialsTable';
 import SuppliersTable from './components/SuppliersTable';
 import SystemTopologyPanel from './components/SystemTopologyPanel';
 import HistoricalStatsView from './components/HistoricalStatsView';
-import { getStats, getPOs, createPO, updatePO, cancelPO, triggerSync, syncAllSheets } from './services/api';
+import { getStats, getPOs, createPO, updatePO, cancelPO, triggerSync, syncAllSheets, getKursUsd, refreshKursUsd } from './services/api';
 
 export default function App() {
   const location = useLocation();
@@ -25,6 +25,8 @@ export default function App() {
 
   // Data states
   const [stats, setStats] = useState(null);
+  const [kurs, setKurs] = useState(null);
+  const [isRefreshingKurs, setIsRefreshingKurs] = useState(false);
   const [rows, setRows] = useState([]);
   const [selectedRow, setSelectedRow] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -53,12 +55,19 @@ export default function App() {
   const loadData = async () => {
     setIsSyncing(true);
     try {
-      const [statsRes, poRes] = await Promise.all([
+      const [statsRes, poRes, kursRes] = await Promise.all([
         getStats().catch(() => ({ stats: {} })),
         getPOs({ status: statusFilter, search: searchQuery }).catch(() => ({ rows: [] })),
+        getKursUsd().catch(() => ({ success: false })),
       ]);
 
       if (statsRes?.stats) setStats(statsRes.stats);
+      if (kursRes?.data) {
+        setKurs(kursRes.data);
+      } else if (statsRes?.stats?.kursUsd) {
+        setKurs(statsRes.stats.kursUsd);
+      }
+
       if (poRes?.rows) {
         setRows(poRes.rows);
         if (poRes.rows.length > 0 && !selectedRow) {
@@ -69,6 +78,21 @@ export default function App() {
       console.warn('Gagal memuat data:', err.message);
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleRefreshKurs = async () => {
+    setIsRefreshingKurs(true);
+    try {
+      const res = await refreshKursUsd();
+      if (res?.success && res.data) {
+        setKurs(res.data);
+        message.success(`Kurs USD diperbarui: Rp ${res.data.kursTengah} (${res.data.tanggal})`);
+      }
+    } catch (err) {
+      message.error(`Gagal memperbarui kurs USD: ${err.message}`);
+    } finally {
+      setIsRefreshingKurs(false);
     }
   };
 
@@ -186,6 +210,9 @@ export default function App() {
             onOpenOcrTab={() => navigate('/multi-ocr')}
             isDark={isDark}
             toggleTheme={toggleTheme}
+            kurs={kurs}
+            isRefreshingKurs={isRefreshingKurs}
+            onRefreshKurs={handleRefreshKurs}
           />
 
           {/* Main Body Routed Views */}
@@ -205,7 +232,13 @@ export default function App() {
                 path="/"
                 element={
                   <>
-                    <KpiCards stats={stats} isDark={isDark} />
+                    <KpiCards
+                      stats={stats}
+                      isDark={isDark}
+                      kurs={kurs}
+                      onRefreshKurs={handleRefreshKurs}
+                      isRefreshingKurs={isRefreshingKurs}
+                    />
                     <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: 12 }}>
                       <SpreadsheetGrid
                         rows={rows}
@@ -239,7 +272,13 @@ export default function App() {
                 path="/po-2026"
                 element={
                   <>
-                    <KpiCards stats={stats} isDark={isDark} />
+                    <KpiCards
+                      stats={stats}
+                      isDark={isDark}
+                      kurs={kurs}
+                      onRefreshKurs={handleRefreshKurs}
+                      isRefreshingKurs={isRefreshingKurs}
+                    />
                     <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: 12 }}>
                       <SpreadsheetGrid
                         rows={rows}
@@ -321,6 +360,9 @@ export default function App() {
                     stats={stats}
                     onRefresh={loadData}
                     isDark={isDark}
+                    kurs={kurs}
+                    onRefreshKurs={handleRefreshKurs}
+                    isRefreshingKurs={isRefreshingKurs}
                   />
                 }
               />

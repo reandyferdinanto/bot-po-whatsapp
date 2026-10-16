@@ -6,6 +6,7 @@ const { hasValidToken, getSheetsClient } = require('./config/googleAuth');
 const cacheService = require('./services/cacheService');
 const dbService = require('./services/dbService');
 const cronService = require('./services/cronService');
+const kursService = require('./services/kursService');
 const { handleWebhook } = require('./handlers/webhookHandler');
 const apiRoutes = require('./routes/apiRoutes');
 
@@ -34,13 +35,19 @@ app.use(
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Health Check Endpoint
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
   const syncStatus = cacheService.getSyncStatus();
+  let kursUsd = null;
+  try {
+    kursUsd = await kursService.getKursUsd();
+  } catch (kErr) {}
+
   res.json({
     status: 'ok',
     googleAuth: hasValidToken(),
     postgres: dbService.isAvailable(),
     masterCache: syncStatus,
+    kursUsd: kursUsd ? { tengah: kursUsd.kursTengah, tanggal: kursUsd.tanggal, trend: kursUsd.trend } : null,
     openwaSession: env.openwa.sessionId,
     timestamp: new Date().toISOString(),
   });
@@ -115,6 +122,11 @@ async function startServer() {
 
   // 3. Jalankan Cron Job Sinkronisasi Otomatis
   cronService.initCron();
+
+  // 4. Inisialisasi Data Kurs USD Bank Indonesia dari Ortax
+  kursService.getKursUsd().catch(err => {
+    console.warn(`⚠️ Gagal inisialisasi awal Kurs USD: ${err.message}`);
+  });
 
   app.listen(env.port, () => {
     console.log(`\n✅ Server bot berjalan di: http://localhost:${env.port}`);
