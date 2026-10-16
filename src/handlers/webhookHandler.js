@@ -109,16 +109,17 @@ async function handleWebhook(req, res) {
       }
     }
 
-    // Jika TIDAK ada sesi aktif dan pesan TIDAK diawali start/menu: JANGAN MENJAWAB APAPUN
-    if (!session && !isStartOrMenu) {
-      return;
-    }
-
-    // 5. Periksa jika ada perintah langsung (misal: !cari, !cekpo, !menu)
+    // 5. Periksa jika ada perintah langsung (misal: /kurs, /usd, /help, /cari, /cekpo, /menu, dsb.)
+    // Perintah ini berjalan LANGSUNG kapan saja tanpa harus 'start' terlebih dahulu
     const commandHandled = await commandHandler.handleDirectCommand(chatId, body);
     if (commandHandled) return;
 
-    // 6. Teruskan ke State Machine Percakapan Terpandu (Wizard)
+    // 6. Jika TIDAK ada sesi aktif dan bukan perintah langsung: JANGAN MENJAWAB APAPUN (Abaikan chat umum)
+    if (!session) {
+      return;
+    }
+
+    // 7. Teruskan ke State Machine Percakapan Terpandu (Wizard)
     await conversationManager.handleConversationMessage(chatId, body, msg);
   } catch (err) {
     console.error('❌ Error saat menangani webhook:', err);

@@ -5,22 +5,73 @@ const conversationManager = require('./conversationManager');
 const { getSheetsClient, hasValidToken } = require('../config/googleAuth');
 
 /**
- * Memproses perintah cepat bersimbol ! atau /
+ * Memproses perintah cepat bersimbol / atau ! serta keyword penting (kurs, usd, help, menu, start)
  */
 async function handleDirectCommand(chatId, text) {
-  const trimmed = text.trim();
-  if (!trimmed.startsWith('!') && !trimmed.startsWith('/')) {
+  const trimmed = (text || '').trim();
+  if (!trimmed) return false;
+
+  const isPrefixed = trimmed.startsWith('!') || trimmed.startsWith('/');
+  const lower = trimmed.toLowerCase();
+
+  // Kata kunci mandiri yang dapat langsung dieksekusi tanpa awalan simbol
+  const standaloneKeywords = ['kurs', 'usd', 'kursbi', 'help', 'bantuan', 'menu', 'start'];
+  const isStandalone = standaloneKeywords.includes(lower);
+
+  if (!isPrefixed && !isStandalone) {
     return false; // Bukan command langsung
   }
 
-  const parts = trimmed.substring(1).trim().split(/\s+/);
+  const raw = isPrefixed ? trimmed.substring(1).trim() : trimmed;
+  const parts = raw.split(/\s+/);
   const command = (parts[0] || '').toLowerCase();
   const args = parts.slice(1).join(' ').trim();
 
   switch (command) {
+    case 'help':
+    case 'bantuan':
+      await openwaService.sendText(
+        chatId,
+        `*DAFTAR PERINTAH BOT PROCUREMENT*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Anda dapat mengirimkan perintah berikut kapan saja tanpa perlu \`start\` terlebih dahulu:
+
+\`INFORMASI & KURS\`
+▸ */kurs* atau */usd*
+  _Cek Kurs Tengah Bank Indonesia (USD) terkini_
+▸ */help*
+  _Menampilkan panduan semua perintah bot_
+▸ */menu*
+  _Membuka navigasi menu interaktif_
+
+\`PENCARIAN DATA MASTER\`
+▸ */cari <nama_barang / kode>*
+  _Contoh: /cari Hex Nipples atau /cari RM00355_
+  _Rekomendasi vendor utama & histori harga_
+▸ */supplier <nama_vendor>*
+  _Contoh: /supplier Zen Teknik_
+  _Daftar seluruh item yang pernah diorder ke vendor_
+
+\`DOKUMEN PURCHASE ORDER\`
+▸ */cekpo <nomor_po>*
+  _Contoh: /cekpo PO-2026-001_
+  _Detail item, GRPO, status bayar & total PO_
+▸ */batalpo <nomor_po> [alasan]*
+  _Contoh: /batalpo PO-2026-001 Salah order_
+  _Membatalkan PO secara sistem_
+
+\`SINKRONISASI\`
+▸ */sync*
+  _Sinkronkan data master dari Google Sheets_
+
+\`SCAN DOKUMEN OTOMATIS\`
+▸ _Kirim foto atau file PDF dokumen PO / Surat Jalan (GRPO) untuk input & update otomatis via AI OCR._
+━━━━━━━━━━━━━━━━━━━━━━━━`
+      );
+      return true;
+
     case 'menu':
     case 'start':
-    case 'help':
       conversationManager.setSession(chatId, 'MAIN_MENU');
       await openwaService.sendText(
         chatId,
@@ -34,8 +85,37 @@ Silakan pilih menu layanan:
 *[4]*  Batalkan PO
 
 ▸ _Balas angka [1-4] atau kirim dokumen Foto/PDF langsung._
+▸ _Ketik */help* untuk melihat seluruh perintah cepat._
 ━━━━━━━━━━━━━━━━━━━━━━━━`
       );
+      return true;
+
+    case 'kurs':
+    case 'kursbi':
+    case 'usd':
+      try {
+        const kursService = require('../services/kursService');
+        const k = await kursService.getKursUsd();
+        const trendLabel = k.trend === 'up' ? 'Menguat (▲)' : (k.trend === 'down' ? 'Melemah (▼)' : 'Stabil (▬)');
+        const selisihDisplay = k.selisih && k.selisih !== '0,00' ? ` (${k.trend === 'up' ? '+' : '-'}${k.selisih})` : '';
+
+        let replyKurs = `*KURS TENGAH BANK INDONESIA (USD)*
+━━━━━━━━━━━━━━━━━━━━━━━━
+📅 ${k.tanggal}
+
+\`RATE RINGKASAN\`
+▸ Kurs Tengah : *Rp ${k.kursTengah}* ${selisihDisplay}
+▸ Kurs Jual   : Rp ${k.kursJual}
+▸ Kurs Beli   : Rp ${k.kursBeli}
+
+\`STATUS PASAR\`
+▸ Tren Pasar  : *${trendLabel}*
+▸ Sumber Data : Bank Indonesia via Ortax
+━━━━━━━━━━━━━━━━━━━━━━━━`;
+        await openwaService.sendText(chatId, replyKurs);
+      } catch (kErr) {
+        await openwaService.sendText(chatId, `✗ Gagal mengambil kurs USD: ${kErr.message}`);
+      }
       return true;
 
     case 'cari':
@@ -44,8 +124,8 @@ Silakan pilih menu layanan:
           chatId,
           `*PENCARIAN REKOMENDASI VENDOR*
 ━━━━━━━━━━━━━━━━━━━━━━━━
-Format : \`!cari <nama_barang / kode>\`
-Contoh : \`!cari RM00355\` atau \`!cari Hex Nipples\`
+Format : \`/cari <nama_barang / kode>\`
+Contoh : \`/cari RM00355\` atau \`/cari Hex Nipples\`
 ━━━━━━━━━━━━━━━━━━━━━━━━`
         );
         return true;
@@ -91,8 +171,8 @@ Kata Kunci : *"${args}"* (${supTotal} ditemukan)
           chatId,
           `*RIWAYAT PEMBELIAN VENDOR*
 ━━━━━━━━━━━━━━━━━━━━━━━━
-Format : \`!supplier <nama_vendor>\`
-Contoh : \`!supplier Zen Teknik\`
+Format : \`/supplier <nama_vendor>\`
+Contoh : \`/supplier Zen Teknik\`
 ━━━━━━━━━━━━━━━━━━━━━━━━`
         );
         return true;
@@ -140,8 +220,8 @@ Total Barang Pernah Dipesan : *${vResult.totalItems} jenis*
           chatId,
           `*DETAIL PURCHASE ORDER*
 ━━━━━━━━━━━━━━━━━━━━━━━━
-Format : \`!cekpo <nomor_po>\`
-Contoh : \`!cekpo PO-2026-001\`
+Format : \`/cekpo <nomor_po>\`
+Contoh : \`/cekpo PO-2026-001\`
 ━━━━━━━━━━━━━━━━━━━━━━━━`
         );
         return true;
@@ -181,8 +261,8 @@ Supplier  : *${po.supplier}*
           chatId,
           `*PEMBATALAN PURCHASE ORDER*
 ━━━━━━━━━━━━━━━━━━━━━━━━
-Format : \`!batalpo <nomor_po> [alasan]\`
-Contoh : \`!batalpo PO-2026-001 Salah order\`
+Format : \`/batalpo <nomor_po> [alasan]\`
+Contoh : \`/batalpo PO-2026-001 Salah order\`
 ━━━━━━━━━━━━━━━━━━━━━━━━`
         );
         return true;
@@ -225,34 +305,6 @@ Alasan  : ${alasan}
         );
       } catch (err) {
         await openwaService.sendText(chatId, `✗ Gagal sinkronisasi: ${err.message}`);
-      }
-      return true;
-
-    case 'kurs':
-    case 'kursbi':
-    case 'usd':
-      try {
-        const kursService = require('../services/kursService');
-        const k = await kursService.getKursUsd();
-        const trendLabel = k.trend === 'up' ? 'Menguat (▲)' : (k.trend === 'down' ? 'Melemah (▼)' : 'Stabil (▬)');
-        const selisihDisplay = k.selisih && k.selisih !== '0,00' ? ` (${k.trend === 'up' ? '+' : '-'}${k.selisih})` : '';
-
-        let replyKurs = `*KURS TENGAH BANK INDONESIA (USD)*
-━━━━━━━━━━━━━━━━━━━━━━━━
-📅 ${k.tanggal}
-
-\`RATE RINGKASAN\`
-▸ Kurs Tengah : *Rp ${k.kursTengah}* ${selisihDisplay}
-▸ Kurs Jual   : Rp ${k.kursJual}
-▸ Kurs Beli   : Rp ${k.kursBeli}
-
-\`STATUS PASAR\`
-▸ Tren Pasar  : *${trendLabel}*
-▸ Sumber Data : Bank Indonesia via Ortax
-━━━━━━━━━━━━━━━━━━━━━━━━`;
-        await openwaService.sendText(chatId, replyKurs);
-      } catch (kErr) {
-        await openwaService.sendText(chatId, `✗ Gagal mengambil kurs USD: ${kErr.message}`);
       }
       return true;
 
