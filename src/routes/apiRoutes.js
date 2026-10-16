@@ -109,6 +109,37 @@ router.get('/pos', async (req, res) => {
 });
 
 /**
+ * GET /api/stats/historical - Mengambil statistik multi-tahun (2017 s/d 2026) dari cache lokal (<5ms)
+ */
+router.get('/stats/historical', async (req, res) => {
+  try {
+    const data = await cacheService.getHistoricalStats();
+    res.json({ success: true, ...data });
+  } catch (err) {
+    console.error('❌ Error /api/stats/historical:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/pos/historical - Mengambil transaksi historis multi-tahun dari cache lokal (<5ms)
+ */
+router.get('/pos/historical', async (req, res) => {
+  try {
+    const year = req.query.year || 'ALL';
+    const search = req.query.search || '';
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 50;
+
+    const result = await cacheService.getHistoricalTransactions({ year, search, page, limit });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('❌ Error /api/pos/historical:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * GET /api/pos/:noPo - Detail spesifik 1 PO
  */
 router.get('/pos/:noPo', async (req, res) => {
@@ -269,36 +300,6 @@ router.post('/sync-all', async (req, res) => {
   }
 });
 
-/**
- * GET /api/stats/historical - Mengambil statistik multi-tahun (2017 s/d 2026) dari cache lokal (<5ms)
- */
-router.get('/stats/historical', (req, res) => {
-  try {
-    const data = cacheService.getHistoricalStats();
-    res.json({ success: true, ...data });
-  } catch (err) {
-    console.error('❌ Error /api/stats/historical:', err.message);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-/**
- * GET /api/pos/historical - Mengambil transaksi historis multi-tahun dari cache lokal (<5ms)
- */
-router.get('/pos/historical', (req, res) => {
-  try {
-    const year = req.query.year || 'ALL';
-    const search = req.query.search || '';
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 50;
-
-    const result = cacheService.getHistoricalTransactions({ year, search, page, limit });
-    res.json({ success: true, ...result });
-  } catch (err) {
-    console.error('❌ Error /api/pos/historical:', err.message);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
 
 /**
  * POST /api/ocr/parse - Multi-File & Multi-Page OCR Document Parser

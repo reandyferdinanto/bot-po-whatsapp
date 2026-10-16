@@ -18,6 +18,98 @@ let fuseSupplier = null;
 let lastSyncedAt = null;
 
 /**
+ * Mendeteksi pemetaan indeks kolom secara dinamis berdasarkan baris header (Row 2).
+ */
+function getColumnMapping(headers) {
+  const map = {};
+  if (!headers || !Array.isArray(headers)) return map;
+
+  headers.forEach((h, idx) => {
+    if (!h) return;
+    const clean = String(h).replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+
+    if (/^no\.?$/i.test(clean) || /^no\s*urut/i.test(clean)) {
+      if (map.no === undefined) map.no = idx;
+    } else if (/^status/i.test(clean)) {
+      if (map.status === undefined) map.status = idx;
+    } else if (/^date$/i.test(clean) || /^tanggal\s*po/i.test(clean) || /^tgl\s*po/i.test(clean)) {
+      if (map.date === undefined) map.date = idx;
+    } else if (/^no\.?\s*po$/i.test(clean) || /^nomor\s*po/i.test(clean)) {
+      if (map.noPo === undefined) map.noPo = idx;
+    } else if (/^supplier/i.test(clean) || /^vendor/i.test(clean)) {
+      if (map.supplier === undefined) map.supplier = idx;
+    } else if (/quot/i.test(clean) || /vendor\s*reff/i.test(clean) || /penawaran/i.test(clean)) {
+      if (map.quotation === undefined) map.quotation = idx;
+    } else if (/kode.*material/i.test(clean) || /kode.*item/i.test(clean) || /kode.*barang/i.test(clean)) {
+      if (map.kode === undefined) map.kode = idx;
+    } else if (/nama.*material/i.test(clean) || /nama.*barang/i.test(clean) || /deskripsi/i.test(clean)) {
+      if (map.nama === undefined) map.nama = idx;
+    } else if (/^qty/i.test(clean) || /^quantity/i.test(clean) || /^jumlah/i.test(clean)) {
+      if (map.qty === undefined) map.qty = idx;
+    } else if (/price\s*unit/i.test(clean) || /harga\s*satuan/i.test(clean) || /harga\s*unit/i.test(clean)) {
+      if (map.priceUnit === undefined) map.priceUnit = idx;
+    } else if (/^discount/i.test(clean) || /^diskon/i.test(clean) || /^disc/i.test(clean)) {
+      if (map.discount === undefined) map.discount = idx;
+    } else if (/^ppn$/i.test(clean) || /^pajak$/i.test(clean) || /^vat$/i.test(clean)) {
+      if (map.ppn === undefined) map.ppn = idx;
+    } else if (/^total$/i.test(clean) || /^total\s*harga/i.test(clean)) {
+      if (map.total === undefined) map.total = idx;
+    } else if (/^no\.?\s*grpo/i.test(clean) || /^grpo\s*no/i.test(clean)) {
+      if (map.grpo === undefined) map.grpo = idx;
+    } else if (/last\s*date.*grpo/i.test(clean) || /grpo.*done/i.test(clean)) {
+      if (map.lastGrpoDate === undefined) map.lastGrpoDate = idx;
+    } else if (/tanggal\s*bayar/i.test(clean) || /tgl\s*bayar/i.test(clean)) {
+      if (map.tglBayar === undefined) map.tglBayar = idx;
+    } else if (/tanggal\s*invoice/i.test(clean) || /tgl\s*invoice/i.test(clean)) {
+      if (map.tglInvoice === undefined) map.tglInvoice = idx;
+    } else if (/no\.?\s*invoice/i.test(clean) || /nomor\s*invoice/i.test(clean)) {
+      if (map.noInvoice === undefined) map.noInvoice = idx;
+    } else if (/^ket/i.test(clean) || /^keterangan/i.test(clean) || /^notes?/i.test(clean)) {
+      if (map.ket === undefined) map.ket = idx;
+    } else if (/^tanggal$/i.test(clean)) {
+      if (map.tglBayar === undefined) map.tglBayar = idx;
+    }
+  });
+
+  return map;
+}
+
+/**
+ * Membersihkan dan mengubah teks angka/mata uang ke angka float murni.
+ */
+function parseNumeric(val) {
+  if (val === undefined || val === null || val === '') return 0;
+  if (typeof val === 'number') return val;
+  const s = String(val).trim();
+  if (s === '-' || s === 'Rp -' || s === 'IDR -' || s === '0') return 0;
+
+  let clean = s.replace(/[^0-9.,-]/g, '');
+  if (!clean) return 0;
+
+  if (clean.includes('.') && clean.includes(',')) {
+    if (clean.lastIndexOf(',') > clean.lastIndexOf('.')) {
+      clean = clean.replace(/\./g, '').replace(',', '.');
+    } else {
+      clean = clean.replace(/,/g, '');
+    }
+  } else if (clean.includes(',')) {
+    const parts = clean.split(',');
+    if (parts.length > 2 || (parts.length === 2 && parts[1].length === 3)) {
+      clean = clean.replace(/,/g, '');
+    } else {
+      clean = clean.replace(',', '.');
+    }
+  } else if (clean.includes('.')) {
+    const parts = clean.split('.');
+    if (parts.length > 2 || (parts.length === 2 && parts[1].length === 3)) {
+      clean = clean.replace(/\./g, '');
+    }
+  }
+  const n = parseFloat(clean);
+  return isNaN(n) ? 0 : n;
+}
+
+/**
  * Memuat dan meng-cache tab 'database Material', 'database Supplier Material', dan 'PO 2026' ke memory & PostgreSQL.
  */
 async function syncMasterData(sheetsClient) {
@@ -35,7 +127,7 @@ async function syncMasterData(sheetsClient) {
       }),
       sheetsClient.spreadsheets.values.get({
         spreadsheetId: env.sheets.spreadsheetId,
-        range: "'PO 2026'!A2:W",
+        range: "'PO 2026'!A1:Z",
       }).catch(err => {
         console.warn('ℹ️ Skip PO 2026 sync:', err.message);
         return { data: { values: [] } };
@@ -87,32 +179,97 @@ async function syncMasterData(sheetsClient) {
       ignoreLocation: true,
     });
 
-    // 3. Process PO 2026 Rows
+    // 3. Process PO 2026 Rows dengan pemetaan dinamis
     const poRawRows = poRes.data.values || [];
-    const poList = poRawRows
-      .filter(r => r && r[3])
-      .map((r, idx) => ({
-        rowIndex: idx + 2,
-        no: r[0] || '',
-        status: r[1] || 'Open',
-        date: r[2] || '',
-        noPo: r[3] || '',
-        supplier: r[4] || '',
-        quotation: r[5] || '',
-        kode: (r[6] || '').trim().toUpperCase(),
-        nama: r[7] || '',
-        qty: parseFloat(r[8]) || 0,
-        priceUnit: parseFloat(r[13]) || 0,
-        discount: parseFloat(r[14]) || 0,
-        ppn: parseFloat(r[15]) || 0,
-        total: parseFloat(r[16]) || 0,
-        grpo: r[17] || '',
-        lastGrpoDate: r[18] || '',
-        tglBayar: r[19] || '',
-        tglInvoice: r[20] || '',
-        noInvoice: r[21] || '',
-        ket: r[22] || '',
-      }));
+    let headerRowIdx = 1;
+    if (!poRawRows[1] || poRawRows[1].filter(Boolean).length < 3) {
+      headerRowIdx = 0;
+    }
+    const headers = poRawRows[headerRowIdx] || [];
+    const map = getColumnMapping(headers);
+
+    const poList = [];
+    let currentHeader = {
+      no: '',
+      status: 'Open',
+      date: '',
+      noPo: '',
+      supplier: '',
+      quotation: '',
+      grpo: '',
+      lastGrpoDate: '',
+      tglBayar: '',
+      tglInvoice: '',
+      noInvoice: '',
+      ket: '',
+    };
+
+    for (let r = headerRowIdx + 1; r < poRawRows.length; r++) {
+      const row = poRawRows[r];
+      if (!row || row.length === 0) continue;
+
+      const rowNoPo = (map.noPo !== undefined && row[map.noPo]) ? String(row[map.noPo]).trim() : '';
+      if (rowNoPo && rowNoPo !== '-' && rowNoPo !== '"') {
+        currentHeader = {
+          no: (map.no !== undefined && row[map.no]) ? String(row[map.no]).trim() : '',
+          status: (map.status !== undefined && row[map.status]) ? String(row[map.status]).trim() : 'Open',
+          date: (map.date !== undefined && row[map.date]) ? String(row[map.date]).trim() : '',
+          noPo: rowNoPo,
+          supplier: (map.supplier !== undefined && row[map.supplier]) ? String(row[map.supplier]).trim() : '',
+          quotation: (map.quotation !== undefined && row[map.quotation]) ? String(row[map.quotation]).trim() : '',
+          grpo: (map.grpo !== undefined && row[map.grpo]) ? String(row[map.grpo]).trim() : '',
+          lastGrpoDate: (map.lastGrpoDate !== undefined && row[map.lastGrpoDate]) ? String(row[map.lastGrpoDate]).trim() : '',
+          tglBayar: (map.tglBayar !== undefined && row[map.tglBayar]) ? String(row[map.tglBayar]).trim() : '',
+          tglInvoice: (map.tglInvoice !== undefined && row[map.tglInvoice]) ? String(row[map.tglInvoice]).trim() : '',
+          noInvoice: (map.noInvoice !== undefined && row[map.noInvoice]) ? String(row[map.noInvoice]).trim() : '',
+          ket: (map.ket !== undefined && row[map.ket]) ? String(row[map.ket]).trim() : '',
+        };
+      }
+
+      const rawKode = (map.kode !== undefined && row[map.kode]) ? String(row[map.kode]).trim().toUpperCase() : '';
+      const nama = (map.nama !== undefined && row[map.nama]) ? String(row[map.nama]).trim() : '';
+      const qty = map.qty !== undefined ? parseNumeric(row[map.qty]) : 0;
+      const priceUnit = map.priceUnit !== undefined ? parseNumeric(row[map.priceUnit]) : 0;
+      const discount = map.discount !== undefined ? parseNumeric(row[map.discount]) : 0;
+      const ppn = map.ppn !== undefined ? parseNumeric(row[map.ppn]) : 0;
+      let total = map.total !== undefined ? parseNumeric(row[map.total]) : 0;
+
+      if (!total && qty > 0 && priceUnit > 0) {
+        total = Math.round(qty * priceUnit * (1 - discount) + ppn);
+      }
+
+      const hasItem = !!(rawKode || nama || qty > 0 || priceUnit > 0 || total > 0);
+      const isHeaderRow = !!rowNoPo;
+      if (!hasItem && !isHeaderRow) continue;
+      if (!currentHeader.noPo) continue;
+
+      const itemObj = {
+        rowIndex: r + 1,
+        sheetName: 'PO 2026',
+        year: '2026',
+        no: currentHeader.no || '',
+        status: currentHeader.status || 'Open',
+        date: currentHeader.date || '',
+        noPo: currentHeader.noPo,
+        supplier: currentHeader.supplier || '',
+        quotation: currentHeader.quotation || '',
+        kode: rawKode,
+        nama,
+        qty,
+        priceUnit,
+        discount,
+        ppn,
+        total,
+        grpo: (map.grpo !== undefined && row[map.grpo]) ? String(row[map.grpo]).trim() : currentHeader.grpo,
+        lastGrpoDate: (map.lastGrpoDate !== undefined && row[map.lastGrpoDate]) ? String(row[map.lastGrpoDate]).trim() : currentHeader.lastGrpoDate,
+        tglBayar: (map.tglBayar !== undefined && row[map.tglBayar]) ? String(row[map.tglBayar]).trim() : currentHeader.tglBayar,
+        tglInvoice: (map.tglInvoice !== undefined && row[map.tglInvoice]) ? String(row[map.tglInvoice]).trim() : currentHeader.tglInvoice,
+        noInvoice: (map.noInvoice !== undefined && row[map.noInvoice]) ? String(row[map.noInvoice]).trim() : currentHeader.noInvoice,
+        ket: (map.ket !== undefined && row[map.ket]) ? String(row[map.ket]).trim() : currentHeader.ket,
+      };
+
+      poList.push(itemObj);
+    }
 
     // Hitung Indeks Harga (Min, Max, Terakhir per material)
     priceCache.clear();
@@ -128,6 +285,7 @@ async function syncMasterData(sheetsClient) {
           latestPrice: p.priceUnit,
           latestSupplier: p.supplier,
           latestDate: p.date,
+          latestPo: p.noPo,
           totalOrders: 1,
         });
       } else {
@@ -137,6 +295,7 @@ async function syncMasterData(sheetsClient) {
         item.latestPrice = p.priceUnit;
         item.latestSupplier = p.supplier || item.latestSupplier;
         item.latestDate = p.date || item.latestDate;
+        item.latestPo = p.noPo || item.latestPo;
         item.totalOrders++;
       }
     }
@@ -145,9 +304,9 @@ async function syncMasterData(sheetsClient) {
     transactionsList = poList;
     lastSyncedAt = new Date();
 
-    // 4. Sinkronisasi ke PostgreSQL jika aktif
+    // 4. Sinkronisasi ke PostgreSQL jika aktif (Gunakan partial replace agar data 2017-2025 tidak terhapus)
     if (dbService.isAvailable()) {
-      await dbService.syncFromSheetsToPg(materialList, supplierList, poList, priceList);
+      await dbService.syncFromSheetsToPg(materialList, supplierList, poList, priceList, { fullReplace: false });
     }
 
     console.log(`✅ Master Data tersinkronisasi: ${materialList.length} Material, ${supplierList.length} Supplier Master, ${poList.length} PO Transaksi, ${priceList.length} Indeks Harga.`);
@@ -565,7 +724,7 @@ async function syncAllSheets(sheetsClient) {
       "'database Material'!A2:C",
       "'database Supplier Material'!A2:F",
     ];
-    const poRanges = poSheetNames.map((name) => `'${name}'!A2:W`);
+    const poRanges = poSheetNames.map((name) => `'${name}'!A1:Z`);
     const allRanges = [...masterRanges, ...poRanges];
 
     let valueRanges = [];
@@ -634,7 +793,7 @@ async function syncAllSheets(sheetsClient) {
       ignoreLocation: true,
     });
 
-    // 5. Process Seluruh Tab PO (Index 2 ke atas)
+    // 5. Process Seluruh Tab PO (Index 2 ke atas) dengan Pemetaan Kolom Dinamis
     allYearsTransactions = [];
     const yearlyBreakdown = [];
     let grandTotalSpendAll = 0;
@@ -661,63 +820,131 @@ async function syncAllSheets(sheetsClient) {
       const yearPoSet = new Set();
       const currentSheetItems = [];
 
-      for (let r = 0; r < rawRows.length; r++) {
+      if (rawRows.length < 2) {
+        yearlyBreakdown.push({
+          year,
+          sheetName,
+          totalRows: 0,
+          totalPOs: 0,
+          totalSpend: 0,
+          countOpen: 0,
+          countClose: 0,
+          countPending: 0,
+          countCancelled: 0,
+        });
+        continue;
+      }
+
+      // Deteksi baris header (Biasanya Row index 1 / Row 2 di Google Sheets)
+      let headerRowIdx = 1;
+      if (!rawRows[1] || rawRows[1].filter(Boolean).length < 3) {
+        headerRowIdx = 0;
+      }
+      const headers = rawRows[headerRowIdx] || [];
+      const map = getColumnMapping(headers);
+
+      let currentHeader = {
+        no: '',
+        status: 'Closed',
+        date: '',
+        noPo: '',
+        supplier: '',
+        quotation: '',
+        grpo: '',
+        lastGrpoDate: '',
+        tglBayar: '',
+        tglInvoice: '',
+        noInvoice: '',
+        ket: '',
+      };
+
+      for (let r = headerRowIdx + 1; r < rawRows.length; r++) {
         const row = rawRows[r];
-        if (!row || !row[3]) continue;
+        if (!row || row.length === 0) continue;
 
-        const noPo = (row[3] || '').trim();
-        const status = (row[1] || 'Open').trim();
-        const kode = (row[6] || '').trim().toUpperCase();
-        const nama = (row[7] || '').trim();
-        const qty = parseFloat(String(row[8] || '0').replace(/,/g, '')) || 0;
-        const priceUnit = parseFloat(String(row[13] || '0').replace(/[^0-9.-]/g, '')) || 0;
-        const discount = parseFloat(String(row[14] || '0').replace(/,/g, '')) || 0;
-        const ppn = parseFloat(String(row[15] || '0').replace(/[^0-9.-]/g, '')) || 0;
+        // Ambil header transaksi baru jika ada
+        const rowNoPo = (map.noPo !== undefined && row[map.noPo]) ? String(row[map.noPo]).trim() : '';
+        if (rowNoPo && rowNoPo !== '-' && rowNoPo !== '"') {
+          currentHeader = {
+            no: (map.no !== undefined && row[map.no]) ? String(row[map.no]).trim() : '',
+            status: (map.status !== undefined && row[map.status]) ? String(row[map.status]).trim() : 'Closed',
+            date: (map.date !== undefined && row[map.date]) ? String(row[map.date]).trim() : '',
+            noPo: rowNoPo,
+            supplier: (map.supplier !== undefined && row[map.supplier]) ? String(row[map.supplier]).trim() : '',
+            quotation: (map.quotation !== undefined && row[map.quotation]) ? String(row[map.quotation]).trim() : '',
+            grpo: (map.grpo !== undefined && row[map.grpo]) ? String(row[map.grpo]).trim() : '',
+            lastGrpoDate: (map.lastGrpoDate !== undefined && row[map.lastGrpoDate]) ? String(row[map.lastGrpoDate]).trim() : '',
+            tglBayar: (map.tglBayar !== undefined && row[map.tglBayar]) ? String(row[map.tglBayar]).trim() : '',
+            tglInvoice: (map.tglInvoice !== undefined && row[map.tglInvoice]) ? String(row[map.tglInvoice]).trim() : '',
+            noInvoice: (map.noInvoice !== undefined && row[map.noInvoice]) ? String(row[map.noInvoice]).trim() : '',
+            ket: (map.ket !== undefined && row[map.ket]) ? String(row[map.ket]).trim() : '',
+          };
+        }
 
-        let total = parseFloat(String(row[16] || '0').replace(/[^0-9.-]/g, ''));
-        if (isNaN(total) || total === 0) {
+        // Ambil data item material dari kolom yang sesuai
+        const rawKode = (map.kode !== undefined && row[map.kode]) ? String(row[map.kode]).trim().toUpperCase() : '';
+        const nama = (map.nama !== undefined && row[map.nama]) ? String(row[map.nama]).trim() : '';
+        const qty = map.qty !== undefined ? parseNumeric(row[map.qty]) : 0;
+        const priceUnit = map.priceUnit !== undefined ? parseNumeric(row[map.priceUnit]) : 0;
+        const discount = map.discount !== undefined ? parseNumeric(row[map.discount]) : 0;
+        const ppn = map.ppn !== undefined ? parseNumeric(row[map.ppn]) : 0;
+        let total = map.total !== undefined ? parseNumeric(row[map.total]) : 0;
+
+        if (!total && qty > 0 && priceUnit > 0) {
           total = Math.round(qty * priceUnit * (1 - discount) + ppn);
         }
 
-        const supplier = (row[4] || '').trim();
+        // Validasi apakah baris ini berisi data valid
+        const hasItem = !!(rawKode || nama || qty > 0 || priceUnit > 0 || total > 0);
+        const isHeaderRow = !!rowNoPo;
+
+        if (!hasItem && !isHeaderRow) continue;
+        if (!currentHeader.noPo) continue;
+
+        const rowGrpo = (map.grpo !== undefined && row[map.grpo]) ? String(row[map.grpo]).trim() : currentHeader.grpo;
+        const rowLastGrpoDate = (map.lastGrpoDate !== undefined && row[map.lastGrpoDate]) ? String(row[map.lastGrpoDate]).trim() : currentHeader.lastGrpoDate;
+        const rowTglBayar = (map.tglBayar !== undefined && row[map.tglBayar]) ? String(row[map.tglBayar]).trim() : currentHeader.tglBayar;
+        const rowTglInvoice = (map.tglInvoice !== undefined && row[map.tglInvoice]) ? String(row[map.tglInvoice]).trim() : currentHeader.tglInvoice;
+        const rowNoInvoice = (map.noInvoice !== undefined && row[map.noInvoice]) ? String(row[map.noInvoice]).trim() : currentHeader.noInvoice;
+        const rowKet = (map.ket !== undefined && row[map.ket]) ? String(row[map.ket]).trim() : currentHeader.ket;
 
         const itemObj = {
-          rowIndex: r + 2,
+          rowIndex: r + 1,
           sheetName,
           year,
-          no: row[0] || '',
-          status,
-          date: row[2] || '',
-          noPo,
-          supplier,
-          quotation: row[5] || '',
-          kode,
+          no: currentHeader.no || '',
+          status: currentHeader.status || 'Closed',
+          date: currentHeader.date || '',
+          noPo: currentHeader.noPo,
+          supplier: currentHeader.supplier || '',
+          quotation: currentHeader.quotation || '',
+          kode: rawKode,
           nama,
           qty,
           priceUnit,
           discount,
           ppn,
           total,
-          grpo: row[17] || '',
-          lastGrpoDate: row[18] || '',
-          tglBayar: row[19] || '',
-          tglInvoice: row[20] || '',
-          noInvoice: row[21] || '',
-          ket: row[22] || '',
+          grpo: rowGrpo || '',
+          lastGrpoDate: rowLastGrpoDate || '',
+          tglBayar: rowTglBayar || '',
+          tglInvoice: rowTglInvoice || '',
+          noInvoice: rowNoInvoice || '',
+          ket: rowKet || '',
         };
 
         currentSheetItems.push(itemObj);
         allYearsTransactions.push(itemObj);
-        yearPoSet.add(noPo);
-        globalPoSet.add(noPo);
+        yearPoSet.add(currentHeader.noPo);
+        globalPoSet.add(currentHeader.noPo);
 
-        const stLower = status.toLowerCase();
-        if (stLower === 'cancelled') {
+        const stLower = (currentHeader.status || '').toLowerCase();
+        if (stLower === 'cancelled' || stLower === 'cancel') {
           countCancelled++;
         } else {
           yearSpend += total;
           grandTotalSpendAll += total;
-          if (stLower === 'close' || stLower === 'lunas') {
+          if (stLower === 'close' || stLower === 'closed' || stLower === 'lunas') {
             countClose++;
           } else if (stLower === 'pending') {
             countPending++;
@@ -725,11 +952,11 @@ async function syncAllSheets(sheetsClient) {
             countOpen++;
           }
 
-          if (supplier) {
-            const sKey = supplier.toLowerCase();
+          if (currentHeader.supplier) {
+            const sKey = currentHeader.supplier.toLowerCase();
             if (!supplierAggregateMap.has(sKey)) {
               supplierAggregateMap.set(sKey, {
-                supplierName: supplier,
+                supplierName: currentHeader.supplier,
                 totalSpend: 0,
                 poCount: new Set(),
                 totalQty: 0,
@@ -738,45 +965,48 @@ async function syncAllSheets(sheetsClient) {
             const sEntry = supplierAggregateMap.get(sKey);
             sEntry.totalSpend += total;
             sEntry.totalQty += qty;
-            sEntry.poCount.add(noPo);
+            sEntry.poCount.add(currentHeader.noPo);
           }
 
-          if (kode) {
-            if (!materialAggregateMap.has(kode)) {
-              materialAggregateMap.set(kode, {
-                kode,
-                nama,
+          if (rawKode) {
+            if (!materialAggregateMap.has(rawKode)) {
+              materialAggregateMap.set(rawKode, {
+                kode: rawKode,
+                nama: nama || (materialCache.get(rawKode) ? materialCache.get(rawKode).nama : ''),
                 totalQty: 0,
                 orderCount: 0,
                 totalSpend: 0,
               });
             }
-            const mEntry = materialAggregateMap.get(kode);
+            const mEntry = materialAggregateMap.get(rawKode);
             mEntry.totalQty += qty;
             mEntry.orderCount++;
             mEntry.totalSpend += total;
           }
         }
 
-        if (kode && priceUnit > 0) {
-          if (!priceCache.has(kode)) {
-            priceCache.set(kode, {
-              kode,
-              nama,
+        // Catat Histori Harga Material (Urut tahun naik, sehingga tahun terbaru menjadi harga terakhir)
+        if (rawKode && priceUnit > 0) {
+          if (!priceCache.has(rawKode)) {
+            priceCache.set(rawKode, {
+              kode: rawKode,
+              nama: nama || (materialCache.get(rawKode) ? materialCache.get(rawKode).nama : ''),
               minPrice: priceUnit,
               maxPrice: priceUnit,
               latestPrice: priceUnit,
-              latestSupplier: supplier,
-              latestDate: row[2] || '',
+              latestSupplier: currentHeader.supplier || '',
+              latestDate: currentHeader.date || '',
+              latestPo: currentHeader.noPo || '',
               totalOrders: 1,
             });
           } else {
-            const pInfo = priceCache.get(kode);
+            const pInfo = priceCache.get(rawKode);
             pInfo.minPrice = Math.min(pInfo.minPrice, priceUnit);
             pInfo.maxPrice = Math.max(pInfo.maxPrice, priceUnit);
             pInfo.latestPrice = priceUnit;
-            pInfo.latestSupplier = supplier || pInfo.latestSupplier;
-            pInfo.latestDate = row[2] || pInfo.latestDate;
+            if (currentHeader.supplier) pInfo.latestSupplier = currentHeader.supplier;
+            if (currentHeader.date) pInfo.latestDate = currentHeader.date;
+            if (currentHeader.noPo) pInfo.latestPo = currentHeader.noPo;
             pInfo.totalOrders++;
           }
         }
@@ -831,7 +1061,7 @@ async function syncAllSheets(sheetsClient) {
     };
 
     if (dbService.isAvailable()) {
-      await dbService.syncFromSheetsToPg(materialList, supplierList, allYearsTransactions, priceList);
+      await dbService.syncFromSheetsToPg(materialList, supplierList, allYearsTransactions, priceList, { fullReplace: true });
     }
 
     console.log(
@@ -858,10 +1088,19 @@ async function syncAllSheets(sheetsClient) {
   }
 }
 
-function getHistoricalStats() {
-  if (historicalStatsSummary) {
+async function getHistoricalStats() {
+  if (historicalStatsSummary && historicalStatsSummary.totalYears > 1) {
     return historicalStatsSummary;
   }
+
+  if (dbService.isAvailable()) {
+    const pgStats = await dbService.getHistoricalStatsFromPg();
+    if (pgStats && pgStats.totalYears > 1) {
+      historicalStatsSummary = pgStats;
+      return pgStats;
+    }
+  }
+
   const currentTotal = transactionsList.reduce(
     (sum, t) => sum + (t.status?.toLowerCase() !== 'cancelled' ? (t.total || 0) : 0),
     0
@@ -892,8 +1131,16 @@ function getHistoricalStats() {
   };
 }
 
-function getHistoricalTransactions(options = {}) {
+async function getHistoricalTransactions(options = {}) {
   const { year, search, page = 1, limit = 50 } = options;
+
+  if (dbService.isAvailable()) {
+    const pgRes = await dbService.getHistoricalTransactionsFromPg({ year, search, page, limit });
+    if (pgRes) {
+      return pgRes;
+    }
+  }
+
   let list = allYearsTransactions.length > 0 ? allYearsTransactions : transactionsList;
 
   if (year && year !== 'ALL') {

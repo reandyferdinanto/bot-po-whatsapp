@@ -82,32 +82,44 @@ async function migrateTables() {
         CREATE TABLE IF NOT EXISTS transactions_po (
           id SERIAL PRIMARY KEY,
           row_index INT,
-          no_urut VARCHAR(50),
-          status VARCHAR(50),
-          tanggal VARCHAR(50),
-          no_po VARCHAR(100) NOT NULL,
+          no_urut TEXT,
+          status TEXT,
+          tanggal TEXT,
+          no_po TEXT NOT NULL,
           supplier TEXT,
           quotation TEXT,
-          kode_material VARCHAR(50),
+          kode_material TEXT,
           nama_material TEXT,
           qty NUMERIC DEFAULT 0,
           price_unit NUMERIC DEFAULT 0,
           discount NUMERIC DEFAULT 0,
           ppn NUMERIC DEFAULT 0,
           total NUMERIC DEFAULT 0,
-          no_grpo VARCHAR(100),
-          last_grpo_date VARCHAR(50),
-          tgl_bayar VARCHAR(50),
-          tgl_invoice VARCHAR(50),
-          no_invoice VARCHAR(100),
+          no_grpo TEXT,
+          last_grpo_date TEXT,
+          tgl_bayar TEXT,
+          tgl_invoice TEXT,
+          no_invoice TEXT,
           ket TEXT,
-          sheet_name VARCHAR(50) DEFAULT 'PO 2026',
-          tahun VARCHAR(10) DEFAULT '2026',
+          sheet_name TEXT DEFAULT 'PO 2026',
+          tahun TEXT DEFAULT '2026',
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         CREATE INDEX IF NOT EXISTS idx_po_nopo ON transactions_po (no_po);
-        ALTER TABLE transactions_po ADD COLUMN IF NOT EXISTS sheet_name VARCHAR(50) DEFAULT 'PO 2026';
-        ALTER TABLE transactions_po ADD COLUMN IF NOT EXISTS tahun VARCHAR(10) DEFAULT '2026';
+        ALTER TABLE transactions_po ADD COLUMN IF NOT EXISTS sheet_name TEXT DEFAULT 'PO 2026';
+        ALTER TABLE transactions_po ADD COLUMN IF NOT EXISTS tahun TEXT DEFAULT '2026';
+        ALTER TABLE transactions_po ALTER COLUMN no_urut TYPE TEXT;
+        ALTER TABLE transactions_po ALTER COLUMN status TYPE TEXT;
+        ALTER TABLE transactions_po ALTER COLUMN tanggal TYPE TEXT;
+        ALTER TABLE transactions_po ALTER COLUMN no_po TYPE TEXT;
+        ALTER TABLE transactions_po ALTER COLUMN kode_material TYPE TEXT;
+        ALTER TABLE transactions_po ALTER COLUMN no_grpo TYPE TEXT;
+        ALTER TABLE transactions_po ALTER COLUMN last_grpo_date TYPE TEXT;
+        ALTER TABLE transactions_po ALTER COLUMN tgl_bayar TYPE TEXT;
+        ALTER TABLE transactions_po ALTER COLUMN tgl_invoice TYPE TEXT;
+        ALTER TABLE transactions_po ALTER COLUMN no_invoice TYPE TEXT;
+        ALTER TABLE transactions_po ALTER COLUMN sheet_name TYPE TEXT;
+        ALTER TABLE transactions_po ALTER COLUMN tahun TYPE TEXT;
         CREATE INDEX IF NOT EXISTS idx_po_tahun ON transactions_po (tahun);
         CREATE INDEX IF NOT EXISTS idx_po_sheet ON transactions_po (sheet_name);
       `);
@@ -115,16 +127,20 @@ async function migrateTables() {
       // 5. Tabel Riwayat Harga Material (Min, Max, Terakhir)
       await client.query(`
         CREATE TABLE IF NOT EXISTS material_prices (
-          kode VARCHAR(50) PRIMARY KEY,
+          kode VARCHAR(100) PRIMARY KEY,
           nama TEXT,
           harga_min NUMERIC DEFAULT 0,
           harga_max NUMERIC DEFAULT 0,
           harga_terakhir NUMERIC DEFAULT 0,
           supplier_terakhir TEXT,
-          tgl_terakhir VARCHAR(50),
+          tgl_terakhir TEXT,
+          latest_po TEXT,
           total_transaksi INT DEFAULT 0,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+        ALTER TABLE material_prices ADD COLUMN IF NOT EXISTS latest_po TEXT;
+        ALTER TABLE material_prices ALTER COLUMN kode TYPE VARCHAR(100);
+        ALTER TABLE material_prices ALTER COLUMN tgl_terakhir TYPE TEXT;
         CREATE INDEX IF NOT EXISTS idx_mat_prices_kode ON material_prices (kode);
       `);
 
@@ -144,7 +160,7 @@ async function migrateTables() {
 /**
  * Sinkronisasi data dari Google Sheets ke PostgreSQL (Batch Upsert).
  */
-async function syncFromSheetsToPg(materials, suppliers, poItems = [], priceList = []) {
+async function syncFromSheetsToPg(materials, suppliers, poItems = [], priceList = [], options = {}) {
   if (!isDbConnected && !(await migrateTables())) {
     return false;
   }
@@ -178,24 +194,62 @@ async function syncFromSheetsToPg(materials, suppliers, poItems = [], priceList 
       }
     }
 
-    // 3. Refresh Transactions PO jika disediakan
+    // 3. Transactions PO (Support Full Replace vs Specific Sheet Update)
     if (poItems && poItems.length > 0) {
-      await client.query('TRUNCATE TABLE transactions_po RESTART IDENTITY;');
-      for (const p of poItems) {
-        await client.query(`
+      if (options.fullReplace) {
+        await client.query('TRUNCATE TABLE transactions_po RESTART IDENTITY;');
+      } else {
+        const affectedSheets = [...new Set(poItems.map(p => p.sheetName || 'PO 2026'))];
+        await client.query('DELETE FROM transactions_po WHERE sheet_name = ANY($1);', [affectedSheets]);
+      }
+
+      // Batch insert in chunks of 100 items (22 columns = 2200 parameters per query)
+      const chunkSize = 100;
+      for (let i = 0; i < poItems.length; i += chunkSize) {
+        const chunk = poItems.slice(i, i + chunkSize);
+        const valuePlaceholders = [];
+        const params = [];
+        let pIdx = 1;
+
+        for (const p of chunk) {
+          const rowParams = [
+            p.rowIndex || 0,
+            p.no || '',
+            p.status || 'Open',
+            p.date || '',
+            p.noPo || '',
+            p.supplier || '',
+            p.quotation || '',
+            p.kode || '',
+            p.nama || '',
+            p.qty || 0,
+            p.priceUnit || 0,
+            p.discount || 0,
+            p.ppn || 0,
+            p.total || 0,
+            p.grpo || '',
+            p.lastGrpoDate || '',
+            p.tglBayar || '',
+            p.tglInvoice || '',
+            p.noInvoice || '',
+            p.ket || '',
+            p.sheetName || 'PO 2026',
+            p.year || '2026'
+          ];
+          const placeholders = rowParams.map(() => `$${pIdx++}`);
+          valuePlaceholders.push(`(${placeholders.join(', ')})`);
+          params.push(...rowParams);
+        }
+
+        const insertQuery = `
           INSERT INTO transactions_po (
             row_index, no_urut, status, tanggal, no_po, supplier, quotation,
             kode_material, nama_material, qty, price_unit, discount, ppn,
             total, no_grpo, last_grpo_date, tgl_bayar, tgl_invoice, no_invoice, ket,
             sheet_name, tahun
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22);
-        `, [
-          p.rowIndex || 0, p.no || '', p.status || 'Open', p.date || '', p.noPo || '',
-          p.supplier || '', p.quotation || '', p.kode || '', p.nama || '', p.qty || 0,
-          p.priceUnit || 0, p.discount || 0, p.ppn || 0, p.total || 0, p.grpo || '',
-          p.lastGrpoDate || '', p.tglBayar || '', p.tglInvoice || '', p.noInvoice || '', p.ket || '',
-          p.sheetName || 'PO 2026', p.year || '2026'
-        ]);
+          ) VALUES ${valuePlaceholders.join(', ')};
+        `;
+        await client.query(insertQuery, params);
       }
     }
 
@@ -205,8 +259,8 @@ async function syncFromSheetsToPg(materials, suppliers, poItems = [], priceList 
         await client.query(`
           INSERT INTO material_prices (
             kode, nama, harga_min, harga_max, harga_terakhir,
-            supplier_terakhir, tgl_terakhir, total_transaksi, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
+            supplier_terakhir, tgl_terakhir, latest_po, total_transaksi, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
           ON CONFLICT (kode) DO UPDATE SET
             nama = EXCLUDED.nama,
             harga_min = EXCLUDED.harga_min,
@@ -214,17 +268,18 @@ async function syncFromSheetsToPg(materials, suppliers, poItems = [], priceList 
             harga_terakhir = EXCLUDED.harga_terakhir,
             supplier_terakhir = EXCLUDED.supplier_terakhir,
             tgl_terakhir = EXCLUDED.tgl_terakhir,
+            latest_po = EXCLUDED.latest_po,
             total_transaksi = EXCLUDED.total_transaksi,
             updated_at = CURRENT_TIMESTAMP;
         `, [
           pr.kode, pr.nama || '', pr.minPrice || 0, pr.maxPrice || 0, pr.latestPrice || 0,
-          pr.latestSupplier || '', pr.latestDate || '', pr.totalOrders || 0
+          pr.latestSupplier || '', pr.latestDate || '', pr.latestPo || '', pr.totalOrders || 0
         ]);
       }
     }
 
     await client.query('COMMIT');
-    console.log(`✅ Sinkronisasi PostgreSQL berhasil: ${materials.length} Material, ${suppliers.length} Supplier, ${priceList.length} Indeks Harga.`);
+    console.log(`✅ Sinkronisasi PostgreSQL berhasil: ${materials.length} Material, ${suppliers.length} Supplier, ${poItems.length} Transaksi PO (${options.fullReplace ? 'Full Replace' : 'Partial'}), ${priceList.length} Indeks Harga.`);
     return true;
   } catch (err) {
     await client.query('ROLLBACK');
@@ -502,6 +557,194 @@ async function getAllSuppliersFromPg(query = '', page = 1, limit = 25) {
   }
 }
 
+/**
+ * Mengambil rekap analitik multi-tahun (2017-2026) langsung dari PostgreSQL.
+ */
+async function getHistoricalStatsFromPg() {
+  if (!isDbConnected && !(await migrateTables())) return null;
+
+  try {
+    const breakdownRes = await pool.query(`
+      SELECT
+        tahun as "year",
+        sheet_name as "sheetName",
+        COUNT(*)::int as "totalRows",
+        COUNT(DISTINCT no_po)::int as "totalPOs",
+        COALESCE(SUM(total), 0)::numeric as "totalSpend",
+        COUNT(*) FILTER (WHERE status ILIKE '%open%')::int as "countOpen",
+        COUNT(*) FILTER (WHERE status ILIKE '%clos%' OR status ILIKE '%lunas%')::int as "countClose",
+        COUNT(*) FILTER (WHERE status ILIKE '%pend%')::int as "countPending",
+        COUNT(*) FILTER (WHERE status ILIKE '%cancel%')::int as "countCancelled"
+      FROM transactions_po
+      GROUP BY tahun, sheet_name
+      ORDER BY tahun ASC;
+    `);
+
+    if (!breakdownRes.rows || breakdownRes.rows.length === 0) return null;
+
+    const yearlyBreakdown = breakdownRes.rows.map((r) => ({
+      year: r.year,
+      sheetName: r.sheetName,
+      totalRows: r.totalRows,
+      totalPOs: r.totalPOs,
+      totalSpend: Math.round(parseFloat(r.totalSpend) || 0),
+      countOpen: r.countOpen,
+      countClose: r.countClose,
+      countPending: r.countPending,
+      countCancelled: r.countCancelled,
+    }));
+
+    const totalAllRows = yearlyBreakdown.reduce((sum, y) => sum + y.totalRows, 0);
+    const totalAllSpend = yearlyBreakdown.reduce((sum, y) => sum + y.totalSpend, 0);
+
+    const distinctPoRes = await pool.query(`SELECT COUNT(DISTINCT no_po)::int as "totalAllPOs" FROM transactions_po;`);
+    const totalAllPOs = distinctPoRes.rows[0]?.totalAllPOs || 0;
+
+    const topSuppliersRes = await pool.query(`
+      SELECT
+        supplier as "supplierName",
+        COALESCE(SUM(total), 0)::numeric as "totalSpend",
+        COUNT(DISTINCT no_po)::int as "totalOrders",
+        COALESCE(SUM(qty), 0)::numeric as "totalQty"
+      FROM transactions_po
+      WHERE supplier IS NOT NULL AND TRIM(supplier) != ''
+      GROUP BY supplier
+      ORDER BY SUM(total) DESC
+      LIMIT 10;
+    `);
+    const topSuppliersAllTime = topSuppliersRes.rows.map((s) => ({
+      supplierName: s.supplierName,
+      totalSpend: Math.round(parseFloat(s.totalSpend) || 0),
+      totalOrders: s.totalOrders,
+      totalQty: Math.round(parseFloat(s.totalQty) || 0),
+    }));
+
+    const topMaterialsRes = await pool.query(`
+      SELECT
+        kode_material as "kode",
+        nama_material as "nama",
+        COALESCE(SUM(qty), 0)::numeric as "totalQty",
+        COUNT(DISTINCT no_po)::int as "orderCount",
+        COALESCE(SUM(total), 0)::numeric as "totalSpend"
+      FROM transactions_po
+      WHERE (kode_material IS NOT NULL AND TRIM(kode_material) != '')
+         OR (nama_material IS NOT NULL AND TRIM(nama_material) != '')
+      GROUP BY kode_material, nama_material
+      ORDER BY COUNT(DISTINCT no_po) DESC, SUM(qty) DESC
+      LIMIT 10;
+    `);
+    const topMaterialsAllTime = topMaterialsRes.rows.map((m) => ({
+      kode: m.kode || '',
+      nama: m.nama || '',
+      totalQty: Math.round(parseFloat(m.totalQty) || 0),
+      orderCount: m.orderCount,
+      totalSpend: Math.round(parseFloat(m.totalSpend) || 0),
+    }));
+
+    const sheetsSynced = yearlyBreakdown.map((y) => y.sheetName);
+
+    return {
+      totalYears: yearlyBreakdown.length,
+      totalAllRows,
+      totalAllPOs,
+      totalAllSpend,
+      averageSpendPerYear: Math.round(totalAllSpend / (yearlyBreakdown.length || 1)),
+      yearlyBreakdown,
+      topSuppliersAllTime,
+      topMaterialsAllTime,
+      sheetsSynced,
+      lastSyncedAt: new Date(),
+    };
+  } catch (err) {
+    console.error('❌ Gagal query historical stats dari PostgreSQL:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Mengambil daftar baris transaksi historis dari PostgreSQL dengan filter tahun, pencarian, dan paginasi.
+ */
+async function getHistoricalTransactionsFromPg(options = {}) {
+  if (!isDbConnected && !(await migrateTables())) return null;
+
+  try {
+    const { year = 'ALL', search = '', page = 1, limit = 50 } = options;
+    const conditions = [];
+    const params = [];
+
+    if (year && year !== 'ALL') {
+      params.push(String(year));
+      conditions.push(`tahun = $${params.length}`);
+    }
+
+    if (search && search.trim()) {
+      params.push(`%${search.trim()}%`);
+      const pIdx = params.length;
+      conditions.push(`(
+        no_po ILIKE $${pIdx} OR
+        supplier ILIKE $${pIdx} OR
+        kode_material ILIKE $${pIdx} OR
+        nama_material ILIKE $${pIdx} OR
+        no_grpo ILIKE $${pIdx} OR
+        no_invoice ILIKE $${pIdx}
+      )`);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const countRes = await pool.query(`SELECT COUNT(*)::int as total FROM transactions_po ${whereClause};`, params);
+    const total = countRes.rows[0]?.total || 0;
+
+    const offset = (page - 1) * limit;
+    params.push(limit, offset);
+    const sql = `
+      SELECT
+        id,
+        row_index as "rowIndex",
+        no_urut as "no",
+        status,
+        tanggal as "date",
+        no_po as "noPo",
+        supplier,
+        quotation,
+        kode_material as "kode",
+        nama_material as "nama",
+        qty::numeric,
+        price_unit::numeric as "priceUnit",
+        discount::numeric,
+        ppn::numeric,
+        total::numeric,
+        no_grpo as "grpo",
+        last_grpo_date as "lastGrpoDate",
+        tgl_bayar as "tglBayar",
+        tgl_invoice as "tglInvoice",
+        no_invoice as "noInvoice",
+        ket,
+        sheet_name as "sheetName",
+        tahun as "year"
+      FROM transactions_po
+      ${whereClause}
+      ORDER BY id ASC
+      LIMIT $${params.length - 1} OFFSET $${params.length};
+    `;
+
+    const dataRes = await pool.query(sql, params);
+    const items = dataRes.rows.map((r) => ({
+      ...r,
+      qty: parseFloat(r.qty) || 0,
+      priceUnit: parseFloat(r.priceUnit) || 0,
+      discount: parseFloat(r.discount) || 0,
+      ppn: parseFloat(r.ppn) || 0,
+      total: parseFloat(r.total) || 0,
+    }));
+
+    return { total, page, limit, items };
+  } catch (err) {
+    console.error('❌ Gagal query historical transactions dari PostgreSQL:', err.message);
+    return null;
+  }
+}
+
 function isAvailable() {
   return isDbConnected;
 }
@@ -515,5 +758,7 @@ module.exports = {
   getPOFromPg,
   getSupplierItemsFromPg,
   getAllSuppliersFromPg,
+  getHistoricalStatsFromPg,
+  getHistoricalTransactionsFromPg,
   isAvailable,
 };

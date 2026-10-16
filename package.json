@@ -9,6 +9,7 @@
     "dev:client": "cd client && npm run dev",
     "build": "npm run build:client",
     "auth": "node auth-google.js",
+    "sync:all": "node scripts/syncAllYears.js",
     "test": "node -e \"console.log('OK')\""
   },
   "keywords": [],
