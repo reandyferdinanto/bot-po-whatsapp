@@ -144,6 +144,29 @@ async function migrateTables() {
         CREATE INDEX IF NOT EXISTS idx_mat_prices_kode ON material_prices (kode);
       `);
 
+      // 6. Tabel Riwayat Kurs (USD dsb.)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS kurs_history (
+          id SERIAL PRIMARY KEY,
+          currency VARCHAR(10) NOT NULL,
+          name TEXT,
+          kurs_tengah NUMERIC,
+          kurs_jual NUMERIC,
+          kurs_beli NUMERIC,
+          kurs_tengah_raw TEXT,
+          kurs_jual_raw TEXT,
+          kurs_beli_raw TEXT,
+          trend VARCHAR(20),
+          trend_text TEXT,
+          selisih TEXT,
+          selisih_num NUMERIC,
+          tanggal TEXT,
+          source TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_kurs_currency_created ON kurs_history (currency, created_at DESC);
+      `);
+
       isDbConnected = true;
       console.log('✅ PostgreSQL Schema siap & termigrasi.');
       return true;
