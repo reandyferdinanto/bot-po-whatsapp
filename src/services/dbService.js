@@ -792,6 +792,13 @@ function isAvailable() {
   return isDbConnected;
 }
 
+function getPool() {
+  if (!pool && env.db.enabled) {
+    initDb();
+  }
+  return pool;
+}
+
 module.exports = {
   initDb,
   migrateTables,
@@ -805,4 +812,6 @@ module.exports = {
   getHistoricalStatsFromPg,
   getHistoricalTransactionsFromPg,
   isAvailable,
+  getPool,
 };
+
