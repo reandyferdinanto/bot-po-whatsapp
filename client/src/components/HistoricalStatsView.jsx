@@ -27,21 +27,12 @@ import {
   AiOutlineCalendar,
   AiOutlineReload,
 } from 'react-icons/ai';
-import { getHistoricalStats, getHistoricalPOs, syncAllSheets } from '../services/api';
+import { getHistoricalStats, syncAllSheets } from '../services/api';
 
 export default function HistoricalStatsView({ isDark }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [syncingAll, setSyncingAll] = useState(false);
-
-  // Transactions explorer states
-  const [selectedYear, setSelectedYear] = useState('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [transactions, setTransactions] = useState([]);
-  const [txTotal, setTxTotal] = useState(0);
-  const [txPage, setTxPage] = useState(1);
-  const [txPageSize, setTxPageSize] = useState(25);
-  const [txLoading, setTxLoading] = useState(false);
 
   const formatRupiah = (val) => 'Rp ' + Number(val || 0).toLocaleString('id-ID');
 
@@ -59,33 +50,9 @@ export default function HistoricalStatsView({ isDark }) {
     }
   };
 
-  const loadTransactions = async () => {
-    setTxLoading(true);
-    try {
-      const res = await getHistoricalPOs({
-        year: selectedYear,
-        search: searchQuery,
-        page: txPage,
-        limit: txPageSize,
-      });
-      if (res) {
-        setTransactions(res.items || []);
-        setTxTotal(res.total || 0);
-      }
-    } catch (err) {
-      console.warn('Gagal load transaksi historis:', err.message);
-    } finally {
-      setTxLoading(false);
-    }
-  };
-
   useEffect(() => {
     loadStats();
   }, []);
-
-  useEffect(() => {
-    loadTransactions();
-  }, [selectedYear, searchQuery, txPage, txPageSize]);
 
   // Eksekusi Sinkronisasi Seluruh Sheet (2017 - 2026)
   const handleTriggerSyncAll = async () => {
@@ -124,7 +91,6 @@ export default function HistoricalStatsView({ isDark }) {
         });
 
         await loadStats();
-        await loadTransactions();
       }
     } catch (err) {
       message.destroy('sync-all-proc');
@@ -202,101 +168,6 @@ export default function HistoricalStatsView({ isDark }) {
           <Tag color="blue">Open: {r.countOpen || 0}</Tag>
           {r.countCancelled > 0 && <Tag color="red">Batal: {r.countCancelled}</Tag>}
         </div>
-      ),
-    },
-    {
-      title: 'Aksi',
-      key: 'action',
-      width: 130,
-      align: 'center',
-      render: (_, r) => (
-        <Button
-          size="small"
-          type="link"
-          onClick={() => {
-            setSelectedYear(r.year);
-            setTxPage(1);
-          }}
-          style={{ fontSize: 11 }}
-        >
-          Lihat Transaksi
-        </Button>
-      ),
-    },
-  ];
-
-  const transactionColumns = [
-    {
-      title: 'Tahun',
-      dataIndex: 'year',
-      key: 'year',
-      width: 90,
-      align: 'center',
-      render: (yr, r) => <Tag color="purple">{yr || r.sheetName || '2026'}</Tag>,
-    },
-    {
-      title: 'No. PO',
-      dataIndex: 'noPo',
-      key: 'noPo',
-      width: 130,
-      render: (noPo) => <strong style={{ color: '#2563eb', fontFamily: 'monospace' }}>{noPo}</strong>,
-    },
-    {
-      title: 'Tanggal',
-      dataIndex: 'date',
-      key: 'date',
-      width: 100,
-    },
-    {
-      title: 'Supplier',
-      dataIndex: 'supplier',
-      key: 'supplier',
-      width: 200,
-      render: (sup) => <span style={{ fontWeight: 600 }}>{sup || '-'}</span>,
-    },
-    {
-      title: 'Barang',
-      key: 'material',
-      render: (_, r) => (
-        <div>
-          <Tag color="cyan">{r.kode || 'JASA'}</Tag>
-          <span>{r.nama || '-'}</span>
-        </div>
-      ),
-    },
-    {
-      title: 'Qty',
-      dataIndex: 'qty',
-      key: 'qty',
-      width: 75,
-      align: 'right',
-    },
-    {
-      title: 'Harga Satuan',
-      dataIndex: 'priceUnit',
-      key: 'priceUnit',
-      width: 120,
-      align: 'right',
-      render: (p) => formatRupiah(p),
-    },
-    {
-      title: 'Total Nilai',
-      dataIndex: 'total',
-      key: 'total',
-      width: 135,
-      align: 'right',
-      render: (t) => <strong style={{ color: '#047857', fontFamily: 'monospace' }}>{formatRupiah(t)}</strong>,
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      width: 95,
-      align: 'center',
-      render: (s) => (
-        <Tag color={s === 'Close' ? 'green' : s === 'Cancelled' ? 'red' : 'blue'}>
-          {s || 'Open'}
-        </Tag>
       ),
     },
   ];
@@ -705,94 +576,6 @@ export default function HistoricalStatsView({ isDark }) {
             )}
           </div>
         </div>
-      </div>
-
-      {/* Interactive Historical Transactions Explorer */}
-      <div
-        style={{
-          backgroundColor: cardBg,
-          borderRadius: 12,
-          border: `1px solid ${borderColor}`,
-          padding: 16,
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: 12,
-            marginBottom: 12,
-          }}
-        >
-          <div>
-            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: textColor }}>
-              🔍 Penjelajah Transaksi Historis (Live Cache &lt;5ms)
-            </h3>
-            <p style={{ margin: '2px 0 0 0', fontSize: 11, color: mutedColor }}>
-              Jelajahi dan saring seluruh transaksi dari tahun 2017 s/d 2026 secara instan.
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {/* Filter Tahun */}
-            <Select
-              value={selectedYear}
-              onChange={(val) => {
-                setSelectedYear(val);
-                setTxPage(1);
-              }}
-              style={{ width: 140 }}
-              options={[
-                { label: 'Semua Tahun', value: 'ALL' },
-                ...((stats?.yearlyBreakdown || []).map((y) => ({
-                  label: `Tahun ${y.year}`,
-                  value: y.year,
-                }))),
-              ]}
-            />
-
-            <Input
-              prefix={<AiOutlineSearch style={{ color: '#94a3b8' }} />}
-              placeholder="Cari No PO, Supplier, Material..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setTxPage(1);
-              }}
-              allowClear
-              style={{ width: 240, borderRadius: 8, fontSize: 12 }}
-            />
-
-            <Button
-              icon={<AiOutlineReload />}
-              onClick={loadTransactions}
-              style={{ borderRadius: 8 }}
-              title="Refresh tabel"
-            />
-          </div>
-        </div>
-
-        <Table
-          rowKey={(r, i) => `${r.year}_${r.noPo}_${i}`}
-          columns={transactionColumns}
-          dataSource={transactions}
-          loading={txLoading}
-          size="small"
-          pagination={{
-            current: txPage,
-            pageSize: txPageSize,
-            total: txTotal,
-            showSizeChanger: true,
-            pageSizeOptions: ['25', '50', '100'],
-            onChange: (p, ps) => {
-              setTxPage(p);
-              setTxPageSize(ps);
-            },
-            showTotal: (tot) => `Total ${tot} Transaksi`,
-          }}
-        />
       </div>
     </div>
   );
