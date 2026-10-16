@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Input, Tag, Card, Button } from 'antd';
+import { Table, Input, Tag, Card, Button, Tooltip } from 'antd';
 import { AiOutlineSearch, AiOutlineReload } from 'react-icons/ai';
 import { getMaterials } from '../services/api';
 
@@ -54,24 +54,29 @@ export default function MaterialsTable({ isDark }) {
       render: (nama) => <span style={{ fontWeight: 600 }}>{nama}</span>,
     },
     {
-      title: 'Histori Harga (Min / Max / Terakhir)',
-      key: 'priceHistory',
-      width: 280,
-      render: (_, r) => {
-        if (!r.hargaTerakhir || r.hargaTerakhir <= 0) {
-          return <span style={{ color: '#94a3b8', fontSize: 11 }}>Belum ada riwayat PO</span>;
+      title: 'Last Price',
+      dataIndex: 'hargaTerakhir',
+      key: 'lastPrice',
+      width: 180,
+      render: (val, r) => {
+        const price = Number(val || r.hargaTerbaru || 0);
+        if (price <= 0) {
+          return <span style={{ color: '#94a3b8', fontSize: 12 }}>-</span>;
         }
         return (
-          <div style={{ fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <div>
-              <strong>Terbaru:</strong> <span style={{ color: '#059669', fontFamily: 'monospace' }}>{formatRupiah(r.hargaTerakhir)}</span>
-            </div>
-            {r.hargaMin !== r.hargaMax && (
-              <div style={{ color: '#64748b' }}>
-                Rentang: {formatRupiah(r.hargaMin)} - {formatRupiah(r.hargaMax)}
-              </div>
-            )}
-          </div>
+          <Tooltip title={r.supplierTerakhir ? `Vendor: ${r.supplierTerakhir}${r.tglTerakhir ? ' (' + r.tglTerakhir + ')' : ''}` : 'Harga terakhir dari riwayat PO'}>
+            <span
+              style={{
+                fontWeight: 700,
+                color: '#059669',
+                fontFamily: 'monospace',
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >
+              {formatRupiah(price)}
+            </span>
+          </Tooltip>
         );
       },
     },

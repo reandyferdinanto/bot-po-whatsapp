@@ -510,7 +510,20 @@ function getSyncStatus() {
   };
 }
 
-function getAllMaterials(query = '', page = 1, limit = 50) {
+async function getAllMaterials(query = '', page = 1, limit = 50) {
+  // 1. Coba query dari PostgreSQL yang memiliki data histori harga lengkap (1.509 material)
+  if (dbService.isAvailable()) {
+    try {
+      const pgRes = await dbService.getAllMaterialsFromPg(query, page, limit);
+      if (pgRes && pgRes.items && pgRes.items.length > 0) {
+        return pgRes;
+      }
+    } catch (pgErr) {
+      console.warn('⚠️ Gagal query getAllMaterialsFromPg, fallback ke RAM:', pgErr.message);
+    }
+  }
+
+  // 2. Fallback In-Memory cache
   let list = materialList;
   if (query) {
     const q = query.trim().toLowerCase();

@@ -292,7 +292,7 @@ router.get('/materials', async (req, res) => {
       }
     }
 
-    const result = cacheService.getAllMaterials(query, page, limit);
+    const result = await cacheService.getAllMaterials(query, page, limit);
     res.json({ success: true, ...result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

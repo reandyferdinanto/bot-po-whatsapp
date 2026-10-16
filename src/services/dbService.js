@@ -375,6 +375,68 @@ async function searchMaterialFromPg(query, limit = 15) {
 }
 
 /**
+ * Mengambil katalog master material dengan pagination dan histori harga terakhir dari PostgreSQL.
+ */
+async function getAllMaterialsFromPg(query = '', page = 1, limit = 50) {
+  if (!isDbConnected && !(await migrateTables())) return null;
+
+  try {
+    const offset = (page - 1) * limit;
+    let countQuery = 'SELECT count(*) FROM master_materials';
+    let dataQuery = `
+      SELECT
+        m.kode,
+        m.nama,
+        m.no_urut as "no",
+        COALESCE(p.harga_min, 0)::numeric as "hargaMin",
+        COALESCE(p.harga_max, 0)::numeric as "hargaMax",
+        COALESCE(p.harga_terakhir, 0)::numeric as "hargaTerakhir",
+        COALESCE(p.supplier_terakhir, '') as "supplierTerakhir",
+        COALESCE(p.tgl_terakhir, '') as "tglTerakhir",
+        COALESCE(p.total_transaksi, 0) as "totalTransaksi"
+      FROM master_materials m
+      LEFT JOIN material_prices p ON m.kode = p.kode
+    `;
+
+    const countParams = [];
+    const dataParams = [];
+
+    if (query) {
+      const qPattern = `%${query.trim()}%`;
+      countQuery += ' WHERE kode ILIKE $1 OR nama ILIKE $1';
+      countParams.push(qPattern);
+
+      dataQuery += ' WHERE m.kode ILIKE $1 OR m.nama ILIKE $1';
+      dataParams.push(qPattern);
+
+      dataQuery += ' ORDER BY CASE WHEN m.kode ILIKE $1 THEN 1 ELSE 2 END, m.kode ASC LIMIT $2 OFFSET $3';
+      dataParams.push(limit, offset);
+    } else {
+      dataQuery += ' ORDER BY NULLIF(regexp_replace(m.no_urut, \'\\D\', \'\', \'g\'), \'\')::int NULLS LAST, m.kode ASC LIMIT $1 OFFSET $2';
+      dataParams.push(limit, offset);
+    }
+
+    const [countRes, dataRes] = await Promise.all([
+      pool.query(countQuery, countParams),
+      pool.query(dataQuery, dataParams),
+    ]);
+
+    const total = parseInt(countRes.rows[0].count, 10) || 0;
+    const items = dataRes.rows.map(r => ({
+      ...r,
+      hargaMin: parseFloat(r.hargaMin) || 0,
+      hargaMax: parseFloat(r.hargaMax) || 0,
+      hargaTerakhir: parseFloat(r.hargaTerakhir) || 0,
+    }));
+
+    return { total, page, limit, items };
+  } catch (err) {
+    console.warn('⚠️ Gagal query getAllMaterialsFromPg:', err.message);
+    return null;
+  }
+}
+
+/**
  * Mengambil detail PO berdasarkan Nomor PO dari database PostgreSQL.
  */
 async function getPOFromPg(noPo) {
@@ -828,6 +890,7 @@ module.exports = {
   syncFromSheetsToPg,
   searchSupplierFromPg,
   searchMaterialFromPg,
+  getAllMaterialsFromPg,
   getPOFromPg,
   updatePoInPg,
   getSupplierItemsFromPg,
