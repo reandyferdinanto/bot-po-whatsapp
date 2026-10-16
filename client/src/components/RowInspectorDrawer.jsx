@@ -11,6 +11,7 @@ import {
 
 export default function RowInspectorDrawer({
   selectedRow,
+  allRows = [],
   onEditPo,
   onCancelPo,
   onClose,
@@ -47,6 +48,10 @@ export default function RowInspectorDrawer({
   }
 
   const isCancelled = selectedRow.status?.toLowerCase() === 'cancelled';
+  const matchingItems = allRows.filter(
+    (r) => (r.noPo || '').trim().toUpperCase() === (selectedRow.noPo || '').trim().toUpperCase()
+  );
+  const totalItemsCount = matchingItems.length > 0 ? matchingItems.length : 1;
 
   return (
     <aside
@@ -99,7 +104,7 @@ export default function RowInspectorDrawer({
           disabled={isCancelled}
           style={{ flex: 1, fontSize: 12, borderRadius: 6, backgroundColor: '#2563eb', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
         >
-          Edit Baris PO
+          Edit PO ({totalItemsCount} Material)
         </Button>
         <Button
           danger
@@ -123,8 +128,11 @@ export default function RowInspectorDrawer({
             padding: 12,
           }}
         >
-          <div style={{ fontWeight: 700, color: textColor, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <AiOutlineShop style={{ color: '#059669', fontSize: 16 }} /> Identitas Dokumen
+          <div style={{ fontWeight: 700, color: textColor, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <AiOutlineShop style={{ color: '#059669', fontSize: 16 }} /> Identitas Dokumen
+            </span>
+            <Tag color="purple" style={{ margin: 0, fontWeight: 600 }}>{totalItemsCount} Material</Tag>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>

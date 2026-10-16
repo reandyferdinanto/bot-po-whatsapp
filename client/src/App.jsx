@@ -258,6 +258,7 @@ export default function App() {
                       {isDrawerOpen && (
                         <RowInspectorDrawer
                           selectedRow={selectedRow}
+                          allRows={rows}
                           onEditPo={openEditModal}
                           onCancelPo={openCancelModal}
                           onClose={() => setIsDrawerOpen(false)}
@@ -298,6 +299,7 @@ export default function App() {
                       {isDrawerOpen && (
                         <RowInspectorDrawer
                           selectedRow={selectedRow}
+                          allRows={rows}
                           onEditPo={openEditModal}
                           onCancelPo={openCancelModal}
                           onClose={() => setIsDrawerOpen(false)}
@@ -388,6 +390,7 @@ export default function App() {
         <EditPoModal
           visible={editModalOpen}
           poRow={targetPoRow}
+          allRows={rows}
           onCancel={() => setEditModalOpen(false)}
           onSuccess={handleEditPoSuccess}
           isDark={isDark}

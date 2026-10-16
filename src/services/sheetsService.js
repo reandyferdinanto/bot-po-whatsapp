@@ -170,6 +170,10 @@ async function getPOByNumber(noPo, forceFreshFromSheets = false) {
         kode: row[6] || '',
         nama: row[7] || '',
         qty: parseFloat(row[8]) || 0,
+        ttd: row[9] || '',
+        em: row[10] || '',
+        doNum: row[11] || '',
+        fktInv: row[12] || '',
         priceUnit: parseFloat(row[13]) || 0,
         discount: parseFloat(row[14]) || 0,
         ppn: parseFloat(row[15]) || 0,
@@ -198,27 +202,279 @@ async function getPOByNumber(noPo, forceFreshFromSheets = false) {
     supplier: first.supplier,
     date: first.date,
     status: first.status,
+    quotation: first.quotation,
+    ttd: first.ttd,
+    em: first.em,
+    doNum: first.doNum,
+    fktInv: first.fktInv,
     grpo: first.grpo,
     lastGrpoDate: first.lastGrpoDate,
     tglBayar: first.tglBayar,
     noInvoice: first.noInvoice,
     tglInvoice: first.tglInvoice,
+    ket: first.ket,
     grandTotal,
     items: matchingItems,
   };
 }
 
 /**
+ * Memperbarui seluruh kolom (A s/d W) dan daftar material dari suatu nomor PO.
+ * Mendukung perubahan data header, edit material yang ada, penambahan item baru,
+ * maupun pengurangan item (untuk antisipasi kesalahan OCR atau revisi transaksi).
+ */
+async function updateCompletePO(noPo, updateData) {
+  const existing = await getPOByNumber(noPo, true);
+  if (!existing || existing.items.length === 0) {
+    return { success: false, message: `PO ${noPo} tidak ditemukan di sheet 'PO 2026'.` };
+  }
+
+  const sheets = getSheetsClient();
+  const header = updateData.header || updateData;
+  const newItems = Array.isArray(updateData.items) ? updateData.items : existing.items;
+
+  const targetNoPo = (header.noPo || noPo).trim();
+  const dateStr = header.date || existing.date || getCurrentFormattedDate();
+  const statusStr = header.status || existing.status || 'Open';
+  const supplierStr = (header.supplier || existing.supplier || '').trim();
+  const quotationStr = header.quotation !== undefined ? header.quotation : (existing.quotation || '');
+  const ttdStr = header.ttd !== undefined ? header.ttd : (existing.ttd || '');
+  const emStr = header.em !== undefined ? header.em : (existing.em || '');
+  const doNumStr = header.doNum !== undefined ? header.doNum : (existing.doNum || '');
+  const fktInvStr = header.fktInv !== undefined ? header.fktInv : (existing.fktInv || '');
+  const grpoStr = header.grpo !== undefined ? header.grpo : (existing.grpo || '');
+  const lastGrpoDateStr = header.lastGrpoDate !== undefined ? header.lastGrpoDate : (existing.lastGrpoDate || '');
+  const tglBayarStr = header.tglBayar !== undefined ? header.tglBayar : (existing.tglBayar || '');
+  const tglInvoiceStr = header.tglInvoice !== undefined ? header.tglInvoice : (existing.tglInvoice || '');
+  const noInvoiceStr = header.noInvoice !== undefined ? header.noInvoice : (existing.noInvoice || '');
+  const headerKetStr = header.ket !== undefined ? header.ket : (existing.ket || '');
+
+  const updateRequests = [];
+  const existingCount = existing.items.length;
+  const newCount = newItems.length;
+  const minCount = Math.min(existingCount, newCount);
+
+  const updatedRowsForPg = [];
+
+  // 1. Update baris-baris fisik yang sudah ada (1 s/d minCount)
+  for (let i = 0; i < minCount; i++) {
+    const it = newItems[i];
+    const rIdx = existing.items[i].rowIndex;
+    const noUrut = existing.items[i].no || (i + 1);
+
+    const kode = (it.kode || '').trim().toUpperCase();
+    let nama = it.nama || '';
+    if (!nama && kode) {
+      const cached = cacheService.findMaterialByCode(kode);
+      nama = cached ? cached.nama : '-';
+    }
+
+    const qty = parseFloat(it.qty) || 0;
+    const priceUnit = parseFloat(it.priceUnit !== undefined ? it.priceUnit : it.harga) || 0;
+    const discount = parseFloat(it.discount !== undefined ? it.discount : it.diskon) || 0;
+    const ppn = parseFloat(it.ppn) || 0;
+    const itemTotal = it.total !== undefined && !isNaN(parseFloat(it.total))
+      ? Math.round(parseFloat(it.total))
+      : Math.round((qty * priceUnit) * (1 - discount) + ppn);
+
+    const itemKet = it.ket !== undefined ? it.ket : headerKetStr;
+
+    // Schema 23 Kolom (A - W)
+    const rowValues = [
+      noUrut,             // A: NO.
+      statusStr,          // B: STATUS
+      dateStr,            // C: DATE
+      targetNoPo,         // D: NO. PO
+      supplierStr,        // E: SUPPLIER
+      quotationStr,       // F: QUOT. / Vendor Reff
+      kode,               // G: Kode Item Material
+      nama,               // H: Nama Material
+      qty,                // I: Quantity
+      ttdStr,             // J: TTD
+      emStr,              // K: Em
+      doNumStr,           // L: DO
+      fktInvStr,          // M: Fkt/Inv
+      priceUnit,          // N: Price Unit
+      discount,           // O: Discount
+      ppn,                // P: PPN
+      itemTotal,          // Q: TOTAL
+      grpoStr,            // R: No. GRPO
+      lastGrpoDateStr,    // S: LAST DATE OF GRPO
+      tglBayarStr,        // T: TANGGAL BAYAR
+      tglInvoiceStr,      // U: TANGGAL INVOICE
+      noInvoiceStr,       // V: NO. INVOICE
+      itemKet,            // W: KET
+    ];
+
+    updateRequests.push({
+      range: `'PO 2026'!A${rIdx}:W${rIdx}`,
+      values: [rowValues],
+    });
+
+    updatedRowsForPg.push({
+      rowIndex: rIdx,
+      no: noUrut,
+      status: statusStr,
+      date: dateStr,
+      noPo: targetNoPo,
+      supplier: supplierStr,
+      quotation: quotationStr,
+      kode,
+      nama,
+      qty,
+      priceUnit,
+      discount,
+      ppn,
+      total: itemTotal,
+      grpo: grpoStr,
+      lastGrpoDate: lastGrpoDateStr,
+      tglBayar: tglBayarStr,
+      tglInvoice: tglInvoiceStr,
+      noInvoice: noInvoiceStr,
+      ket: itemKet,
+    });
+  }
+
+  // 2. Jika item baru LEBIH SEDIKIT daripada baris lama (penghapusan item salah baca OCR)
+  if (newCount < existingCount) {
+    for (let i = newCount; i < existingCount; i++) {
+      const rIdx = existing.items[i].rowIndex;
+      const blankRow = new Array(23).fill('');
+      updateRequests.push({
+        range: `'PO 2026'!A${rIdx}:W${rIdx}`,
+        values: [blankRow],
+      });
+    }
+  }
+
+  // Eksekusi batchUpdate ke Google Sheets
+  if (updateRequests.length > 0) {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: env.sheets.spreadsheetId,
+      requestBody: {
+        valueInputOption: 'USER_ENTERED',
+        data: updateRequests,
+      },
+    });
+  }
+
+  // 3. Jika item baru LEBIH BANYAK daripada baris lama (penambahan item terlewat)
+  if (newCount > existingCount) {
+    const { nextNo } = await getLastRowInfo();
+    let curNo = nextNo;
+    const rowsToAppend = [];
+
+    for (let i = existingCount; i < newCount; i++) {
+      const it = newItems[i];
+      const kode = (it.kode || '').trim().toUpperCase();
+      let nama = it.nama || '';
+      if (!nama && kode) {
+        const cached = cacheService.findMaterialByCode(kode);
+        nama = cached ? cached.nama : '-';
+      }
+
+      const qty = parseFloat(it.qty) || 0;
+      const priceUnit = parseFloat(it.priceUnit !== undefined ? it.priceUnit : it.harga) || 0;
+      const discount = parseFloat(it.discount !== undefined ? it.discount : it.diskon) || 0;
+      const ppn = parseFloat(it.ppn) || 0;
+      const itemTotal = it.total !== undefined && !isNaN(parseFloat(it.total))
+        ? Math.round(parseFloat(it.total))
+        : Math.round((qty * priceUnit) * (1 - discount) + ppn);
+
+      const itemKet = it.ket !== undefined ? it.ket : headerKetStr;
+
+      const appendRow = [
+        curNo,
+        statusStr,
+        dateStr,
+        targetNoPo,
+        supplierStr,
+        quotationStr,
+        kode,
+        nama,
+        qty,
+        ttdStr,
+        emStr,
+        doNumStr,
+        fktInvStr,
+        priceUnit,
+        discount,
+        ppn,
+        itemTotal,
+        grpoStr,
+        lastGrpoDateStr,
+        tglBayarStr,
+        tglInvoiceStr,
+        noInvoiceStr,
+        itemKet,
+      ];
+
+      rowsToAppend.push(appendRow);
+      updatedRowsForPg.push({
+        rowIndex: 0,
+        no: curNo,
+        status: statusStr,
+        date: dateStr,
+        noPo: targetNoPo,
+        supplier: supplierStr,
+        quotation: quotationStr,
+        kode,
+        nama,
+        qty,
+        priceUnit,
+        discount,
+        ppn,
+        total: itemTotal,
+        grpo: grpoStr,
+        lastGrpoDate: lastGrpoDateStr,
+        tglBayar: tglBayarStr,
+        tglInvoice: tglInvoiceStr,
+        noInvoice: noInvoiceStr,
+        ket: itemKet,
+      });
+
+      curNo++;
+    }
+
+    if (rowsToAppend.length > 0) {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: env.sheets.spreadsheetId,
+        range: "'PO 2026'!A:W",
+        valueInputOption: 'USER_ENTERED',
+        insertDataOption: 'INSERT_ROWS',
+        requestBody: {
+          values: rowsToAppend,
+        },
+      });
+    }
+  }
+
+  // 4. Update sinkron ke PostgreSQL jika aktif
+  if (dbService.isAvailable() && typeof dbService.updatePoInPg === 'function') {
+    await dbService.updatePoInPg(targetNoPo, updatedRowsForPg).catch(err => {
+      console.warn('⚠️ Gagal sync PostgreSQL setelah update PO:', err.message);
+    });
+  }
+
+  return {
+    success: true,
+    noPo: targetNoPo,
+    itemsUpdated: minCount,
+    itemsAppended: Math.max(0, newCount - existingCount),
+    itemsCleared: Math.max(0, existingCount - newCount),
+  };
+}
+
+/**
  * Memperbarui field status, GRPO, atau pembayaran pada seluruh baris item suatu PO.
- * Update tertarget langsung ke Kolom R s/d W:
- * Kolom R: No. GRPO
- * Kolom S: LAST DATE OF GRPO JOB DONE
- * Kolom T: TANGGAL BAYAR
- * Kolom U: TANGGAL INVOICE
- * Kolom V: NO. INVOICE
- * Kolom W: KET
+ * Jika updateData menyertakan array 'items', otomatis mendelegasikan ke updateCompletePO.
  */
 async function updatePOField(noPo, updateData) {
+  // Jika permintaan berisi daftar items atau isFullUpdate, gunakan fungsi update komprehensif
+  if (Array.isArray(updateData.items) || updateData.isFullUpdate) {
+    return updateCompletePO(noPo, updateData);
+  }
+
   // Selalu ambil live data dari Google Sheets agar rowIndex 100% tepat
   const existing = await getPOByNumber(noPo, true);
   if (!existing || existing.items.length === 0) {
@@ -239,7 +495,7 @@ async function updatePOField(noPo, updateData) {
       });
     }
 
-    // 2. Update tertarget persis ke Kolom R s/d W (6 Kolom: No. GRPO, LAST DATE OF GRPO, TGL BAYAR, TGL INVOICE, NO. INVOICE, KET)
+    // 2. Update tertarget persis ke Kolom R s/d W
     const valGrpo = updateData.grpo !== undefined ? updateData.grpo : (it.grpo || '');
     const valLastDate = updateData.lastGrpoDate !== undefined
       ? updateData.lastGrpoDate
@@ -434,6 +690,7 @@ module.exports = {
   appendPOTransaction,
   getPOByNumber,
   updatePOField,
+  updateCompletePO,
   softDeletePO,
   getAllTransactions,
 };

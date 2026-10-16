@@ -745,6 +745,49 @@ async function getHistoricalTransactionsFromPg(options = {}) {
   }
 }
 
+/**
+ * Memperbarui data transaksi suatu nomor PO di PostgreSQL (PO 2026).
+ */
+async function updatePoInPg(noPo, rows) {
+  if (!isDbConnected && !(await migrateTables())) return false;
+  try {
+    const cleanNo = noPo.trim();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM transactions_po WHERE UPPER(no_po) = UPPER($1) AND tahun = $2', [cleanNo, '2026']);
+      if (rows && rows.length > 0) {
+        for (const r of rows) {
+          await client.query(`
+            INSERT INTO transactions_po (
+              row_index, no_urut, status, tanggal, no_po, supplier, quotation,
+              kode_material, nama_material, qty, price_unit, discount, ppn,
+              total, no_grpo, last_grpo_date, tgl_bayar, tgl_invoice, no_invoice, ket,
+              sheet_name, tahun
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+          `, [
+            r.rowIndex || 0, r.no || '', r.status || 'Open', r.date || '', r.noPo || cleanNo,
+            r.supplier || '', r.quotation || '', r.kode || '', r.nama || '',
+            r.qty || 0, r.priceUnit || 0, r.discount || 0, r.ppn || 0, r.total || 0,
+            r.grpo || '', r.lastGrpoDate || '', r.tglBayar || '', r.tglInvoice || '',
+            r.noInvoice || '', r.ket || '', 'PO 2026', '2026'
+          ]);
+        }
+      }
+      await client.query('COMMIT');
+      return true;
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.warn('⚠️ Gagal update PO di PostgreSQL:', err.message);
+    return false;
+  }
+}
+
 function isAvailable() {
   return isDbConnected;
 }
@@ -756,6 +799,7 @@ module.exports = {
   searchSupplierFromPg,
   searchMaterialFromPg,
   getPOFromPg,
+  updatePoInPg,
   getSupplierItemsFromPg,
   getAllSuppliersFromPg,
   getHistoricalStatsFromPg,
