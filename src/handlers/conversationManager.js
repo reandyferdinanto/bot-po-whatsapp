@@ -35,32 +35,36 @@ function clearSession(chatId) {
  * Format teks menu utama
  */
 function getMainTextMenu() {
-  return `🤖 *SISTEM REKAP PO 2026*
-Halo! Silakan pilih menu di bawah ini:
+  return `*PROCUREMENT ASSISTANT — 2026*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Silakan tentukan menu layanan:
 
-1️⃣ *1* - Input PO Baru (Multi-Item)
-2️⃣ *2* - Cari Data (Supplier / Material / PO)
-3️⃣ *3* - Update Status PO (GRPO / Pembayaran)
-4️⃣ *4* - Hapus / Batalkan PO
+*[1]*  Input PO Baru _(Multi-Item & AI Scan)_
+*[2]*  Pencarian Data _(Vendor, Material & PO)_
+*[3]*  Update Status _(GRPO & Pembayaran)_
+*[4]*  Batalkan PO
 
-📷 _Atau langsung kirim Foto / PDF dokumen PO untuk input otomatis via OCR!_
-💡 _Ketik angka pilihan (1-4) atau ketik 'batal'_`;
+▸ _Balas angka [1-4] atau kirim dokumen Foto/PDF langsung._
+▸ _Ketik *batal* untuk mengakhiri sesi._
+━━━━━━━━━━━━━━━━━━━━━━━━`;
 }
 
 /**
  * Format teks menu pencarian
  */
 function getSearchMenuText() {
-  return `🔍 *MENU PENCARIAN DATA*
-Silakan pilih kategori pencarian:
+  return `*MODUL PENCARIAN DATA*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Pilih kategori pencarian:
 
-1️⃣ *1* - Rekomendasi Vendor Utama (dari Nama Barang)
-2️⃣ *2* - Cari Master Material (Kode / Nama & Rentang Harga)
-3️⃣ *3* - Cek Riwayat Barang di Supplier X (Barang, Harga Min/Max/Terbaru & No. PO)
-4️⃣ *4* - Cek Status & Detail PO Tertentu
+*[1]*  Rekomendasi Vendor Utama _(Nama Barang)_
+*[2]*  Master Material _(Spesifikasi & Rentang Harga)_
+*[3]*  Histori Barang per Vendor _(Katalog Vendor)_
+*[4]*  Cek Status & Detail PO Tertentu
 
-0️⃣ *0* - Kembali ke Menu Utama
-💡 _Ketik angka pilihan (0-4):_`;
+*[0]*  Kembali ke Menu Utama
+▸ _Balas angka pilihan [0-4]:_
+━━━━━━━━━━━━━━━━━━━━━━━━`;
 }
 
 /**
@@ -73,18 +77,15 @@ async function handleConversationMessage(chatId, messageText, rawMessage) {
   // 1. Ambil sesi pengguna saat ini
   const session = getSession(chatId);
 
-  // Periksa apakah pesan diawali dengan 'start' atau 'menu' (case-insensitive: start, Start, menu, Menu, !start, /start, dll)
+  // Periksa apakah pesan diawali dengan 'start' atau 'menu'
   const isStartOrMenu = /^(?:!|\/)?(start|menu)\b/i.test(text);
 
-  // Jika pesan diawali 'start' atau 'menu', selalu buka menu utama & aktifkan sesi
   if (isStartOrMenu) {
     setSession(chatId, 'MAIN_MENU');
     await openwaService.sendText(chatId, getMainTextMenu());
     return;
   }
 
-  // Jika TIDAK ada sesi aktif dan pesan TIDAK diawali start/menu:
-  // JANGAN MENJAWAB APAPUN (Abaikan pesan)
   if (!session || session.state === 'IDLE') {
     return;
   }
@@ -92,7 +93,7 @@ async function handleConversationMessage(chatId, messageText, rawMessage) {
   // 2. Jika ada sesi aktif dan user ingin batal
   if (lower === 'batal' || lower === 'cancel') {
     clearSession(chatId);
-    await openwaService.sendText(chatId, '❌ Sesi dibatalkan. Ketik *menu* atau *start* untuk membuka menu utama.');
+    await openwaService.sendText(chatId, '✓ _Sesi interaktif telah diakhiri. Ketik *menu* untuk memulai kembali._');
     return;
   }
 
@@ -155,13 +156,13 @@ async function handleMainMenuChoice(chatId, choice) {
       setSession(chatId, 'INPUT_PO_HEADER');
       await openwaService.sendText(
         chatId,
-        `📝 *INPUT PO BARU (Langkah 1/2: Info Header)*
-Silakan masukkan *Nomor PO* dan *Nama Supplier* (pisahkan dengan koma).
+        `*INPUT PO BARU — LANGKAH 1/2*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Masukkan *Nomor PO* dan *Nama Vendor* (pisahkan koma).
 
-💡 _Contoh:_
-\`PO-2026-001, PT Buana Logam Perkasa\`
-
-_(Ketik 'batal' untuk membatalkan)_`
+Contoh : \`PO-2026-001, PT Buana Logam Perkasa\`
+▸ _Ketik *batal* untuk keluar._
+━━━━━━━━━━━━━━━━━━━━━━━━`
       );
       break;
 
@@ -174,9 +175,12 @@ _(Ketik 'batal' untuk membatalkan)_`
       setSession(chatId, 'UPDATE_PO_WAIT_NO');
       await openwaService.sendText(
         chatId,
-        `✏️ *UPDATE STATUS PO*
-Silakan ketik *Nomor PO* yang ingin diperbarui:
-Contoh: \`PO-2026-001\``
+        `*UPDATE STATUS PURCHASE ORDER*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Ketik *Nomor PO* yang ingin diperbarui:
+Contoh : \`PO-2026-001\`
+▸ _Ketik *batal* untuk keluar._
+━━━━━━━━━━━━━━━━━━━━━━━━`
       );
       break;
 
@@ -184,14 +188,17 @@ Contoh: \`PO-2026-001\``
       setSession(chatId, 'CANCEL_PO_WAIT_NO');
       await openwaService.sendText(
         chatId,
-        `❌ *BATALKAN / HAPUS PO*
-Silakan ketik *Nomor PO* dan *Alasan Pembatalan* (pisahkan dengan koma):
-Contoh: \`PO-2026-001, Salah spesifikasi material\``
+        `*BATALKAN PURCHASE ORDER*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Ketik *Nomor PO* dan *Alasan Pembatalan* (pisahkan koma):
+Contoh : \`PO-2026-001, Salah spesifikasi material\`
+▸ _Ketik *batal* untuk keluar._
+━━━━━━━━━━━━━━━━━━━━━━━━`
       );
       break;
 
     default:
-      await openwaService.sendText(chatId, 'Pilihan tidak valid. Silakan ketik angka *1*, *2*, *3*, atau *4*.\nKetik *batal* untuk keluar.');
+      await openwaService.sendText(chatId, 'Pilihan tidak valid. Silakan balas angka *1*, *2*, *3*, atau *4*.\nKetik *batal* untuk keluar.');
       break;
   }
 }
@@ -205,7 +212,11 @@ async function handleSearchMenuChoice(chatId, choice) {
       setSession(chatId, 'WAIT_SEARCH_SUPPLIER');
       await openwaService.sendText(
         chatId,
-        '🏢 *Cari Rekomendasi Vendor*\nKetik nama barang atau kode material yang ingin dicari:\nContoh: `Nipples` atau `RM00355`'
+        `*PENCARIAN REKOMENDASI VENDOR*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Ketik nama barang atau kode material yang dicari:
+Contoh : \`Nipples\` atau \`RM00355\`
+━━━━━━━━━━━━━━━━━━━━━━━━`
       );
       break;
 
@@ -213,7 +224,11 @@ async function handleSearchMenuChoice(chatId, choice) {
       setSession(chatId, 'WAIT_SEARCH_MATERIAL');
       await openwaService.sendText(
         chatId,
-        '📦 *Cari Master Material*\nKetik kode atau nama spesifikasi barang:\nContoh: `elbow` atau `gates` atau `OT00736`'
+        `*PENCARIAN MASTER MATERIAL*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Ketik kode atau spesifikasi barang:
+Contoh : \`elbow\` atau \`gates\` atau \`OT00736\`
+━━━━━━━━━━━━━━━━━━━━━━━━`
       );
       break;
 
@@ -221,7 +236,11 @@ async function handleSearchMenuChoice(chatId, choice) {
       setSession(chatId, 'WAIT_SEARCH_SUPPLIER_ITEMS');
       await openwaService.sendText(
         chatId,
-        '🏢 *Cek Riwayat Barang di Supplier X*\nKetik nama vendor/supplier yang ingin dicek:\nContoh: `Zen Teknik` atau `Rivindi` atau `Buana Logam`'
+        `*HISTORI PEMBELIAN PER VENDOR*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Ketik nama vendor / supplier:
+Contoh : \`Zen Teknik\` atau \`Buana Logam\`
+━━━━━━━━━━━━━━━━━━━━━━━━`
       );
       break;
 
@@ -229,7 +248,11 @@ async function handleSearchMenuChoice(chatId, choice) {
       setSession(chatId, 'WAIT_SEARCH_PO');
       await openwaService.sendText(
         chatId,
-        '📋 *Cek Status PO*\nKetik Nomor PO yang ingin dicek:\nContoh: `2600120` atau `PO-2026-001`'
+        `*CEK STATUS PURCHASE ORDER*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Ketik Nomor PO yang ingin diperiksa:
+Contoh : \`2600120\` atau \`PO-2026-001\`
+━━━━━━━━━━━━━━━━━━━━━━━━`
       );
       break;
 
@@ -252,32 +275,35 @@ async function handleSearchSupplierQuery(chatId, query) {
   const total = Array.isArray(res) ? res.length : (res.total || items.length);
 
   if (!items || items.length === 0) {
-    await openwaService.sendText(chatId, `⚠️ Tidak ditemukan riwayat supplier untuk kata kunci: "${query}".`);
+    await openwaService.sendText(chatId, `⚠️ _Tidak ditemukan riwayat supplier untuk kata kunci:_ *"${query}"*.`);
     return;
   }
 
-  let text = `🏢 *HASIL REKOMENDASI SUPPLIER (${total} Ditemukan):*\n`;
+  let text = `*HASIL REKOMENDASI VENDOR*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Kata Kunci : *"${query}"* (${total} ditemukan)
+
+`;
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    text += `\n${i + 1}. *[${item.kode}]* ${item.nama}\n`;
-    text += `   • *Supplier Utama:* ${item.supplierUtama || '-'}\n`;
-    text += `   • *Frekuensi PO:* ${item.frekuensi} kali (${item.totalQty} unit diorder)\n`;
+    text += `*[${item.kode}]* ${item.nama}\n`;
+    text += `  ▸ Vendor Utama : *${item.supplierUtama || '-'}*\n`;
+    text += `  ▸ Histori PO   : ${item.frekuensi}x pemesanan (${item.totalQty} pcs)\n`;
     if (item.hargaMin && item.hargaMin > 0) {
       if (item.hargaMin === item.hargaMax) {
-        text += `   💰 *Histori Harga:* Rp ${item.hargaMin.toLocaleString('id-ID')}\n`;
+        text += `  ▸ Harga PO     : Rp ${item.hargaMin.toLocaleString('id-ID')}\n`;
       } else {
-        text += `   💰 *Histori Harga:* Rp ${item.hargaMin.toLocaleString('id-ID')} _(Termurah)_ - Rp ${item.hargaMax.toLocaleString('id-ID')} _(Termahal)_\n`;
+        text += `  ▸ Rentang Harga: Rp ${item.hargaMin.toLocaleString('id-ID')} — Rp ${item.hargaMax.toLocaleString('id-ID')}\n`;
       }
     }
+    text += `\n`;
   }
 
   if (total > items.length) {
-    text += `\n_... dan ${total - items.length} hasil lainnya._\n`;
-    text += `💡 _Tips: Persempit kata kunci (misal: "${query} 1/2") untuk hasil lebih spesifik._`;
-  } else {
-    text += `\n💡 _Ketik *menu* untuk opsi lainnya._`;
+    text += `▸ _...dan ${total - items.length} hasil lainnya._\n`;
   }
-  await openwaService.sendText(chatId, text);
+  text += `━━━━━━━━━━━━━━━━━━━━━━━━`;
+  await openwaService.sendText(chatId, text.trim());
 }
 
 async function handleSearchMaterialQuery(chatId, query) {
@@ -288,77 +314,82 @@ async function handleSearchMaterialQuery(chatId, query) {
   const total = Array.isArray(res) ? res.length : (res.total || items.length);
 
   if (!items || items.length === 0) {
-    await openwaService.sendText(chatId, `⚠️ Material dengan kata kunci "${query}" tidak ditemukan di database master.`);
+    await openwaService.sendText(chatId, `⚠️ _Material dengan kata kunci "${query}" tidak ditemukan di database master._`);
     return;
   }
 
-  let text = `📦 *HASIL PENCARIAN MATERIAL (${total} Ditemukan):*\n`;
+  let text = `*HASIL PENCARIAN MATERIAL*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Kata Kunci : *"${query}"* (${total} ditemukan)
+
+`;
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    text += `\n${i + 1}. *[${item.kode}]* ${item.nama}\n`;
+    text += `*[${item.kode}]* ${item.nama}\n`;
 
     if (item.hargaMin && item.hargaMin > 0) {
       if (item.hargaMin === item.hargaMax) {
-        text += `   💰 *Harga:* Rp ${item.hargaMin.toLocaleString('id-ID')}\n`;
+        text += `  ▸ Harga   : Rp ${item.hargaMin.toLocaleString('id-ID')}\n`;
       } else {
-        text += `   💰 *Harga:* Rp ${item.hargaMin.toLocaleString('id-ID')} _(Termurah)_ - Rp ${item.hargaMax.toLocaleString('id-ID')} _(Termahal)_\n`;
+        text += `  ▸ Rentang : Rp ${item.hargaMin.toLocaleString('id-ID')} — Rp ${item.hargaMax.toLocaleString('id-ID')}\n`;
       }
       if (item.supplierTerakhir) {
-        text += `   • *Terakhir:* Rp ${item.hargaTerakhir.toLocaleString('id-ID')} (${item.supplierTerakhir}${item.tglTerakhir ? ' - ' + item.tglTerakhir : ''})\n`;
+        text += `  ▸ Terakhir: Rp ${item.hargaTerakhir.toLocaleString('id-ID')} (${item.supplierTerakhir}${item.tglTerakhir ? ' - ' + item.tglTerakhir : ''})\n`;
       }
     } else {
-      text += `   💰 *Harga:* _Belum ada riwayat transaksi_\n`;
+      text += `  ▸ Harga   : _Belum ada transaksi_\n`;
     }
+    text += `\n`;
   }
 
   if (total > items.length) {
-    text += `\n_... dan ${total - items.length} material lainnya._\n`;
-    text += `💡 _Tips: Ketik spesifikasi lebih detail (misal: "${query} 1/2" atau "${query} 3/4") untuk mempersempit hasil._`;
-  } else {
-    text += `\n💡 _Ketik *menu* untuk opsi lainnya._`;
+    text += `▸ _...dan ${total - items.length} material lainnya._\n`;
   }
-  await openwaService.sendText(chatId, text);
+  text += `━━━━━━━━━━━━━━━━━━━━━━━━`;
+  await openwaService.sendText(chatId, text.trim());
 }
 
 async function handleSearchSupplierItemsQuery(chatId, query) {
   clearSession(chatId);
-  await openwaService.sendText(chatId, `🔍 Sedang mencari riwayat pembelian dari vendor "${query}"...`);
+  await openwaService.sendText(chatId, `🔍 _Sedang mencari riwayat pembelian vendor:_ *"${query}"*...`);
 
   const result = await cacheService.getSupplierOrderHistory(query, 15);
   if (!result || !result.items || result.items.length === 0) {
     await openwaService.sendText(
       chatId,
-      `⚠️ Tidak ditemukan riwayat pembelian untuk vendor "${query}" di sheet transaksi.\n💡 _Ketik *menu* untuk opsi lainnya._`
+      `⚠️ _Tidak ditemukan riwayat pembelian untuk vendor "${query}" di sheet transaksi._`
     );
     return;
   }
 
-  let text = `🏢 *RIWAYAT PEMBELIAN VENDOR: ${result.supplier}*\n`;
-  text += `Ditemukan *${result.totalItems} jenis barang* yang pernah dipesan:\n`;
+  let text = `*RIWAYAT VENDOR: ${result.supplier}*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Total Barang Pernah Dipesan : *${result.totalItems} jenis*
 
+`;
   for (let i = 0; i < result.items.length; i++) {
     const item = result.items[i];
-    text += `\n${i + 1}. *[${item.kode}]* ${item.nama}\n`;
+    text += `*${i + 1}. [${item.kode}]* ${item.nama}\n`;
     if (item.hargaMin === item.hargaMax) {
-      text += `   💰 *Harga:* Rp ${item.hargaMin.toLocaleString('id-ID')}\n`;
+      text += `   ▸ Harga   : Rp ${item.hargaMin.toLocaleString('id-ID')}\n`;
     } else {
-      text += `   💰 *Harga:* Rp ${item.hargaMin.toLocaleString('id-ID')} _(Termurah)_ - Rp ${item.hargaMax.toLocaleString('id-ID')} _(Termahal)_\n`;
+      text += `   ▸ Rentang : Rp ${item.hargaMin.toLocaleString('id-ID')} — Rp ${item.hargaMax.toLocaleString('id-ID')}\n`;
     }
     if (item.hargaTerbaru) {
-      text += `   • *Terbaru:* Rp ${item.hargaTerbaru.toLocaleString('id-ID')}${item.tglTerbaru ? ' (' + item.tglTerbaru + ')' : ''}\n`;
+      text += `   ▸ Terakhir: Rp ${item.hargaTerbaru.toLocaleString('id-ID')}${item.tglTerbaru ? ' (' + item.tglTerbaru + ')' : ''}\n`;
     }
     if (item.poList && item.poList.length > 0) {
-      const poDisplay = item.poList.slice(0, 5).join(', ') + (item.poList.length > 5 ? ` (+${item.poList.length - 5} PO lainnya)` : '');
-      text += `   📋 *No. PO:* ${poDisplay} _(${item.totalOrders}x order)_\n`;
+      const poDisplay = item.poList.slice(0, 5).join(', ') + (item.poList.length > 5 ? ` (+${item.poList.length - 5} PO)` : '');
+      text += `   ▸ Terkait : ${poDisplay} _(${item.totalOrders}x order)_\n`;
     }
+    text += `\n`;
   }
 
   if (result.totalItems > result.items.length) {
-    text += `\n_... dan ${result.totalItems - result.items.length} barang lainnya._\n`;
+    text += `▸ _...dan ${result.totalItems - result.items.length} barang lainnya._\n`;
   }
-
-  text += `\n💡 _Ketik *menu* untuk opsi lainnya._`;
-  await openwaService.sendText(chatId, text);
+  text += `━━━━━━━━━━━━━━━━━━━━━━━━`;
+  await openwaService.sendText(chatId, text.trim());
 }
 
 async function handleSearchPOQuery(chatId, noPo) {
@@ -370,26 +401,31 @@ async function handleSearchPOQuery(chatId, noPo) {
       return;
     }
 
-    let text = `📋 *DETAIL PO: ${po.noPo}*\n`;
-    text += `• *Status:* ${po.status}\n`;
-    text += `• *Tanggal:* ${po.date}\n`;
-    text += `• *Supplier:* ${po.supplier}\n`;
-    if (po.grpo) text += `• *No GRPO:* ${po.grpo} (Tgl: ${po.lastGrpoDate || '-'})\n`;
-    if (po.tglBayar) text += `• *Status Bayar:* Lunas tgl ${po.tglBayar}\n`;
-    if (po.noInvoice) text += `• *No Invoice:* ${po.noInvoice}\n`;
+    let text = `*DOKUMEN PURCHASE ORDER*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Nomor PO  : \`${po.noPo}\`
+Status    : *[${(po.status || 'OPEN').toUpperCase()}]*
+Tanggal   : ${po.date}
+Supplier  : *${po.supplier}*
+`;
+    if (po.grpo) text += `No. GRPO  : \`${po.grpo}\` (${po.lastGrpoDate || '-'})\n`;
+    if (po.tglBayar) text += `Pembayaran: *LUNAS* (${po.tglBayar})\n`;
+    if (po.noInvoice) text += `No Invoice: \`${po.noInvoice}\`\n`;
 
-    text += `\n📦 *Rincian Barang (${po.items.length} item):*\n`;
+    text += `\n\`RINCIAN ITEM (${po.items.length})\`\n`;
     for (let i = 0; i < po.items.length; i++) {
       const it = po.items[i];
       const subtotal = it.qty * it.priceUnit * (1 - it.discount) + it.ppn;
-      text += `${i + 1}. [${it.kode}] ${it.nama}\n   Qty: ${it.qty} x Rp ${it.priceUnit.toLocaleString('id-ID')} = Rp ${subtotal.toLocaleString('id-ID')}\n`;
+      text += `${i + 1}. *[${it.kode}]* ${it.nama}\n`;
+      text += `   └ ${it.qty} pcs × Rp ${it.priceUnit.toLocaleString('id-ID')} = Rp ${subtotal.toLocaleString('id-ID')}\n`;
     }
-    text += `───────────────────────\n`;
-    text += `*TOTAL PO: Rp ${po.grandTotal.toLocaleString('id-ID')}*`;
+    text += `━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    text += `*TOTAL AKHIR : Rp ${po.grandTotal.toLocaleString('id-ID')}*\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━━━━━`;
 
     await openwaService.sendText(chatId, text);
   } catch (err) {
-    await openwaService.sendText(chatId, `❌ Gagal mengambil data PO: ${err.message}`);
+    await openwaService.sendText(chatId, `✗ Gagal mengambil data PO: ${err.message}`);
   }
 }
 
@@ -401,7 +437,7 @@ async function handleInputPOHeader(chatId, text, session) {
   if (parts.length < 2) {
     await openwaService.sendText(
       chatId,
-      `⚠️ Format salah. Mohon masukkan *Nomor PO* dan *Supplier* dipisahkan koma.\nContoh: \`PO-2026-001, PT Buana Logam Perkasa\``
+      `⚠️ Format tidak sesuai. Masukkan *Nomor PO* dan *Supplier* dipisahkan tanda koma.\nContoh: \`PO-2026-001, PT Buana Logam Perkasa\``
     );
     return;
   }
@@ -409,7 +445,6 @@ async function handleInputPOHeader(chatId, text, session) {
   const noPo = parts[0].toUpperCase();
   const supplier = parts[1];
 
-  // Inisialisasi draft PO
   const draft = {
     noPo,
     supplier,
@@ -421,19 +456,21 @@ async function handleInputPOHeader(chatId, text, session) {
 
   await openwaService.sendText(
     chatId,
-    `✅ Header tersimpan:
-• *No PO:* ${noPo}
-• *Supplier:* ${supplier}
+    `*HEADER PO TERSIMPAN*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Nomor PO : \`${noPo}\`
+Vendor   : *${supplier}*
 
-📦 *Langkah 2/2: Masukkan Item Barang*
-Ketik rincian barang dengan format:
+\`LANGKAH 2/2 : INPUT BARANG\`
+Ketik rincian item dengan format:
 \`[Kode] [Qty] [HargaSatuan]\`
 
-💡 _Contoh (bisa beberapa baris sekaligus):_
+Contoh (bisa multi-baris):
 RM00355 20 25000
 RM00356 10 40000
 
-_(Ketik 'simpan' jika sudah selesai, atau 'batal')_`
+▸ _Ketik *simpan* jika selesai, atau *batal*._
+━━━━━━━━━━━━━━━━━━━━━━━━`
   );
 }
 
@@ -441,31 +478,33 @@ async function handleInputPOItems(chatId, text, session) {
   const draft = session.data;
   const lower = text.toLowerCase();
 
-  // Jika user konfirmasi simpan
   if (lower === 'simpan' || lower === 'ya' || lower === 'save') {
     if (draft.items.length === 0) {
-      await openwaService.sendText(chatId, '⚠️ Keranjang barang masih kosong! Masukkan minimal 1 barang terlebih dahulu.');
+      await openwaService.sendText(chatId, '⚠️ Keranjang item masih kosong. Masukkan minimal 1 barang terlebih dahulu.');
       return;
     }
 
     try {
-      await openwaService.sendText(chatId, '⏳ Sedang menyimpan data ke Google Sheets...');
+      await openwaService.sendText(chatId, '⏳ _Sedang mencatat transaksi ke Google Sheets..._');
       const result = await sheetsService.appendPOTransaction(draft);
       clearSession(chatId);
 
       await openwaService.sendText(
         chatId,
-        `✅ *BERHASIL DISIMPAN!*
-PO *${result.noPo}* berisi *${result.itemsInserted} item* telah berhasil dicatat ke Google Sheets 'PO 2026'.
-Total Transaksi: *Rp ${result.grandTotal.toLocaleString('id-ID')}*`
+        `*PURCHASE ORDER BERHASIL DICATAT*
+━━━━━━━━━━━━━━━━━━━━━━━━
+PO Ref      : \`${result.noPo}\`
+Total Item  : *${result.itemsInserted} item*
+Total Nilai : *Rp ${result.grandTotal.toLocaleString('id-ID')}*
+Status      : \`[TERSIMPAN KE PO 2026]\`
+━━━━━━━━━━━━━━━━━━━━━━━━`
       );
     } catch (err) {
-      await openwaService.sendText(chatId, `❌ Gagal menyimpan ke Google Sheets: ${err.message}`);
+      await openwaService.sendText(chatId, `✗ Gagal menyimpan ke Google Sheets: ${err.message}`);
     }
     return;
   }
 
-  // Parse baris demi baris item
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   let addedCount = 0;
   const warnings = [];
@@ -473,7 +512,7 @@ Total Transaksi: *Rp ${result.grandTotal.toLocaleString('id-ID')}*`
   for (const line of lines) {
     const tokens = line.split(/[\s|]+/).filter(Boolean);
     if (tokens.length < 3) {
-      warnings.push(`Baris "${line}" dilewati (format harus: Kode Qty Harga)`);
+      warnings.push(`Baris "${line}" dilewati (format: Kode Qty Harga)`);
       continue;
     }
 
@@ -500,26 +539,24 @@ Total Transaksi: *Rp ${result.grandTotal.toLocaleString('id-ID')}*`
     addedCount++;
   }
 
-  // Hitung total saat ini
   let totalBelanja = 0;
-  let summaryText = `🛒 *KERANJANG PO: ${draft.noPo}*\n`;
+  let summaryText = `*DRAF KERANJANG PO : ${draft.noPo}*
+━━━━━━━━━━━━━━━━━━━━━━━━\n`;
   for (let i = 0; i < draft.items.length; i++) {
     const it = draft.items[i];
     const sub = it.qty * it.harga;
     totalBelanja += sub;
-    summaryText += `${i + 1}. [${it.kode}] ${it.nama}\n   ${it.qty} x Rp ${it.harga.toLocaleString('id-ID')} = Rp ${sub.toLocaleString('id-ID')}\n`;
+    summaryText += `${i + 1}. *[${it.kode}]* ${it.nama}\n`;
+    summaryText += `   └ ${it.qty} pcs × Rp ${it.harga.toLocaleString('id-ID')} = Rp ${sub.toLocaleString('id-ID')}\n`;
   }
-  summaryText += `───────────────────────\n`;
-  summaryText += `*TOTAL: Rp ${totalBelanja.toLocaleString('id-ID')}*\n\n`;
+  summaryText += `━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  summaryText += `*SUBTOTAL : Rp ${totalBelanja.toLocaleString('id-ID')}*\n\n`;
 
   if (warnings.length > 0) {
     summaryText += `⚠️ _Catatan:_\n${warnings.join('\n')}\n\n`;
   }
 
-  summaryText += `Ketik:
-• Kirim baris lagi untuk tambah item
-• *SIMPAN* untuk eksekusi ke Google Sheet
-• *BATAL* untuk membatalkan`;
+  summaryText += `▸ Kirim baris item lagi untuk menambah\n▸ Ketik *SIMPAN* untuk finalisasi\n▸ Ketik *BATAL* untuk membatalkan`;
 
   setSession(chatId, 'INPUT_PO_ITEMS', draft);
   await openwaService.sendText(chatId, summaryText);
@@ -534,27 +571,31 @@ async function handleConfirmOcrPO(chatId, text, session) {
 
   if (lower === 'ya' || lower === 'simpan' || lower === 'oke' || lower === 'ok') {
     try {
-      await openwaService.sendText(chatId, '⏳ Sedang menyimpan hasil scan ke Google Sheets...');
+      await openwaService.sendText(chatId, '⏳ _Sedang mencatat pindaian ke Google Sheets..._');
       const result = await sheetsService.appendPOTransaction(draft);
       clearSession(chatId);
 
       await openwaService.sendText(
         chatId,
-        `✅ *BERHASIL TERCATAT!*
-Data dari pindaian dokumen PO *${result.noPo}* (${result.itemsInserted} item) sukses disimpan ke sheet 'PO 2026'.
-Total: *Rp ${result.grandTotal.toLocaleString('id-ID')}*`
+        `*PURCHASE ORDER BERHASIL DICATAT*
+━━━━━━━━━━━━━━━━━━━━━━━━
+PO Ref      : \`${result.noPo}\`
+Total Item  : *${result.itemsInserted} item*
+Total Nilai : *Rp ${result.grandTotal.toLocaleString('id-ID')}*
+Status      : \`[TERSIMPAN KE PO 2026]\`
+━━━━━━━━━━━━━━━━━━━━━━━━`
       );
     } catch (err) {
-      await openwaService.sendText(chatId, `❌ Gagal menyimpan ke Google Sheets: ${err.message}`);
+      await openwaService.sendText(chatId, `✗ Gagal menyimpan ke Google Sheets: ${err.message}`);
     }
   } else {
     clearSession(chatId);
-    await openwaService.sendText(chatId, '❌ Draf hasil scan dibatalkan.');
+    await openwaService.sendText(chatId, '✓ _Draf pindaian dokumen dibatalkan._');
   }
 }
 
 // -------------------------------------------------------------
-// HANDLER KONFIRMASI UPDATE GRPO (PURCHASE DELIVERY NOTE)
+// HANDLER KONFIRMASI UPDATE GRPO
 // -------------------------------------------------------------
 async function handleConfirmUpdateGrpo(chatId, text, session) {
   const lower = text.toLowerCase();
@@ -567,12 +608,12 @@ async function handleConfirmUpdateGrpo(chatId, text, session) {
         clearSession(chatId);
         await openwaService.sendText(
           chatId,
-          `⚠️ *PO TIDAK DITEMUKAN!*\nNomor PO *${data.noPo || '-'}* tidak ditemukan di sheet 'PO 2026'.\n\n👉 *Scan atau input terlebih dahulu PO nya* sebelum mengupdate Surat Jalan / Delivery Note ini.`
+          `⚠️ *PO TIDAK DITEMUKAN*\nNomor PO *${data.noPo || '-'}* tidak ditemukan di sheet 'PO 2026'.\nSilakan pastikan PO telah terdaftar sebelum upload Surat Jalan.`
         );
         return;
       }
 
-      await openwaService.sendText(chatId, `⏳ Sedang mengupdate GRPO untuk PO *${data.noPo}* di Google Sheets...`);
+      await openwaService.sendText(chatId, `⏳ _Sedang memperbarui status GRPO untuk PO ${data.noPo}..._`);
 
       const updatePayload = {
         grpo: data.noGrpo,
@@ -586,49 +627,53 @@ async function handleConfirmUpdateGrpo(chatId, text, session) {
       if (res.success) {
         await openwaService.sendText(
           chatId,
-          `✅ *BERHASIL UPDATE GRPO!*
-Data PO *${data.noPo}* (${res.rowsUpdated} baris) berhasil di-update dengan Purchase Delivery Note *${data.noGrpo}*:
-• *No. GRPO (Kolom R):* ${data.noGrpo}
-• *LAST DATE OF GRPO JOB DONE (Kolom S):* ${data.lastGrpoDate || '-'}`
+          `*SURAT JALAN / GRPO BERHASIL DIUPDATE*
+━━━━━━━━━━━━━━━━━━━━━━━━
+PO Ref       : \`${data.noPo}\` (${res.rowsUpdated} baris)
+No. GRPO     : \`${data.noGrpo}\`
+Tgl Terima   : ${data.lastGrpoDate || '-'}
+Status       : \`[UPDATE BERHASIL]\`
+━━━━━━━━━━━━━━━━━━━━━━━━`
         );
       } else {
         await openwaService.sendText(chatId, `⚠️ ${res.message}`);
       }
     } catch (err) {
-      await openwaService.sendText(chatId, `❌ Gagal update GRPO ke Google Sheets: ${err.message}`);
+      await openwaService.sendText(chatId, `✗ Gagal update GRPO ke Google Sheets: ${err.message}`);
     }
   } else {
     clearSession(chatId);
-    await openwaService.sendText(chatId, '❌ Update GRPO dibatalkan.');
+    await openwaService.sendText(chatId, '✓ _Pembaruan status GRPO dibatalkan._');
   }
 }
 
 // -------------------------------------------------------------
-// HANDLER UPDATE PO
+// HANDLER UPDATE PO MANUAL
 // -------------------------------------------------------------
 async function handleUpdatePOWaitNo(chatId, noPo) {
   try {
     const po = await sheetsService.getPOByNumber(noPo);
     if (!po) {
-      await openwaService.sendText(chatId, `⚠️ Dokumen PO *${noPo}* tidak ditemukan di sheet 'PO 2026'.\nKetik 'batal' untuk keluar.`);
+      await openwaService.sendText(chatId, `⚠️ Dokumen PO *${noPo}* tidak ditemukan di sheet 'PO 2026'.\nKetik *batal* untuk keluar.`);
       return;
     }
 
     setSession(chatId, 'UPDATE_PO_SELECT_ACTION', { noPo: po.noPo });
     await openwaService.sendText(
       chatId,
-      `✏️ *PILIH DATA YANG INGIN DIUPDATE (${po.noPo}):*
+      `*PILIH KOLOM UPDATE: ${po.noPo}*
+━━━━━━━━━━━━━━━━━━━━━━━━
+*[1]*  Nomor GRPO & Tanggal Terima Gudang
+*[2]*  Tanggal Pembayaran (Finance)
+*[3]*  Nomor Invoice Vendor
+*[4]*  Ubah Status Transaksi (Close / Pending / Open)
 
-1️⃣ *1* - Input No. GRPO & Selesai Penerimaan Gudang
-2️⃣ *2* - Input Tanggal Bayar (Finance)
-3️⃣ *3* - Input No. Invoice Vendor
-4️⃣ *4* - Ubah Status Transaksi (Close/Pending)
-
-0️⃣ *0* - Batal
-💡 _Ketik angka pilihan (1-4):_`
+*[0]*  Batalkan
+▸ _Balas angka [1-4]:_
+━━━━━━━━━━━━━━━━━━━━━━━━`
     );
   } catch (err) {
-    await openwaService.sendText(chatId, `❌ Error: ${err.message}`);
+    await openwaService.sendText(chatId, `✗ Terjadi kendala: ${err.message}`);
   }
 }
 
@@ -637,31 +682,31 @@ async function handleUpdatePOSelectAction(chatId, choice, session) {
   switch (choice.trim()) {
     case '1':
       setSession(chatId, 'UPDATE_PO_WAIT_VALUE', { noPo, type: 'grpo' });
-      await openwaService.sendText(chatId, `📦 Masukkan *Nomor GRPO* untuk PO *${noPo}*:\nContoh: \`GRPO-2026-088\``);
+      await openwaService.sendText(chatId, `Masukkan *Nomor GRPO* untuk PO \`${noPo}\`:\nContoh : \`GRPO-2026-088\``);
       break;
 
     case '2':
       setSession(chatId, 'UPDATE_PO_WAIT_VALUE', { noPo, type: 'bayar' });
-      await openwaService.sendText(chatId, `💰 Masukkan *Tanggal Bayar* untuk PO *${noPo}* (DD/MM/YYYY):\nContoh: \`15/10/2026\``);
+      await openwaService.sendText(chatId, `Masukkan *Tanggal Bayar* untuk PO \`${noPo}\` (DD/MM/YYYY):\nContoh : \`15/10/2026\``);
       break;
 
     case '3':
       setSession(chatId, 'UPDATE_PO_WAIT_VALUE', { noPo, type: 'invoice' });
-      await openwaService.sendText(chatId, `📄 Masukkan *Nomor Invoice* untuk PO *${noPo}*:\nContoh: \`INV-BLP-2026-09\``);
+      await openwaService.sendText(chatId, `Masukkan *Nomor Invoice* untuk PO \`${noPo}\`:\nContoh : \`INV-BLP-2026-09\``);
       break;
 
     case '4':
       setSession(chatId, 'UPDATE_PO_WAIT_VALUE', { noPo, type: 'status' });
-      await openwaService.sendText(chatId, `🔄 Masukkan status baru untuk PO *${noPo}* (\`Close\`, \`Pending\`, atau \`Open\`):`);
+      await openwaService.sendText(chatId, `Masukkan status baru untuk PO \`${noPo}\` (\`Close\`, \`Pending\`, atau \`Open\`):`);
       break;
 
     case '0':
       clearSession(chatId);
-      await openwaService.sendText(chatId, 'Update dibatalkan.');
+      await openwaService.sendText(chatId, '✓ _Update status dibatalkan._');
       break;
 
     default:
-      await openwaService.sendText(chatId, 'Pilihan tidak valid. Ketik 1, 2, 3, 4, atau 0.');
+      await openwaService.sendText(chatId, 'Pilihan tidak valid. Silakan balas 1, 2, 3, 4, atau 0.');
       break;
   }
 }
@@ -677,11 +722,20 @@ async function handleUpdatePOWaitValue(chatId, value, session) {
   if (type === 'status') updatePayload.status = value.trim();
 
   try {
-    await openwaService.sendText(chatId, '⏳ Sedang mengupdate baris di Google Sheets...');
+    await openwaService.sendText(chatId, '⏳ _Sedang memperbarui baris di Google Sheets..._');
     const res = await sheetsService.updatePOField(noPo, updatePayload);
-    await openwaService.sendText(chatId, `✅ *Sukses!* PO *${noPo}* (${res.rowsUpdated} baris) berhasil diperbarui.`);
+    await openwaService.sendText(
+      chatId,
+      `*STATUS PO BERHASIL DIUPDATE*
+━━━━━━━━━━━━━━━━━━━━━━━━
+PO Ref  : \`${noPo}\` (${res.rowsUpdated} baris)
+Field   : \`${type.toUpperCase()}\`
+Nilai   : *${value.trim()}*
+Status  : \`[BERHASIL DISIMPAN]\`
+━━━━━━━━━━━━━━━━━━━━━━━━`
+    );
   } catch (err) {
-    await openwaService.sendText(chatId, `❌ Gagal update PO: ${err.message}`);
+    await openwaService.sendText(chatId, `✗ Gagal update PO: ${err.message}`);
   }
 }
 
@@ -695,19 +749,23 @@ async function handleCancelPOWaitNo(chatId, text) {
   const reason = parts[1] || 'Dibatalkan via WhatsApp Bot';
 
   try {
-    await openwaService.sendText(chatId, `⏳ Sedang memproses pembatalan PO ${noPo}...`);
+    await openwaService.sendText(chatId, `⏳ _Sedang memproses pembatalan PO ${noPo}..._`);
     const res = await sheetsService.softDeletePO(noPo, reason);
     if (res.success) {
       await openwaService.sendText(
         chatId,
-        `✅ *PO ${noPo} Berhasil Dibatalkan!*
-Status transaksi telah diubah menjadi \`Cancelled\` di sheet 'PO 2026' (${res.rowsUpdated} baris).`
+        `*PURCHASE ORDER DIBATALKAN*
+━━━━━━━━━━━━━━━━━━━━━━━━
+PO Ref  : \`${noPo}\` (${res.rowsUpdated} baris)
+Status  : \`[CANCELLED]\`
+Alasan  : ${reason}
+━━━━━━━━━━━━━━━━━━━━━━━━`
       );
     } else {
       await openwaService.sendText(chatId, `⚠️ ${res.message}`);
     }
   } catch (err) {
-    await openwaService.sendText(chatId, `❌ Gagal membatalkan PO: ${err.message}`);
+    await openwaService.sendText(chatId, `✗ Gagal membatalkan PO: ${err.message}`);
   }
 }
 

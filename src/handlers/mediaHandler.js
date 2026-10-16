@@ -12,7 +12,7 @@ async function handleIncomingMedia(message) {
 
   if (!media) return false;
 
-  await openwaService.sendText(chatId, '🔍 *Dokumen terdeteksi!* Sedang memindai teks dokumen via OCR, mohon tunggu...');
+  await openwaService.sendText(chatId, '🔍 _Dokumen terdeteksi. Sedang memproses analisis teks via OCR, mohon tunggu..._');
 
   let mediaBuffer;
   let mimeType = media.mimetype || 'application/octet-stream';
@@ -41,7 +41,7 @@ async function handleIncomingMedia(message) {
     } else {
       await openwaService.sendText(
         chatId,
-        '⚠️ Tipe file tidak didukung. Mohon kirimkan dokumen dalam format *PDF* atau foto (*JPG/PNG*).'
+        '⚠️ Tipe berkas tidak didukung. Mohon kirimkan dokumen dalam format *PDF* atau gambar (*JPG / PNG*).'
       );
       return true;
     }
@@ -66,42 +66,49 @@ async function handleIncomingMedia(message) {
       if (!existingPo) {
         await openwaService.sendText(
           chatId,
-          `⚠️ *PO TIDAK DITEMUKAN!*\n` +
-          `Nomor PO *${targetPo || '(Tidak terdeteksi)'}* dari Purchase Delivery Note *${extractedData.noGrpo || '-'}* tidak ditemukan di sheet 'PO 2026'.\n\n` +
-          `👉 *Scan atau input terlebih dahulu PO nya* sebelum mengupload Surat Jalan / Delivery Note ini.`
+          `*PO TIDAK DITEMUKAN*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Nomor PO  : *${targetPo || '(Tidak terdeteksi)'}*
+Surat Jalan: \`${extractedData.noGrpo || '-'}\`
+
+⚠️ Nomor PO di atas belum tercatat di sheet 'PO 2026'.
+▸ _Silakan rekap / input PO terlebih dahulu sebelum mengunggah Surat Jalan ini._
+━━━━━━━━━━━━━━━━━━━━━━━━`
         );
         conversationManager.clearSession(chatId);
         return true;
       }
 
-      let summaryText = `📦 *HASIL PINDAIAN PURCHASE DELIVERY NOTE (GRPO)*\n`;
-      summaryText += `───────────────────────\n`;
-      summaryText += `• *No. GRPO:* ${extractedData.noGrpo}\n`;
-      summaryText += `• *Target No. PO:* ${targetPo} (✓ Ditemukan, Status: ${existingPo.status})\n`;
-      summaryText += `• *Tgl Selesai / Terima:* ${extractedData.lastGrpoDate || 'Hari ini'}\n`;
-      summaryText += `• *Supplier:* ${extractedData.supplier}\n`;
+      let summaryText = `*HASIL PINDAIAN SURAT JALAN (GRPO)*
+━━━━━━━━━━━━━━━━━━━━━━━━
+No. GRPO     : \`${extractedData.noGrpo}\`
+PO Terkait   : \`${targetPo}\` _(Status: ${existingPo.status})_
+Tgl Terima   : ${extractedData.lastGrpoDate || 'Hari ini'}
+Supplier     : *${extractedData.supplier}*\n`;
+
       if (extractedData.receivedBy) {
-        summaryText += `• *Penerima:* ${extractedData.receivedBy}\n`;
+        summaryText += `Penerima     : ${extractedData.receivedBy}\n`;
       }
       if (extractedData.remarks) {
-        summaryText += `• *Catatan:* ${extractedData.remarks}\n`;
+        summaryText += `Catatan      : ${extractedData.remarks}\n`;
       }
 
       if (extractedData.items && extractedData.items.length > 0) {
-        summaryText += `\n📦 *Barang Diterima (${extractedData.items.length} Item):*\n`;
+        summaryText += `\n\`BARANG DITERIMA (${extractedData.items.length})\`\n`;
         for (let i = 0; i < extractedData.items.length; i++) {
           const it = extractedData.items[i];
-          summaryText += `${i + 1}. [${it.kode}] ${it.nama} (Qty: ${it.qty} ${it.uom})\n`;
+          summaryText += `${i + 1}. *[${it.kode}]* ${it.nama}\n`;
+          summaryText += `   └ Diterima: ${it.qty} ${it.uom}\n`;
         }
       }
 
-      summaryText += `───────────────────────\n`;
-      summaryText += `📝 *Kolom yang akan di-update pada baris PO ${targetPo}:*\n`;
-      summaryText += `• No. GRPO (Kolom R) ➔ *${extractedData.noGrpo}*\n`;
-      summaryText += `• LAST DATE OF GRPO (Kolom S) ➔ *${extractedData.lastGrpoDate || 'Hari ini'}*\n`;
-      summaryText += `• KET (Kolom W) ➔ *${extractedData.updateFields ? extractedData.updateFields.ket : `GRPO ${extractedData.noGrpo}`}*\n\n`;
+      summaryText += `━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      summaryText += `\`DATA UPDATE PO ${targetPo}\`\n`;
+      summaryText += `▸ No. GRPO (Kol. R)   : *${extractedData.noGrpo}*\n`;
+      summaryText += `▸ Tgl Terima (Kol. S) : *${extractedData.lastGrpoDate || 'Hari ini'}*\n`;
+      summaryText += `▸ Keterangan (Kol. W) : *${extractedData.updateFields ? extractedData.updateFields.ket : `GRPO ${extractedData.noGrpo}`}*\n\n`;
 
-      summaryText += `Ketik:\n• *YA* untuk update baris PO di Google Sheets 'PO 2026'\n• *BATAL* jika data tidak sesuai`;
+      summaryText += `▸ Ketik *YA* untuk konfirmasi update ke Google Sheets\n▸ Ketik *BATAL* untuk membatalkan`;
 
       conversationManager.setSession(chatId, 'CONFIRM_UPDATE_GRPO', extractedData);
       await openwaService.sendText(chatId, summaryText);
@@ -114,11 +121,14 @@ async function handleIncomingMedia(message) {
     if (!extractedData.items || extractedData.items.length === 0) {
       await openwaService.sendText(
         chatId,
-        `⚠️ Berhasil membaca dokumen, tetapi tidak menemukan baris material yang jelas.
-Nomor PO terdeteksi: *${extractedData.noPo}*
-Supplier: *${extractedData.supplier}*
+        `*PINDAIAN DOKUMEN SELESAI*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Nomor PO : \`${extractedData.noPo || '-'}\`
+Vendor   : *${extractedData.supplier || '-'}*
 
-Silakan coba gunakan menu *Input PO Manual* dengan mengetik *menu*.`
+⚠️ _Rincian item barang tidak terdeteksi dengan jelas._
+Silakan gunakan input manual dengan mengetik *menu*.
+━━━━━━━━━━━━━━━━━━━━━━━━`
       );
       return true;
     }
@@ -128,49 +138,44 @@ Silakan coba gunakan menu *Input PO Manual* dengan mengetik *menu*.`
     const subTotal = totals.subTotal || 0;
     const ppnRatePercent = totals.ppnRatePercent !== undefined ? totals.ppnRatePercent : (totals.ppnRate ? Math.round(totals.ppnRate * 100) : 0);
     const ppnNominal = totals.ppnNominal !== undefined ? totals.ppnNominal : (totals.ppn || 0);
-    const manualPpn11 = totals.manualPpn11 || Math.round(subTotal * 0.11);
     const discount = totals.discount || 0;
     const grandTotal = totals.grandTotal || (subTotal - discount + ppnNominal);
 
-    let summaryText = `📄 *HASIL PINDAIAN DOKUMEN PO*\n`;
-    summaryText += `───────────────────────\n`;
-    summaryText += `• *Kategori:* ${tipeDisplay}\n`;
-    summaryText += `• *No PO:* ${extractedData.noPo}\n`;
-    summaryText += `• *Supplier:* ${extractedData.supplier}\n`;
-    summaryText += `• *Tanggal:* ${extractedData.date || 'Hari ini'}\n`;
+    let summaryText = `*HASIL PINDAIAN PURCHASE ORDER*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Nomor PO  : \`${extractedData.noPo}\`
+Kategori  : \`[${tipeDisplay}]\`
+Vendor    : *${extractedData.supplier}*
+Tanggal   : ${extractedData.date || 'Hari ini'}
+`;
     if (extractedData.quotation) {
-      summaryText += `• *Ref / Quotation:* ${extractedData.quotation}\n`;
+      summaryText += `Quotation : \`${extractedData.quotation}\`\n`;
     }
-    summaryText += `\n📦 *Daftar Item (${extractedData.items.length} Item):*\n`;
 
+    summaryText += `\n\`RINCIAN ITEM (${extractedData.items.length})\`\n`;
     for (let i = 0; i < extractedData.items.length; i++) {
       const it = extractedData.items[i];
       const kodeDisplay = it.kode ? `[${it.kode}] ` : '[JASA] ';
       const itemSub = (it.qty || 1) * (it.harga || 0);
 
-      summaryText += `${i + 1}. ${kodeDisplay}${it.nama || it.matchedMasterNama || 'Item'}\n`;
-      summaryText += `   ${it.qty} x Rp ${(it.harga || 0).toLocaleString('id-ID')} = Rp ${itemSub.toLocaleString('id-ID')}\n`;
-      if (it.ppn > 0) {
-        summaryText += `   _(PPN: Rp ${it.ppn.toLocaleString('id-ID')})_\n`;
-      }
+      summaryText += `${i + 1}. *${kodeDisplay}${it.nama || it.matchedMasterNama || 'Item'}*\n`;
+      summaryText += `   └ ${it.qty} pcs × Rp ${(it.harga || 0).toLocaleString('id-ID')} = Rp ${itemSub.toLocaleString('id-ID')}\n`;
     }
 
-    summaryText += `───────────────────────\n`;
-    summaryText += `📊 *Rincian & Validasi Perhitungan (Cross-Check):*\n`;
-    summaryText += `• *Subtotal Barang:* Rp ${subTotal.toLocaleString('id-ID')} (✓ Cocok Qty x Harga)\n`;
-    if (ppnRatePercent > 0) {
-      summaryText += `• *PPN Dokumen (${ppnRatePercent}%):* Rp ${ppnNominal.toLocaleString('id-ID')} (✓ Valid)\n`;
-    } else {
-      summaryText += `• *PPN Dokumen:* 0% (Rp 0)\n`;
+    summaryText += `━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    summaryText += `\`RINGKASAN NILAI\`\n`;
+    summaryText += `▸ Subtotal : Rp ${subTotal.toLocaleString('id-ID')}\n`;
+    if (ppnRatePercent > 0 || ppnNominal > 0) {
+      summaryText += `▸ PPN (${ppnRatePercent}%) : Rp ${ppnNominal.toLocaleString('id-ID')}\n`;
     }
-    summaryText += `• *Hitungan Manual PPN 11%:* Rp ${manualPpn11.toLocaleString('id-ID')}\n`;
     if (discount > 0) {
-      summaryText += `• *Diskon:* Rp ${discount.toLocaleString('id-ID')}\n`;
+      summaryText += `▸ Diskon   : -Rp ${discount.toLocaleString('id-ID')}\n`;
     }
-    summaryText += `───────────────────────\n`;
-    summaryText += `*TOTAL TRANSAKSI: Rp ${grandTotal.toLocaleString('id-ID')}*\n`;
-    summaryText += `_(✓ Validasi: Subtotal + PPN 100% Sesuai)_\n\n`;
-    summaryText += `Ketik:\n• *YA* untuk simpan ke sheet 'PO 2026'\n• *BATAL* jika data tidak sesuai`;
+    summaryText += `━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    summaryText += `*TOTAL TRANSAKSI : Rp ${grandTotal.toLocaleString('id-ID')}*\n`;
+    summaryText += `━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    summaryText += `▸ Ketik *YA* untuk simpan ke sheet 'PO 2026'\n▸ Ketik *BATAL* untuk membatalkan`;
 
     conversationManager.setSession(chatId, 'CONFIRM_OCR_PO', extractedData);
     await openwaService.sendText(chatId, summaryText);
@@ -179,7 +184,7 @@ Silakan coba gunakan menu *Input PO Manual* dengan mengetik *menu*.`
     console.error('❌ Gagal memproses media:', err.message);
     await openwaService.sendText(
       chatId,
-      `❌ Gagal mengekstrak dokumen: ${err.message}\nSilakan periksa kembali foto atau gunakan menu manual.`
+      `✗ _Gagal mengekstrak dokumen:_ ${err.message}\nSilakan kirim ulang foto yang lebih jelas atau gunakan menu manual.`
     );
     return true;
   }
