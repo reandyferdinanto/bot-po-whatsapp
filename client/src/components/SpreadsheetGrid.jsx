@@ -99,11 +99,11 @@ export default function SpreadsheetGrid({
 
   const totalSumQ = filteredRows.reduce((acc, r) => acc + (!r.status?.toLowerCase().includes('cancel') ? (r.total || 0) : 0), 0);
 
-  const cardBg = isDark ? '#0f172a' : '#ffffff';
-  const borderColor = isDark ? '#1e293b' : '#e2e8f0';
-  const textColor = isDark ? '#f8fafc' : '#0f172a';
-  const headerBg = isDark ? '#162032' : '#f8fafc';
-  const mutedColor = isDark ? '#94a3b8' : '#64748b';
+  const cardBg = isDark ? '#0a252a' : '#ffffff';
+  const borderColor = isDark ? '#133e46' : '#e0e5e9';
+  const textColor = isDark ? '#fbfcfc' : '#055b65';
+  const headerBg = isDark ? '#071f24' : '#f2f6f7';
+  const mutedColor = isDark ? '#8ea8ab' : '#5c7e84';
 
   // Counts for pipeline filters
   const pipelineCounts = React.useMemo(() => {
@@ -167,7 +167,7 @@ export default function SpreadsheetGrid({
           <div
             style={{
               display: 'flex',
-              backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+              backgroundColor: isDark ? '#071f24' : '#f2f6f7',
               padding: 3,
               borderRadius: 8,
               border: `1px solid ${borderColor}`,
@@ -183,8 +183,8 @@ export default function SpreadsheetGrid({
                   border: 'none',
                   fontSize: 11,
                   fontWeight: statusFilter === st ? 700 : 500,
-                  backgroundColor: statusFilter === st ? (isDark ? '#334155' : '#ffffff') : 'transparent',
-                  color: statusFilter === st ? textColor : mutedColor,
+                  backgroundColor: statusFilter === st ? (isDark ? '#133e46' : '#ffffff') : 'transparent',
+                  color: statusFilter === st ? (isDark ? '#1bd488' : '#055b65') : mutedColor,
                   cursor: 'pointer',
                   boxShadow: statusFilter === st ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
                 }}
@@ -199,7 +199,7 @@ export default function SpreadsheetGrid({
             style={{
               display: 'flex',
               alignItems: 'center',
-              backgroundColor: isDark ? 'rgba(30, 41, 59, 0.7)' : '#f8fafc',
+              backgroundColor: isDark ? 'rgba(7, 31, 36, 0.7)' : '#f8fafc',
               padding: 2,
               borderRadius: 8,
               border: `1px solid ${borderColor}`,
@@ -208,15 +208,16 @@ export default function SpreadsheetGrid({
           >
             {[
               { id: 'ALL', label: 'Semua Tahap', count: rows.length },
-              { id: 'BELUM_GRPO', label: '📦 Belum GRPO', count: pipelineCounts.belumGrpo },
-              { id: 'BELUM_BAYAR', label: '💳 Belum Bayar', count: pipelineCounts.belumBayar },
-              { id: 'LUNAS', label: '✓ Lunas', count: pipelineCounts.lunas },
+              { id: 'BELUM_GRPO', label: 'Belum GRPO', count: pipelineCounts.belumGrpo },
+              { id: 'BELUM_BAYAR', label: 'Belum Bayar', count: pipelineCounts.belumBayar },
+              { id: 'LUNAS', label: 'Lunas', count: pipelineCounts.lunas },
             ].map((p) => {
               const isActive = pipelineFilter === p.id;
               return (
                 <button
                   key={p.id}
                   onClick={() => setPipelineFilter(p.id)}
+                  className="smooth-clickable"
                   style={{
                     padding: '3px 8px',
                     borderRadius: 6,
@@ -224,16 +225,16 @@ export default function SpreadsheetGrid({
                     fontSize: 11,
                     fontWeight: isActive ? 700 : 500,
                     backgroundColor: isActive
-                      ? (isDark ? '#047857' : '#ecfdf5')
+                      ? (isDark ? '#1bd488' : '#055b65')
                       : 'transparent',
                     color: isActive
-                      ? (isDark ? '#ffffff' : '#047857')
+                      ? (isDark ? '#05191d' : '#ffffff')
                       : mutedColor,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 4,
-                    transition: 'all 0.15s ease',
+                    transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                 >
                   <span>{p.label}</span>
@@ -244,9 +245,9 @@ export default function SpreadsheetGrid({
                       padding: '0 4px',
                       borderRadius: 4,
                       backgroundColor: isActive
-                        ? (isDark ? 'rgba(0,0,0,0.2)' : '#d1fae5')
-                        : (isDark ? '#334155' : '#e2e8f0'),
-                      color: isActive ? (isDark ? '#ffffff' : '#065f46') : mutedColor,
+                        ? (isDark ? 'rgba(5, 25, 29, 0.25)' : '#45828b')
+                        : (isDark ? '#133e46' : '#e0e5e9'),
+                      color: isActive ? '#ffffff' : mutedColor,
                     }}
                   >
                     {p.count}
@@ -391,7 +392,7 @@ export default function SpreadsheetGrid({
                   <tr
                     key={rNumber}
                     onClick={() => onSelectRow(r)}
-                    className={isRowSelected ? 'row-selected' : ''}
+                    className={`gsheet-row ${isRowSelected ? 'row-selected' : ''}`}
                     style={{
                       backgroundColor: isRowSelected
                         ? (isDark ? 'rgba(37, 99, 235, 0.18)' : '#edf5ff')
@@ -484,11 +485,12 @@ export default function SpreadsheetGrid({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontWeight: 'bold', color: '#059669' }}>● Google Sheets API v4 (Live CRUD)</span>
+          <span className="live-dot-green" style={{ width: 6, height: 6 }} />
+          <span style={{ fontWeight: 'bold', color: '#059669' }}>Google Sheets API v4 (Live CRUD)</span>
           <span>•</span>
           <span>Klik baris untuk melihat ringkasan di panel samping</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontFamily: "'JetBrains Mono', monospace" }}>
+        <div className="tabular-nums" style={{ display: 'flex', alignItems: 'center', gap: 16, fontFamily: "'JetBrains Mono', monospace" }}>
           <span>
             BARIS: <strong style={{ color: textColor }}>{filteredRows.length}</strong>
             {filteredRows.length !== rows.length && (

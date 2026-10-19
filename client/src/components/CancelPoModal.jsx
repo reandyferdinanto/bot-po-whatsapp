@@ -33,14 +33,14 @@ export default function CancelPoModal({ visible, poRow, onCancel, onSuccess }) {
       open={visible}
       onCancel={onCancel}
       footer={[
-        <Button key="back" onClick={onCancel}>
+        <Button key="back" onClick={onCancel} className="smooth-clickable">
           Batal
         </Button>,
-        <Button key="submit" type="primary" danger loading={loading} onClick={handleConfirm}>
+        <Button key="submit" type="primary" danger loading={loading} onClick={handleConfirm} className="smooth-clickable">
           Ya, Batalkan PO
         </Button>,
       ]}
-      destroyOnClose
+      destroyOnHidden
       width={460}
     >
       <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.6 }}>

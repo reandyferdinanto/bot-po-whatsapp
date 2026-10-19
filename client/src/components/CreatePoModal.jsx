@@ -85,7 +85,7 @@ export default function CreatePoModal({ visible, onCancel, onSuccess, isDark }) 
     <Modal
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 16, fontWeight: 700 }}>+ Input PO Baru ke Google Sheets 'PO 2026'</span>
+          <span style={{ fontSize: 16, fontWeight: 700 }}>Input PO Baru ke Google Sheets 'PO 2026'</span>
           <Tag color="green">Multi-Item Supported</Tag>
         </div>
       }
@@ -93,7 +93,7 @@ export default function CreatePoModal({ visible, onCancel, onSuccess, isDark }) 
       onCancel={onCancel}
       width={920}
       footer={null}
-      destroyOnClose
+      destroyOnHidden
     >
       <Formik
         initialValues={{
@@ -452,26 +452,27 @@ export default function CreatePoModal({ visible, onCancel, onSuccess, isDark }) 
                 }}
               >
                 <div>
-                  <div style={{ fontSize: 11, color: '#047857' }}>Subtotal: {formatRupiah(subTotal)} | PPN: {formatRupiah(totalPpn)}</div>
+                  <div className="tabular-nums" style={{ fontSize: 11, color: '#047857' }}>Subtotal: {formatRupiah(subTotal)} | PPN: {formatRupiah(totalPpn)}</div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: '#047857' }}>
                     Grand Total Transaksi PO:
                   </div>
                 </div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: '#047857', fontFamily: 'monospace' }}>
+                <div className="tabular-nums" style={{ fontSize: 20, fontWeight: 700, color: '#047857', fontFamily: 'monospace' }}>
                   {formatRupiah(grandTotal)}
                 </div>
               </div>
 
               {/* Footer Buttons */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
-                <Button onClick={onCancel}>Batal</Button>
+                <Button onClick={onCancel} className="smooth-clickable">Batal</Button>
                 <Button
                   type="primary"
                   htmlType="submit"
                   loading={isSubmitting}
-                  style={{ backgroundColor: '#047857', borderColor: '#047857', fontWeight: 600 }}
+                  className="smooth-clickable"
+                  style={{ backgroundColor: isDark ? '#1bd488' : '#055b65', borderColor: isDark ? '#1bd488' : '#055b65', color: isDark ? '#05191d' : '#ffffff', fontWeight: 600 }}
                 >
-                  ✓ Simpan ke Google Sheets
+                  Simpan ke Google Sheets
                 </Button>
               </div>
             </form>

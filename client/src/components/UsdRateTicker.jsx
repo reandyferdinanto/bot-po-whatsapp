@@ -19,29 +19,29 @@ export default function UsdRateTicker({
   const isUp = kurs?.trend === 'up';
   const isDown = kurs?.trend === 'down';
 
-  const trendColor = isUp ? '#10b981' : isDown ? '#ef4444' : '#64748b';
+  const trendColor = isUp ? '#1bd488' : isDown ? '#ef4444' : '#45828b';
   const trendBg = isUp
-    ? (isDark ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5')
+    ? (isDark ? 'rgba(27, 212, 136, 0.18)' : '#e0f5ed')
     : isDown
-    ? (isDark ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2')
-    : (isDark ? 'rgba(100, 116, 139, 0.15)' : '#f1f5f9');
+    ? (isDark ? 'rgba(239, 68, 68, 0.18)' : '#fef2f2')
+    : (isDark ? 'rgba(69, 130, 139, 0.2)' : '#f2f6f7');
 
-  const pillBg = isDark ? '#1e293b' : '#f8fafc';
-  const pillBorder = isDark ? '#334155' : '#e2e8f0';
-  const textColor = isDark ? '#f8fafc' : '#0f172a';
-  const mutedColor = isDark ? '#94a3b8' : '#64748b';
+  const pillBg = isDark ? '#0a252a' : '#fbfcfc';
+  const pillBorder = isDark ? '#133e46' : '#e0e5e9';
+  const textColor = isDark ? '#fbfcfc' : '#055b65';
+  const mutedColor = isDark ? '#8ea8ab' : '#5c7e84';
 
   const popoverContent = (
     <div style={{ width: 280, padding: '4px 0' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 16 }}>🇺🇸</span>
+          <AiOutlineGlobal style={{ color: '#45828b', fontSize: 16 }} />
           <span style={{ fontWeight: 700, fontSize: 13, color: textColor }}>
             USD — Dolar AS
           </span>
         </div>
         <Tag color={isUp ? 'green' : isDown ? 'red' : 'default'} style={{ margin: 0, fontSize: 11, fontWeight: 600 }}>
-          {isUp ? '▲ NAIK' : isDown ? '▼ TURUN' : '— STABIL'}
+          {isUp ? 'NAIK' : isDown ? 'TURUN' : 'STABIL'}
         </Tag>
       </div>
 
@@ -116,12 +116,15 @@ export default function UsdRateTicker({
           style={{
             fontSize: 10,
             color: mutedColor,
-            fontStyle: 'italic',
             marginBottom: 10,
             lineHeight: 1.4,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 6,
           }}
         >
-          ℹ️ {kurs.trendText}
+          <AiOutlineGlobal style={{ fontSize: 12, marginTop: 2, flexShrink: 0, color: '#45828b' }} />
+          <span>{kurs.trendText}</span>
         </div>
       )}
 
@@ -135,9 +138,9 @@ export default function UsdRateTicker({
           href="https://datacenter.ortax.org/ortax/kursbi/list"
           target="_blank"
           rel="noopener noreferrer"
-          style={{ fontSize: 11, padding: '0 6px', color: '#2563eb' }}
+          style={{ fontSize: 11, padding: '0 6px', color: '#45828b' }}
         >
-          Buka Ortax ↗
+          Buka Ortax
         </Button>
 
         <Button
@@ -151,7 +154,10 @@ export default function UsdRateTicker({
           style={{
             fontSize: 11,
             borderRadius: 6,
-            backgroundColor: '#047857',
+            backgroundColor: isDark ? '#1bd488' : '#055b65',
+            borderColor: isDark ? '#1bd488' : '#055b65',
+            color: isDark ? '#05191d' : '#ffffff',
+            fontWeight: 600,
             display: 'inline-flex',
             alignItems: 'center',
             gap: 4,
@@ -171,13 +177,15 @@ export default function UsdRateTicker({
       open={popoverOpen}
       onOpenChange={setPopoverOpen}
       placement="bottom"
-      overlayInnerStyle={{
-        backgroundColor: isDark ? '#1e293b' : '#ffffff',
-        border: `1px solid ${pillBorder}`,
-        borderRadius: 12,
-        boxShadow: isDark
-          ? '0 10px 25px -5px rgba(0,0,0,0.5), 0 8px 10px -6px rgba(0,0,0,0.5)'
-          : '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+      styles={{
+        body: {
+          backgroundColor: isDark ? '#0a252a' : '#ffffff',
+          border: `1px solid ${pillBorder}`,
+          borderRadius: 12,
+          boxShadow: isDark
+            ? '0 10px 25px -5px rgba(0,0,0,0.5), 0 8px 10px -6px rgba(0,0,0,0.5)'
+            : '0 10px 25px -5px rgba(5,91,101,0.1), 0 8px 10px -6px rgba(5,91,101,0.06)',
+        },
       }}
     >
       <div
@@ -211,15 +219,15 @@ export default function UsdRateTicker({
         }}
       >
         {/* Flag & Currency Tag */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontSize: 14, lineHeight: 1 }}>🇺🇸</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <AiOutlineGlobal style={{ fontSize: 13, color: isDark ? '#1bd488' : '#45828b' }} />
           <span
             style={{
               fontSize: 10,
               fontWeight: 800,
               letterSpacing: '0.04em',
-              color: '#2563eb',
-              backgroundColor: isDark ? 'rgba(37,99,235,0.2)' : '#eff6ff',
+              color: isDark ? '#1bd488' : '#055b65',
+              backgroundColor: isDark ? 'rgba(27,212,136,0.15)' : 'rgba(178,201,197,0.3)',
               padding: '1px 5px',
               borderRadius: 4,
             }}

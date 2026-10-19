@@ -43,10 +43,10 @@ export default function Sidebar({
     }));
   };
 
-  const bgColor = isDark ? '#0f172a' : '#ffffff';
-  const borderColor = isDark ? '#1e293b' : '#e2e8f0';
-  const textColor = isDark ? '#f8fafc' : '#0f172a';
-  const mutedColor = isDark ? '#94a3b8' : '#64748b';
+  const bgColor = isDark ? '#071f24' : '#ffffff';
+  const borderColor = isDark ? '#133e46' : '#e0e5e9';
+  const textColor = isDark ? '#fbfcfc' : '#055b65';
+  const mutedColor = isDark ? '#8ea8ab' : '#5c7e84';
 
   // Submenu items
   const ocrSubItems = [
@@ -138,7 +138,7 @@ export default function Sidebar({
     <aside
       style={{
         width: isCollapsed ? 72 : 270,
-        transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        transition: 'width 0.22s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease-out, border-color 0.2s ease-out',
         backgroundColor: bgColor,
         borderRight: `1px solid ${borderColor}`,
         display: 'flex',
@@ -178,12 +178,12 @@ export default function Sidebar({
                 width: 38,
                 height: 38,
                 borderRadius: 10,
-                backgroundColor: '#047857',
+                backgroundColor: '#055b65',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#ffffff',
-                boxShadow: '0 2px 6px rgba(4,120,87,0.3)',
+                boxShadow: '0 2px 6px rgba(5,91,101,0.3)',
                 flexShrink: 0,
               }}
             >
@@ -241,16 +241,16 @@ export default function Sidebar({
                   style={{
                     padding: '10px 0',
                     borderRadius: 10,
-                    backgroundColor: isOcrActive ? (isDark ? 'rgba(14, 165, 233, 0.25)' : '#e0f2fe') : 'transparent',
-                    color: isOcrActive ? '#0284c7' : textColor,
+                    backgroundColor: isOcrActive ? (isDark ? 'rgba(69, 130, 139, 0.25)' : 'rgba(178, 201, 197, 0.3)') : 'transparent',
+                    color: isOcrActive ? (isDark ? '#1bd488' : '#055b65') : textColor,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    border: isOcrActive ? `1px solid ${isDark ? 'rgba(14, 165, 233, 0.4)' : '#bae6fd'}` : '1px solid transparent',
+                    border: isOcrActive ? `1px solid ${isDark ? 'rgba(27, 212, 136, 0.4)' : '#b2c9c5'}` : '1px solid transparent',
                   }}
                 >
-                  <AiOutlineScan style={{ fontSize: 18, color: '#0284c7' }} />
+                  <AiOutlineScan style={{ fontSize: 18, color: isOcrActive ? (isDark ? '#1bd488' : '#055b65') : '#45828b' }} />
                 </div>
               </Tooltip>
             ) : (
@@ -263,9 +263,9 @@ export default function Sidebar({
                   style={{
                     padding: '9px 12px',
                     borderRadius: 10,
-                    backgroundColor: isOcrActive ? (isDark ? 'rgba(14, 165, 233, 0.18)' : '#f0f9ff') : 'transparent',
-                    border: isOcrActive ? `1px solid ${isDark ? 'rgba(14, 165, 233, 0.35)' : '#bae6fd'}` : '1px solid transparent',
-                    color: isOcrActive ? (isDark ? '#38bdf8' : '#0284c7') : textColor,
+                    backgroundColor: isOcrActive ? (isDark ? 'rgba(69, 130, 139, 0.2)' : 'rgba(178, 201, 197, 0.25)') : 'transparent',
+                    border: isOcrActive ? `1px solid ${isDark ? 'rgba(27, 212, 136, 0.35)' : '#b2c9c5'}` : '1px solid transparent',
+                    color: isOcrActive ? (isDark ? '#1bd488' : '#055b65') : textColor,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
@@ -274,7 +274,7 @@ export default function Sidebar({
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <AiOutlineScan style={{ fontSize: 18, color: '#0284c7' }} />
+                    <AiOutlineScan style={{ fontSize: 18, color: isOcrActive ? (isDark ? '#1bd488' : '#055b65') : '#45828b' }} />
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 700 }}>
                         Smart Multi-OCR
@@ -345,16 +345,16 @@ export default function Sidebar({
                   style={{
                     padding: '10px 0',
                     borderRadius: 10,
-                    backgroundColor: isPurchasingActive ? (isDark ? 'rgba(4, 120, 87, 0.25)' : '#ecfdf5') : 'transparent',
-                    color: isPurchasingActive ? '#059669' : textColor,
+                    backgroundColor: isPurchasingActive ? (isDark ? 'rgba(27, 212, 136, 0.22)' : 'rgba(27, 212, 136, 0.12)') : 'transparent',
+                    color: isPurchasingActive ? (isDark ? '#1bd488' : '#055b65') : textColor,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    border: isPurchasingActive ? `1px solid ${isDark ? 'rgba(16, 185, 129, 0.4)' : '#a7f3d0'}` : '1px solid transparent',
+                    border: isPurchasingActive ? `1px solid ${isDark ? 'rgba(27, 212, 136, 0.4)' : '#b2c9c5'}` : '1px solid transparent',
                   }}
                 >
-                  <AiOutlineShopping style={{ fontSize: 18, color: '#059669' }} />
+                  <AiOutlineShopping style={{ fontSize: 18, color: isPurchasingActive ? (isDark ? '#1bd488' : '#055b65') : '#45828b' }} />
                 </div>
               </Tooltip>
             ) : (
@@ -367,9 +367,9 @@ export default function Sidebar({
                   style={{
                     padding: '9px 12px',
                     borderRadius: 10,
-                    backgroundColor: isPurchasingActive ? (isDark ? 'rgba(4, 120, 87, 0.22)' : '#ecfdf5') : 'transparent',
-                    border: isPurchasingActive ? `1px solid ${isDark ? 'rgba(16, 185, 129, 0.4)' : '#a7f3d0'}` : '1px solid transparent',
-                    color: isPurchasingActive ? (isDark ? '#6ee7b7' : '#047857') : textColor,
+                    backgroundColor: isPurchasingActive ? (isDark ? 'rgba(27, 212, 136, 0.18)' : 'rgba(27, 212, 136, 0.12)') : 'transparent',
+                    border: isPurchasingActive ? `1px solid ${isDark ? 'rgba(27, 212, 136, 0.4)' : '#b2c9c5'}` : '1px solid transparent',
+                    color: isPurchasingActive ? (isDark ? '#1bd488' : '#055b65') : textColor,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
@@ -378,7 +378,7 @@ export default function Sidebar({
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <AiOutlineShopping style={{ fontSize: 18, color: '#047857' }} />
+                    <AiOutlineShopping style={{ fontSize: 18, color: isPurchasingActive ? (isDark ? '#1bd488' : '#055b65') : '#055b65' }} />
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 700 }}>
                         Purchasing
@@ -419,13 +419,13 @@ export default function Sidebar({
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            color: active ? (isDark ? '#6ee7b7' : '#047857') : textColor,
-                            backgroundColor: active ? (isDark ? 'rgba(4, 120, 87, 0.25)' : '#f0fdf4') : 'transparent',
+                            color: active ? (isDark ? '#1bd488' : '#055b65') : textColor,
+                            backgroundColor: active ? (isDark ? 'rgba(27, 212, 136, 0.2)' : 'rgba(178, 201, 197, 0.35)') : 'transparent',
                             fontWeight: active ? 700 : 500,
                             transition: 'all 0.15s ease',
                           }}
                           onMouseEnter={(e) => {
-                            if (!active) e.currentTarget.style.backgroundColor = isDark ? '#1e293b' : '#f8fafc';
+                            if (!active) e.currentTarget.style.backgroundColor = isDark ? '#0a252a' : '#f2f6f7';
                           }}
                           onMouseLeave={(e) => {
                             if (!active) e.currentTarget.style.backgroundColor = 'transparent';
@@ -460,9 +460,9 @@ export default function Sidebar({
                 style={{
                   padding: isCollapsed ? '10px 0' : '9px 12px',
                   borderRadius: 10,
-                  backgroundColor: active ? (isDark ? 'rgba(4, 120, 87, 0.25)' : '#ecfdf5') : 'transparent',
-                  border: active ? `1px solid ${isDark ? 'rgba(16, 185, 129, 0.4)' : '#a7f3d0'}` : '1px solid transparent',
-                  color: active ? (isDark ? '#6ee7b7' : '#047857') : textColor,
+                  backgroundColor: active ? (isDark ? 'rgba(27, 212, 136, 0.2)' : 'rgba(27, 212, 136, 0.12)') : 'transparent',
+                  border: active ? `1px solid ${isDark ? 'rgba(27, 212, 136, 0.4)' : '#b2c9c5'}` : '1px solid transparent',
+                  color: active ? (isDark ? '#1bd488' : '#055b65') : textColor,
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -509,16 +509,16 @@ export default function Sidebar({
                   style={{
                     padding: '10px 0',
                     borderRadius: 10,
-                    backgroundColor: activeNav === 'topology' ? (isDark ? 'rgba(16, 185, 129, 0.25)' : '#ecfdf5') : 'transparent',
-                    color: activeNav === 'topology' ? '#059669' : textColor,
+                    backgroundColor: activeNav === 'topology' ? (isDark ? 'rgba(27, 212, 136, 0.25)' : 'rgba(27, 212, 136, 0.12)') : 'transparent',
+                    color: activeNav === 'topology' ? (isDark ? '#1bd488' : '#055b65') : textColor,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    border: activeNav === 'topology' ? `1px solid ${isDark ? 'rgba(16, 185, 129, 0.4)' : '#a7f3d0'}` : '1px solid transparent',
+                    border: activeNav === 'topology' ? `1px solid ${isDark ? 'rgba(27, 212, 136, 0.4)' : '#b2c9c5'}` : '1px solid transparent',
                   }}
                 >
-                  <AiOutlineCluster style={{ fontSize: 18, color: '#10b981' }} />
+                  <AiOutlineCluster style={{ fontSize: 18, color: '#1bd488' }} />
                 </div>
               </Tooltip>
             ) : (
@@ -527,9 +527,9 @@ export default function Sidebar({
                 style={{
                   padding: '9px 12px',
                   borderRadius: 10,
-                  backgroundColor: activeNav === 'topology' ? (isDark ? 'rgba(16, 185, 129, 0.25)' : '#ecfdf5') : 'transparent',
-                  border: activeNav === 'topology' ? `1px solid ${isDark ? 'rgba(16, 185, 129, 0.4)' : '#a7f3d0'}` : '1px solid transparent',
-                  color: activeNav === 'topology' ? (isDark ? '#6ee7b7' : '#047857') : textColor,
+                  backgroundColor: activeNav === 'topology' ? (isDark ? 'rgba(27, 212, 136, 0.22)' : 'rgba(27, 212, 136, 0.12)') : 'transparent',
+                  border: activeNav === 'topology' ? `1px solid ${isDark ? 'rgba(27, 212, 136, 0.4)' : '#b2c9c5'}` : '1px solid transparent',
+                  color: activeNav === 'topology' ? (isDark ? '#1bd488' : '#055b65') : textColor,
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -539,7 +539,7 @@ export default function Sidebar({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <AiOutlineCluster style={{ fontSize: 18, color: '#10b981' }} />
+                  <AiOutlineCluster style={{ fontSize: 18, color: '#1bd488' }} />
                   <div>
                     <div style={{ fontSize: 13, fontWeight: activeNav === 'topology' ? 700 : 600 }}>
                       Status Bot &amp; Sistem
@@ -550,7 +550,7 @@ export default function Sidebar({
                   </div>
                 </div>
                 <div>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block' }}></span>
+                  <span className="live-dot-green" />
                 </div>
               </div>
             )}
@@ -637,15 +637,7 @@ export default function Sidebar({
           </Tooltip>
 
           <Tooltip placement="right" title="Cron 30m • PostgreSQL / RAM">
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                backgroundColor: '#10b981',
-                boxShadow: '0 0 6px #10b981',
-              }}
-            />
+            <span className="live-dot-green" />
           </Tooltip>
         </div>
       ) : (
@@ -661,16 +653,8 @@ export default function Sidebar({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ fontWeight: 'bold', color: textColor, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span
-                style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: '50%',
-                  backgroundColor: '#10b981',
-                  boxShadow: '0 0 6px #10b981',
-                }}
-              ></span>
+            <span style={{ fontWeight: 'bold', color: textColor, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="live-dot-green" />
               Sinkronisasi Otomatis
             </span>
             <span style={{ color: '#059669', fontWeight: 'bold', fontFamily: 'monospace' }}>Cron 30m</span>

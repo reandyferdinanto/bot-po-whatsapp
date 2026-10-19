@@ -113,8 +113,9 @@ export default function SuppliersTable({ isDark }) {
               )}
             </div>
             {poNumber ? (
-              <div style={{ fontSize: 11, color: '#047857' }}>
-                📋 <strong>No. PO:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{poNumber}{poExtra}</span>
+              <div style={{ fontSize: 11, color: isDark ? '#1bd488' : '#055b65', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <AiOutlineFileText style={{ fontSize: 12 }} />
+                <span><strong>No. PO:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{poNumber}{poExtra}</span></span>
               </div>
             ) : null}
           </div>
@@ -185,7 +186,7 @@ export default function SuppliersTable({ isDark }) {
                 {name}
               </div>
               <div style={{ fontSize: 11, color: '#64748b' }}>
-                {isExpanded ? '▼ Menampilkan material & harga terakhir' : '▶ Klik untuk melihat daftar material & No. PO'}
+                {isExpanded ? 'Menampilkan material & harga terakhir' : 'Klik untuk melihat daftar material & No. PO'}
               </div>
             </div>
           </div>
@@ -273,13 +274,14 @@ export default function SuppliersTable({ isDark }) {
     },
   ];
 
-  const cardBg = isDark ? '#0f172a' : '#ffffff';
-  const borderColor = isDark ? '#1e293b' : '#e2e8f0';
-  const textColor = isDark ? '#f8fafc' : '#0f172a';
+  const cardBg = isDark ? '#0a252a' : '#ffffff';
+  const borderColor = isDark ? '#133e46' : '#e0e5e9';
+  const textColor = isDark ? '#fbfcfc' : '#055b65';
   const isAllExpanded = expandedRowKeys.length === data.length && data.length > 0;
 
   return (
     <div
+      className="smooth-card"
       style={{
         flex: 1,
         backgroundColor: cardBg,
@@ -321,6 +323,7 @@ export default function SuppliersTable({ isDark }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Button
             size="small"
+            className="smooth-clickable"
             onClick={handleToggleExpandAll}
             style={{ fontSize: 11, borderRadius: 6 }}
           >

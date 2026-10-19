@@ -190,7 +190,7 @@ export default function GoogleDriveSettingsView({ isDark }) {
   const borderCol = isDark ? '#303030' : '#e8e8e8';
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', paddingBottom: 40 }}>
+    <div className="smooth-page-fade" style={{ maxWidth: 1100, margin: '0 auto', paddingBottom: 40 }}>
       {/* HEADER SECTION */}
       <div style={{ marginBottom: 24 }}>
         <Space orientation="vertical" orientationMargin={0} style={{ width: '100%' }}>
@@ -360,8 +360,8 @@ export default function GoogleDriveSettingsView({ isDark }) {
                               Aktifkan Izin
                             </Button>
                           </div>
-                          <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
-                            💡 <i>Catatan:</i> Jika memilih opsi <b>Domain Web</b>, browser akan langsung otomatis mengaktifkan token setelah klik "Izinkan" tanpa perlu salin kode manual.
+                          <Text type="secondary" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                            <AiOutlineInfoCircle /> <i>Catatan:</i> Jika memilih opsi <b>Domain Web</b>, browser akan langsung otomatis mengaktifkan token setelah klik "Izinkan" tanpa perlu salin kode manual.
                           </Text>
                         </div>
 
@@ -373,8 +373,8 @@ export default function GoogleDriveSettingsView({ isDark }) {
                             {
                               key: '1',
                               label: (
-                                <Text type="danger" style={{ fontSize: 12 }}>
-                                  ⚠️ Muncul "Error 400: redirect_uri_mismatch"? Klik di sini untuk panduan perbaikan Google Cloud Console
+                                <Text type="danger" style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                  <AiOutlineWarning /> Muncul "Error 400: redirect_uri_mismatch"? Klik di sini untuk panduan perbaikan Google Cloud Console
                                 </Text>
                               ),
                               children: (
@@ -447,8 +447,8 @@ export default function GoogleDriveSettingsView({ isDark }) {
                     <Text type="secondary" style={{ fontSize: 12 }}>
                       Contoh: <code>https://drive.google.com/drive/folders/1ABCxyz-1234567890</code> atau cukup ID-nya saja.
                     </Text>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      💡 Pastikan folder tersebut telah dibagikan (Shared) dengan akun Google bot dengan hak akses <b>Editor</b>.
+                    <Text type="secondary" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <AiOutlineInfoCircle /> Pastikan folder tersebut telah dibagikan (Shared) dengan akun Google bot dengan hak akses <b>Editor</b>.
                     </Text>
                   </Space>
                 }
@@ -521,7 +521,7 @@ export default function GoogleDriveSettingsView({ isDark }) {
                           <br />
                           <b>Pemilik:</b> {testResult.folder?.owners || '-'}
                           <br />
-                          <b>Izin Tambah File:</b> {testResult.folder?.canAddChildren ? ' Ya (Editor)' : '⚠️ Hanya Baca (Viewer)'}
+                          <b>Izin Tambah File:</b> {testResult.folder?.canAddChildren ? ' Ya (Editor)' : ' Hanya Baca (Viewer)'}
                         </Paragraph>
                         {testResult.folder?.webViewLink && (
                           <a href={testResult.folder.webViewLink} target="_blank" rel="noreferrer">

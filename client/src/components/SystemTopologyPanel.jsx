@@ -58,10 +58,10 @@ export default function SystemTopologyPanel({
     }
   };
 
-  const cardBg = isDark ? '#0f172a' : '#ffffff';
-  const borderColor = isDark ? '#1e293b' : '#e2e8f0';
-  const textColor = isDark ? '#f8fafc' : '#0f172a';
-  const mutedColor = isDark ? '#94a3b8' : '#64748b';
+  const cardBg = isDark ? '#0a252a' : '#ffffff';
+  const borderColor = isDark ? '#133e46' : '#e0e5e9';
+  const textColor = isDark ? '#fbfcfc' : '#055b65';
+  const mutedColor = isDark ? '#8ea8ab' : '#5c7e84';
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto' }}>
@@ -69,6 +69,7 @@ export default function SystemTopologyPanel({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
         {/* OpenWA Gateway */}
         <div
+          className="smooth-card"
           style={{
             backgroundColor: cardBg,
             borderRadius: 12,
@@ -80,7 +81,8 @@ export default function SystemTopologyPanel({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontWeight: 700, color: textColor, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontWeight: 700, color: textColor, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="live-dot-green" />
               <AiOutlineApi style={{ color: '#059669', fontSize: 16 }} /> 1. OpenWA Gateway
             </span>
             <Tag color="success">ONLINE</Tag>
@@ -98,6 +100,7 @@ export default function SystemTopologyPanel({
 
         {/* Google Sheets API v4 */}
         <div
+          className="smooth-card"
           style={{
             backgroundColor: cardBg,
             borderRadius: 12,
@@ -109,7 +112,8 @@ export default function SystemTopologyPanel({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontWeight: 700, color: textColor, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontWeight: 700, color: textColor, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="live-dot-blue" />
               <AiOutlineCloudServer style={{ color: '#2563eb', fontSize: 16 }} /> 2. Google Sheets API v4
             </span>
             <Tag color="blue">CONNECTED</Tag>
@@ -127,6 +131,7 @@ export default function SystemTopologyPanel({
 
         {/* Database & Cache */}
         <div
+          className="smooth-card"
           style={{
             backgroundColor: cardBg,
             borderRadius: 12,
@@ -245,8 +250,9 @@ export default function SystemTopologyPanel({
         }}
       >
         <div>
-          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: textColor }}>
-            📲 WhatsApp Direct Test Notification
+          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: textColor, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <AiOutlineSend style={{ color: '#1bd488' }} />
+            <span>WhatsApp Direct Test Notification</span>
           </h3>
           <p style={{ margin: '4px 0 0 0', fontSize: 12, color: mutedColor }}>
             Uji kirim pesan instan langsung dari dashboard ke WhatsApp penerima via OpenWA Gateway.

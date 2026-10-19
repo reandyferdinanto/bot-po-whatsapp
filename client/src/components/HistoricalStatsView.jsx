@@ -53,10 +53,10 @@ export default function HistoricalStatsView({ isDark }) {
     loadStats();
   }, []);
 
-  const cardBg = isDark ? '#0f172a' : '#ffffff';
-  const borderColor = isDark ? '#1e293b' : '#e2e8f0';
-  const textColor = isDark ? '#f8fafc' : '#0f172a';
-  const mutedColor = isDark ? '#94a3b8' : '#64748b';
+  const cardBg = isDark ? '#0a252a' : '#ffffff';
+  const borderColor = isDark ? '#133e46' : '#e0e5e9';
+  const textColor = isDark ? '#fbfcfc' : '#055b65';
+  const mutedColor = isDark ? '#8ea8ab' : '#5c7e84';
 
   // Hitung persentase proporsi belanja tahunan
   const maxYearlySpend = Math.max(
@@ -72,7 +72,7 @@ export default function HistoricalStatsView({ isDark }) {
       width: 140,
       render: (name, r) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <AiOutlineCalendar style={{ color: '#0284c7' }} />
+          <AiOutlineCalendar style={{ color: '#45828b' }} />
           <strong style={{ color: textColor }}>{name || `PO ${r.year}`}</strong>
         </div>
       ),
@@ -86,10 +86,10 @@ export default function HistoricalStatsView({ isDark }) {
         const percent = Math.min(Math.round((spend / maxYearlySpend) * 100), 100);
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span style={{ fontWeight: 800, color: '#047857', fontFamily: 'monospace' }}>
+            <span style={{ fontWeight: 800, color: isDark ? '#1bd488' : '#055b65', fontFamily: 'monospace' }}>
               {formatRupiah(spend)}
             </span>
-            <Progress percent={percent} size="small" strokeColor="#059669" showInfo={false} />
+            <Progress percent={percent} size="small" strokeColor="#1bd488" showInfo={false} />
           </div>
         );
       },
@@ -196,6 +196,7 @@ export default function HistoricalStatsView({ isDark }) {
       {/* KPI Cards across All Years */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
         <div
+          className="smooth-card"
           style={{
             backgroundColor: cardBg,
             borderRadius: 12,
@@ -210,7 +211,7 @@ export default function HistoricalStatsView({ isDark }) {
             <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: mutedColor }}>
               TOTAL BELANJA (2017 - 2026)
             </div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#047857', fontFamily: 'monospace', marginTop: 4 }}>
+            <div className="tabular-nums" style={{ fontSize: 20, fontWeight: 800, color: '#047857', fontFamily: 'monospace', marginTop: 4 }}>
               {formatRupiah(stats?.totalAllSpend || 0)}
             </div>
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
@@ -235,6 +236,7 @@ export default function HistoricalStatsView({ isDark }) {
         </div>
 
         <div
+          className="smooth-card"
           style={{
             backgroundColor: cardBg,
             borderRadius: 12,
@@ -249,7 +251,7 @@ export default function HistoricalStatsView({ isDark }) {
             <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: mutedColor }}>
               RATA-RATA PENGELUARAN / TAHUN
             </div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#2563eb', fontFamily: 'monospace', marginTop: 4 }}>
+            <div className="tabular-nums" style={{ fontSize: 20, fontWeight: 800, color: '#2563eb', fontFamily: 'monospace', marginTop: 4 }}>
               {formatRupiah(stats?.averageSpendPerYear || 0)}
             </div>
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
@@ -274,6 +276,7 @@ export default function HistoricalStatsView({ isDark }) {
         </div>
 
         <div
+          className="smooth-card"
           style={{
             backgroundColor: cardBg,
             borderRadius: 12,
@@ -288,7 +291,7 @@ export default function HistoricalStatsView({ isDark }) {
             <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: mutedColor }}>
               TOTAL BARIS DOKUMEN PO
             </div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: textColor, fontFamily: 'monospace', marginTop: 4 }}>
+            <div className="tabular-nums" style={{ fontSize: 20, fontWeight: 800, color: textColor, fontFamily: 'monospace', marginTop: 4 }}>
               {Number(stats?.totalAllRows || 0).toLocaleString('id-ID')} Baris
             </div>
             <div style={{ fontSize: 11, color: '#059669', fontWeight: 600, marginTop: 2 }}>
@@ -313,6 +316,7 @@ export default function HistoricalStatsView({ isDark }) {
         </div>
 
         <div
+          className="smooth-card"
           style={{
             backgroundColor: cardBg,
             borderRadius: 12,
@@ -327,7 +331,7 @@ export default function HistoricalStatsView({ isDark }) {
             <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: mutedColor }}>
               TAB TERSINKRONKAN
             </div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#047857', fontFamily: 'monospace', marginTop: 4 }}>
+            <div className="tabular-nums" style={{ fontSize: 20, fontWeight: 800, color: '#047857', fontFamily: 'monospace', marginTop: 4 }}>
               {stats?.yearlyBreakdown?.length || 1} Tahun Buku
             </div>
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
@@ -363,8 +367,9 @@ export default function HistoricalStatsView({ isDark }) {
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: textColor }}>
-              📊 Distribusi Pengeluaran &amp; Transaksi Tahunan (PO 2017 - 2026)
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: textColor, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <AiOutlineBarChart style={{ color: '#45828b' }} />
+              <span>Distribusi Pengeluaran &amp; Transaksi Tahunan (PO 2017 - 2026)</span>
             </h3>
             <p style={{ margin: '2px 0 0 0', fontSize: 11, color: mutedColor }}>
               Data perbandingan dihitung otomatis dari masing-masing sheet tahunan di Google Spreadsheet.

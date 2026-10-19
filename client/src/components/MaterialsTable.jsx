@@ -68,7 +68,7 @@ export default function MaterialsTable({ isDark }) {
             <span
               style={{
                 fontWeight: 700,
-                color: '#059669',
+                color: isDark ? '#1bd488' : '#055b65',
                 fontFamily: 'monospace',
                 fontSize: 13,
                 cursor: 'pointer',
@@ -87,19 +87,20 @@ export default function MaterialsTable({ isDark }) {
       width: 140,
       align: 'center',
       render: (count) => (
-        <Tag color={count > 0 ? 'blue' : 'default'} style={{ fontWeight: 600 }}>
+        <Tag color={count > 0 ? 'cyan' : 'default'} style={{ fontWeight: 600 }}>
           {count || 0}x Order
         </Tag>
       ),
     },
   ];
 
-  const cardBg = isDark ? '#0f172a' : '#ffffff';
-  const borderColor = isDark ? '#1e293b' : '#e2e8f0';
-  const textColor = isDark ? '#f8fafc' : '#0f172a';
+  const cardBg = isDark ? '#0a252a' : '#ffffff';
+  const borderColor = isDark ? '#133e46' : '#e0e5e9';
+  const textColor = isDark ? '#fbfcfc' : '#055b65';
 
   return (
     <div
+      className="smooth-card"
       style={{
         flex: 1,
         backgroundColor: cardBg,
@@ -143,7 +144,7 @@ export default function MaterialsTable({ isDark }) {
             allowClear
             style={{ width: 280, borderRadius: 8, fontSize: 12 }}
           />
-          <Button icon={<AiOutlineReload />} onClick={loadMaterials} style={{ borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} />
+          <Button icon={<AiOutlineReload />} onClick={loadMaterials} className="smooth-clickable" style={{ borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} />
         </div>
       </div>
 

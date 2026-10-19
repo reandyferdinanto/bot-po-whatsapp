@@ -14,6 +14,7 @@ import {
   Tooltip,
 } from 'antd';
 import {
+  AiOutlineEdit,
   AiOutlinePlus,
   AiOutlineDelete,
   AiOutlineCheck,
@@ -294,8 +295,9 @@ export default function EditPoModal({
       title={
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <AiOutlineEdit style={{ color: '#45828b', fontSize: 18 }} />
             <span style={{ fontSize: 16, fontWeight: 700, color: textColor }}>
-              ✏️ Edit Transaksi PO: {header.noPo || poRow?.noPo}
+              Edit Transaksi PO: {header.noPo || poRow?.noPo}
             </span>
             <Tag color={header.status === 'Close' ? 'green' : header.status === 'Cancelled' ? 'red' : 'blue'}>
               {header.status}
@@ -316,7 +318,7 @@ export default function EditPoModal({
             *Semua perubahan 23 kolom &amp; multi-item material disinkronkan langsung ke Google Sheets.
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <Button onClick={onCancel} disabled={saving}>
+            <Button onClick={onCancel} disabled={saving} className="smooth-clickable">
               Batal
             </Button>
             <Button
@@ -324,14 +326,15 @@ export default function EditPoModal({
               icon={<AiOutlineCheck />}
               loading={saving}
               onClick={handleSave}
-              style={{ backgroundColor: '#2563eb', fontWeight: 600 }}
+              className="smooth-clickable"
+              style={{ backgroundColor: isDark ? '#1bd488' : '#055b65', borderColor: isDark ? '#1bd488' : '#055b65', color: isDark ? '#05191d' : '#ffffff', fontWeight: 600 }}
             >
               Simpan Semua Kolom ({items.length} Material)
             </Button>
           </div>
         </div>
       }
-      destroyOnClose
+      destroyOnHidden
     >
       <Spin spinning={loading} tip="Memuat detail seluruh material PO...">
         <Tabs

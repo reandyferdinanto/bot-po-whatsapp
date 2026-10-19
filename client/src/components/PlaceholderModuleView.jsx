@@ -13,8 +13,8 @@ const MODULE_CONFIG = {
   warehouse: {
     title: 'Modul Warehouse (Gudang)',
     tag: 'Operasional Gudang',
-    icon: <AiOutlineInbox style={{ fontSize: 36, color: '#059669' }} />,
-    color: '#059669',
+    icon: <AiOutlineInbox style={{ fontSize: 36, color: '#1bd488' }} />,
+    color: '#1bd488',
     description: 'Pusat manajemen penerimaan barang fisik, kontrol Surat Jalan (DO), dan verifikasi Goods Receipt PO (GRPO).',
     features: [
       'Pencatatan Goods Receipt PO (GRPO) langsung dari gudang',
@@ -27,8 +27,8 @@ const MODULE_CONFIG = {
   finance: {
     title: 'Modul Finance (Keuangan)',
     tag: 'Keuangan & Pembayaran',
-    icon: <AiOutlineDollar style={{ fontSize: 36, color: '#0284c7' }} />,
-    color: '#0284c7',
+    icon: <AiOutlineDollar style={{ fontSize: 36, color: '#45828b' }} />,
+    color: '#45828b',
     description: 'Pusat rekonsiliasi faktur, validasi perpajakan (PPN/PPH), verifikasi nomor invoice, dan pelunasan PO.',
     features: [
       'Rekonsiliasi Faktur Pembayaran terhadap GRPO & PO',
@@ -41,8 +41,8 @@ const MODULE_CONFIG = {
   maintenance: {
     title: 'Modul Maintenance (Pemeliharaan)',
     tag: 'Teknik & Pemeliharaan',
-    icon: <AiOutlineTool style={{ fontSize: 36, color: '#0d9488' }} />,
-    color: '#0d9488',
+    icon: <AiOutlineTool style={{ fontSize: 36, color: '#055b65' }} />,
+    color: '#055b65',
     description: 'Pusat pengajuan kebutuhan sparepart mesin, work order pemeliharaan fasilitas, dan monitoring suku cadang.',
     features: [
       'Pengajuan permintaan suku cadang/material ke Purchasing',
@@ -57,10 +57,10 @@ const MODULE_CONFIG = {
 export default function PlaceholderModuleView({ module = 'warehouse', isDark }) {
   const config = MODULE_CONFIG[module] || MODULE_CONFIG.warehouse;
 
-  const bgColor = isDark ? '#0f172a' : '#ffffff';
-  const borderColor = isDark ? '#1e293b' : '#e2e8f0';
-  const textColor = isDark ? '#f8fafc' : '#0f172a';
-  const mutedColor = isDark ? '#94a3b8' : '#64748b';
+  const bgColor = isDark ? '#0a252a' : '#ffffff';
+  const borderColor = isDark ? '#133e46' : '#e0e5e9';
+  const textColor = isDark ? '#fbfcfc' : '#055b65';
+  const mutedColor = isDark ? '#8ea8ab' : '#5c7e84';
 
   return (
     <div
@@ -75,6 +75,7 @@ export default function PlaceholderModuleView({ module = 'warehouse', isDark }) 
       }}
     >
       <div
+        className="smooth-card smooth-page-fade"
         style={{
           maxWidth: 680,
           width: '100%',

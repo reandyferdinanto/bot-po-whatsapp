@@ -161,41 +161,59 @@ export default function App() {
     setIsDark((prev) => !prev);
   };
 
-  const mainBg = isDark ? '#090d16' : '#f1f5f9';
+  const mainBg = isDark ? '#05191d' : '#fbfcfc';
   const isPublicForm = location.pathname === '/form-budget' || location.pathname === '/form-lpj';
+
+  const appTheme = {
+    algorithm: isDark ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
+    token: {
+      colorPrimary: isDark ? '#1bd488' : '#055b65',
+      colorSuccess: '#1bd488',
+      colorInfo: '#45828b',
+      borderRadius: 8,
+      fontFamily: "'Carlito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      colorBgContainer: isDark ? '#0a252a' : '#ffffff',
+      colorBorder: isDark ? '#133e46' : '#e0e5e9',
+      colorText: isDark ? '#fbfcfc' : '#055b65',
+      colorTextSecondary: isDark ? '#8ea8ab' : '#5c7e84',
+    },
+    components: {
+      Button: {
+        controlHeight: 34,
+        borderRadius: 8,
+      },
+      Table: {
+        borderRadius: 8,
+      },
+      Card: {
+        borderRadius: 12,
+      },
+      Modal: {
+        borderRadiusLG: 14,
+      },
+      Tag: {
+        borderRadiusSM: 4,
+      },
+    },
+  };
 
   if (isPublicForm) {
     return (
-      <ConfigProvider
-        theme={{
-          algorithm: isDark ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
-          token: {
-            colorPrimary: '#047857',
-            borderRadius: 8,
-            fontFamily: "'Calibri', 'Carlito', sans-serif",
-          },
-        }}
-      >
-        <Routes>
-          <Route path="/form-budget" element={<FinanceBudgetPublicForm mode="request" isDark={isDark} />} />
-          <Route path="/form-lpj" element={<FinanceBudgetPublicForm mode="lpj" isDark={isDark} />} />
-        </Routes>
+      <ConfigProvider theme={appTheme}>
+        <div className="smooth-page-fade">
+          <Routes>
+            <Route path="/form-budget" element={<FinanceBudgetPublicForm mode="request" isDark={isDark} />} />
+            <Route path="/form-lpj" element={<FinanceBudgetPublicForm mode="lpj" isDark={isDark} />} />
+          </Routes>
+        </div>
       </ConfigProvider>
     );
   }
 
   return (
-    <ConfigProvider
-      theme={{
-        algorithm: isDark ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
-        token: {
-          colorPrimary: '#047857',
-          borderRadius: 8,
-          fontFamily: "'Calibri', 'Carlito', sans-serif",
-        },
-      }}
-    >
+    <ConfigProvider theme={appTheme}>
       <div
+        className={isDark ? 'dark-theme' : 'light-theme'}
         style={{
           width: '100vw',
           height: '100vh',
@@ -203,6 +221,7 @@ export default function App() {
           overflow: 'hidden',
           backgroundColor: mainBg,
           color: isDark ? '#f8fafc' : '#0f172a',
+          transition: 'background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1), color 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
         }}
       >
         {/* Sidebar with Route Navigation */}
@@ -243,192 +262,194 @@ export default function App() {
               gap: 14,
             }}
           >
-            <Routes>
-              {/* Halaman 1: PO 2026 (Root & /po-2026) */}
-              <Route
-                path="/"
-                element={
-                  <>
-                    <KpiCards
+            <div key={location.pathname} className="smooth-page-fade" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', gap: 14 }}>
+              <Routes>
+                {/* Halaman 1: PO 2026 (Root & /po-2026) */}
+                <Route
+                  path="/"
+                  element={
+                    <>
+                      <KpiCards
+                        stats={stats}
+                        isDark={isDark}
+                        kurs={kurs}
+                        onRefreshKurs={handleRefreshKurs}
+                        isRefreshingKurs={isRefreshingKurs}
+                        onStatusFilterChange={setStatusFilter}
+                        activeStatusFilter={statusFilter}
+                      />
+                      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: 12 }}>
+                        <SpreadsheetGrid
+                          rows={rows}
+                          selectedRow={selectedRow}
+                          onSelectRow={setSelectedRow}
+                          onEditPo={openEditModal}
+                          onCancelPo={openCancelModal}
+                          statusFilter={statusFilter}
+                          onStatusFilterChange={setStatusFilter}
+                          searchQuery={searchQuery}
+                          onSearchChange={setSearchQuery}
+                          isDrawerOpen={isDrawerOpen}
+                          onToggleDrawer={() => setIsDrawerOpen((prev) => !prev)}
+                          isDark={isDark}
+                        />
+
+                        {isDrawerOpen && (
+                          <RowInspectorDrawer
+                            selectedRow={selectedRow}
+                            allRows={rows}
+                            onEditPo={openEditModal}
+                            onCancelPo={openCancelModal}
+                            onClose={() => setIsDrawerOpen(false)}
+                            isDark={isDark}
+                          />
+                        )}
+                      </div>
+                    </>
+                  }
+                />
+                <Route
+                  path="/po-2026"
+                  element={
+                    <>
+                      <KpiCards
+                        stats={stats}
+                        isDark={isDark}
+                        kurs={kurs}
+                        onRefreshKurs={handleRefreshKurs}
+                        isRefreshingKurs={isRefreshingKurs}
+                        onStatusFilterChange={setStatusFilter}
+                        activeStatusFilter={statusFilter}
+                      />
+                      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: 12 }}>
+                        <SpreadsheetGrid
+                          rows={rows}
+                          selectedRow={selectedRow}
+                          onSelectRow={setSelectedRow}
+                          onEditPo={openEditModal}
+                          onCancelPo={openCancelModal}
+                          statusFilter={statusFilter}
+                          onStatusFilterChange={setStatusFilter}
+                          searchQuery={searchQuery}
+                          onSearchChange={setSearchQuery}
+                          isDrawerOpen={isDrawerOpen}
+                          onToggleDrawer={() => setIsDrawerOpen((prev) => !prev)}
+                          isDark={isDark}
+                        />
+
+                        {isDrawerOpen && (
+                          <RowInspectorDrawer
+                            selectedRow={selectedRow}
+                            allRows={rows}
+                            onEditPo={openEditModal}
+                            onCancelPo={openCancelModal}
+                            onClose={() => setIsDrawerOpen(false)}
+                            isDark={isDark}
+                          />
+                        )}
+                      </div>
+                    </>
+                  }
+                />
+
+                {/* Halaman Statistik Multi-Tahun (2017 - 2026) */}
+                <Route
+                  path="/statistik"
+                  element={<HistoricalStatsView isDark={isDark} />}
+                />
+                <Route
+                  path="/analytics"
+                  element={<Navigate to="/statistik" replace />}
+                />
+
+                {/* Halaman 2: Smart Multi-OCR */}
+                <Route
+                  path="/multi-ocr"
+                  element={
+                    <MultiOcrPanel
+                      onPoCommitted={() => {
+                        loadData();
+                      }}
+                      isDark={isDark}
+                    />
+                  }
+                />
+
+                {/* Halaman 3: database Material */}
+                <Route
+                  path="/database-material"
+                  element={<MaterialsTable isDark={isDark} />}
+                />
+                <Route
+                  path="/material"
+                  element={<Navigate to="/database-material" replace />}
+                />
+
+                {/* Halaman 4: database Supplier Material */}
+                <Route
+                  path="/database-supplier"
+                  element={<SuppliersTable isDark={isDark} />}
+                />
+                <Route
+                  path="/supplier"
+                  element={<Navigate to="/database-supplier" replace />}
+                />
+
+                {/* Modul Standalone: Warehouse, Finance, Maintenance */}
+                <Route
+                  path="/warehouse"
+                  element={<PlaceholderModuleView module="warehouse" isDark={isDark} />}
+                />
+                <Route
+                  path="/finance"
+                  element={<FinanceDashboardView isDark={isDark} />}
+                />
+                <Route
+                  path="/maintenance"
+                  element={<PlaceholderModuleView module="maintenance" isDark={isDark} />}
+                />
+                <Route
+                  path="/form-budget"
+                  element={<FinanceBudgetPublicForm mode="request" isDark={isDark} />}
+                />
+                <Route
+                  path="/form-lpj"
+                  element={<FinanceBudgetPublicForm mode="lpj" isDark={isDark} />}
+                />
+
+                {/* Halaman 5: Status Sistem & Bot WA */}
+                <Route
+                  path="/status-sistem"
+                  element={
+                    <SystemTopologyPanel
                       stats={stats}
+                      onRefresh={loadData}
                       isDark={isDark}
                       kurs={kurs}
                       onRefreshKurs={handleRefreshKurs}
                       isRefreshingKurs={isRefreshingKurs}
-                      onStatusFilterChange={setStatusFilter}
-                      activeStatusFilter={statusFilter}
                     />
-                    <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: 12 }}>
-                      <SpreadsheetGrid
-                        rows={rows}
-                        selectedRow={selectedRow}
-                        onSelectRow={setSelectedRow}
-                        onEditPo={openEditModal}
-                        onCancelPo={openCancelModal}
-                        statusFilter={statusFilter}
-                        onStatusFilterChange={setStatusFilter}
-                        searchQuery={searchQuery}
-                        onSearchChange={setSearchQuery}
-                        isDrawerOpen={isDrawerOpen}
-                        onToggleDrawer={() => setIsDrawerOpen((prev) => !prev)}
-                        isDark={isDark}
-                      />
+                  }
+                />
+                <Route
+                  path="/topology"
+                  element={<Navigate to="/status-sistem" replace />}
+                />
 
-                      {isDrawerOpen && (
-                        <RowInspectorDrawer
-                          selectedRow={selectedRow}
-                          allRows={rows}
-                          onEditPo={openEditModal}
-                          onCancelPo={openCancelModal}
-                          onClose={() => setIsDrawerOpen(false)}
-                          isDark={isDark}
-                        />
-                      )}
-                    </div>
-                  </>
-                }
-              />
-              <Route
-                path="/po-2026"
-                element={
-                  <>
-                    <KpiCards
-                      stats={stats}
-                      isDark={isDark}
-                      kurs={kurs}
-                      onRefreshKurs={handleRefreshKurs}
-                      isRefreshingKurs={isRefreshingKurs}
-                      onStatusFilterChange={setStatusFilter}
-                      activeStatusFilter={statusFilter}
-                    />
-                    <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: 12 }}>
-                      <SpreadsheetGrid
-                        rows={rows}
-                        selectedRow={selectedRow}
-                        onSelectRow={setSelectedRow}
-                        onEditPo={openEditModal}
-                        onCancelPo={openCancelModal}
-                        statusFilter={statusFilter}
-                        onStatusFilterChange={setStatusFilter}
-                        searchQuery={searchQuery}
-                        onSearchChange={setSearchQuery}
-                        isDrawerOpen={isDrawerOpen}
-                        onToggleDrawer={() => setIsDrawerOpen((prev) => !prev)}
-                        isDark={isDark}
-                      />
+                {/* Halaman 6: Pengaturan Google Drive */}
+                <Route
+                  path="/settings/drive"
+                  element={<GoogleDriveSettingsView isDark={isDark} />}
+                />
+                <Route
+                  path="/drive"
+                  element={<Navigate to="/settings/drive" replace />}
+                />
 
-                      {isDrawerOpen && (
-                        <RowInspectorDrawer
-                          selectedRow={selectedRow}
-                          allRows={rows}
-                          onEditPo={openEditModal}
-                          onCancelPo={openCancelModal}
-                          onClose={() => setIsDrawerOpen(false)}
-                          isDark={isDark}
-                        />
-                      )}
-                    </div>
-                  </>
-                }
-              />
-
-              {/* Halaman Statistik Multi-Tahun (2017 - 2026) */}
-              <Route
-                path="/statistik"
-                element={<HistoricalStatsView isDark={isDark} />}
-              />
-              <Route
-                path="/analytics"
-                element={<Navigate to="/statistik" replace />}
-              />
-
-              {/* Halaman 2: Smart Multi-OCR */}
-              <Route
-                path="/multi-ocr"
-                element={
-                  <MultiOcrPanel
-                    onPoCommitted={() => {
-                      loadData();
-                    }}
-                    isDark={isDark}
-                  />
-                }
-              />
-
-              {/* Halaman 3: database Material */}
-              <Route
-                path="/database-material"
-                element={<MaterialsTable isDark={isDark} />}
-              />
-              <Route
-                path="/material"
-                element={<Navigate to="/database-material" replace />}
-              />
-
-              {/* Halaman 4: database Supplier Material */}
-              <Route
-                path="/database-supplier"
-                element={<SuppliersTable isDark={isDark} />}
-              />
-              <Route
-                path="/supplier"
-                element={<Navigate to="/database-supplier" replace />}
-              />
-
-              {/* Modul Standalone: Warehouse, Finance, Maintenance */}
-              <Route
-                path="/warehouse"
-                element={<PlaceholderModuleView module="warehouse" isDark={isDark} />}
-              />
-              <Route
-                path="/finance"
-                element={<FinanceDashboardView isDark={isDark} />}
-              />
-              <Route
-                path="/maintenance"
-                element={<PlaceholderModuleView module="maintenance" isDark={isDark} />}
-              />
-              <Route
-                path="/form-budget"
-                element={<FinanceBudgetPublicForm mode="request" isDark={isDark} />}
-              />
-              <Route
-                path="/form-lpj"
-                element={<FinanceBudgetPublicForm mode="lpj" isDark={isDark} />}
-              />
-
-              {/* Halaman 5: Status Sistem & Bot WA */}
-              <Route
-                path="/status-sistem"
-                element={
-                  <SystemTopologyPanel
-                    stats={stats}
-                    onRefresh={loadData}
-                    isDark={isDark}
-                    kurs={kurs}
-                    onRefreshKurs={handleRefreshKurs}
-                    isRefreshingKurs={isRefreshingKurs}
-                  />
-                }
-              />
-              <Route
-                path="/topology"
-                element={<Navigate to="/status-sistem" replace />}
-              />
-
-              {/* Halaman 6: Pengaturan Google Drive */}
-              <Route
-                path="/settings/drive"
-                element={<GoogleDriveSettingsView isDark={isDark} />}
-              />
-              <Route
-                path="/drive"
-                element={<Navigate to="/settings/drive" replace />}
-              />
-
-              {/* Fallback to /po-2026 */}
-              <Route path="*" element={<Navigate to="/po-2026" replace />} />
-            </Routes>
+                {/* Fallback to /po-2026 */}
+                <Route path="*" element={<Navigate to="/po-2026" replace />} />
+              </Routes>
+            </div>
           </main>
         </div>
 

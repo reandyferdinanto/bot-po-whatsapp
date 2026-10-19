@@ -1,0 +1,444 @@
+/* ==========================================================================
+   SmoothUI Global Styles & Design System Tokens
+   Palette: #fbfcfc | #e0e5e9 | #b2c9c5 | #1bd488 | #45828b | #055b65
+   ========================================================================== */
+
+:root {
+  --font-ui: 'Carlito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Smooth Easing Curves */
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Animation Durations */
+  --dur-fast: 120ms;
+  --dur-normal: 200ms;
+  --dur-medium: 280ms;
+  --dur-slow: 380ms;
+
+  /* Theme Palette Tokens (Light) */
+  --bg-canvas: #fbfcfc;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f2f6f7;
+  --border-light: #e0e5e9;
+  --border-accent: #b2c9c5;
+  --text-main: #055b65;
+  --text-body: #163e44;
+  --text-muted: #5c7e84;
+
+  /* Accents */
+  --accent-vibrant: #1bd488;
+  --accent-vibrant-hover: #16b875;
+  --accent-vibrant-subtle: rgba(27, 212, 136, 0.12);
+  --accent-teal: #45828b;
+  --accent-teal-dark: #055b65;
+  --accent-sage: #b2c9c5;
+
+  /* Elevation Shadows - Light */
+  --shadow-sm: 0 1px 2px 0 rgba(5, 91, 101, 0.05);
+  --shadow-md: 0 4px 14px -2px rgba(5, 91, 101, 0.08), 0 2px 4px -2px rgba(5, 91, 101, 0.04);
+  --shadow-lg: 0 10px 25px -4px rgba(5, 91, 101, 0.1), 0 4px 8px -3px rgba(5, 91, 101, 0.05);
+
+  /* Borders & Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 9999px;
+}
+
+/* Dark Theme Variables */
+.dark-theme,
+[data-theme='dark'] {
+  --bg-canvas: #05191d;
+  --bg-surface: #0a252a;
+  --bg-subtle: #071f24;
+  --border-light: #133e46;
+  --border-accent: #1d525c;
+  --text-main: #fbfcfc;
+  --text-body: #e0e5e9;
+  --text-muted: #8ea8ab;
+
+  --accent-vibrant: #1bd488;
+  --accent-vibrant-hover: #16b875;
+  --accent-vibrant-subtle: rgba(27, 212, 136, 0.18);
+  --accent-teal: #5298a2;
+  --accent-teal-dark: #3b767f;
+  --accent-sage: #8ba9a4;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 14px -2px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 10px 25px -4px rgba(0, 0, 0, 0.5), 0 4px 8px -3px rgba(0, 0, 0, 0.35);
+}
+
+/* Base resets & typography */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  font-family: var(--font-ui);
+  background-color: var(--bg-canvas);
+  color: var(--text-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Tabular Numbers for Data & Currencies */
+.tabular-nums,
+.num-mono,
+.ant-table-cell-fix-left,
+.ant-table-cell-fix-right {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* ==========================================================================
+   Smooth Scrollbars
+   ========================================================================== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(178, 201, 197, 0.55);
+  border-radius: 9999px;
+  transition: background var(--dur-normal) var(--ease-out);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(69, 130, 139, 0.7);
+}
+
+/* Dark scrollbar */
+.dark-theme ::-webkit-scrollbar-thumb,
+[data-theme='dark'] ::-webkit-scrollbar-thumb {
+  background: rgba(178, 201, 197, 0.25);
+}
+
+.dark-theme ::-webkit-scrollbar-thumb:hover,
+[data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(27, 212, 136, 0.45);
+}
+
+/* ==========================================================================
+   Smooth Animations & Transitions
+   ========================================================================== */
+
+@keyframes smoothFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes smoothScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes smoothSlideRight {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes smoothSlideLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes smoothPulseLive {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(27, 212, 136, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 7px rgba(27, 212, 136, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(27, 212, 136, 0);
+  }
+}
+
+@keyframes smoothPulseTeal {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(69, 130, 139, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 7px rgba(69, 130, 139, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(69, 130, 139, 0);
+  }
+}
+
+@keyframes smoothShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Page fade transition container */
+.smooth-page-fade {
+  animation: smoothFadeIn 0.22s var(--ease-spring) both;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Card hover lift effect */
+.smooth-card {
+  transition: transform var(--dur-normal) var(--ease-spring),
+              box-shadow var(--dur-normal) var(--ease-spring),
+              border-color var(--dur-normal) var(--ease-out),
+              background-color var(--dur-fast) var(--ease-out);
+}
+
+.smooth-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Card click tap feedback */
+.smooth-clickable {
+  cursor: pointer;
+  user-select: none;
+  transition: transform var(--dur-fast) var(--ease-out),
+              background-color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-normal) var(--ease-spring);
+}
+
+.smooth-clickable:active {
+  transform: scale(0.985);
+}
+
+/* Interactive Pill Button */
+.smooth-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--radius-full);
+  font-weight: 500;
+  transition: all var(--dur-normal) var(--ease-spring);
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.smooth-pill-btn:hover {
+  transform: translateY(-1px);
+}
+
+.smooth-pill-btn:active {
+  transform: translateY(0) scale(0.97);
+}
+
+/* Live Pulse Dots */
+.live-dot-green {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #1bd488;
+  display: inline-block;
+  animation: smoothPulseLive 2s infinite var(--ease-smooth);
+}
+
+.live-dot-blue,
+.live-dot-teal {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #45828b;
+  display: inline-block;
+  animation: smoothPulseTeal 2s infinite var(--ease-smooth);
+}
+
+/* ==========================================================================
+   Spreadsheet Table & Drawer Polish
+   ========================================================================== */
+.gsheet-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.gsheet-table th, .gsheet-table td {
+  border-right: 1px solid #e0e5e9;
+  border-bottom: 1px solid #e0e5e9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+
+.dark-theme .gsheet-table th,
+.dark-theme .gsheet-table td {
+  border-right: 1px solid #133e46;
+  border-bottom: 1px solid #133e46;
+}
+
+.col-letter {
+  background-color: #f2f6f7;
+  color: #5c7e84;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  height: 22px;
+  user-select: none;
+}
+
+.dark-theme .col-letter {
+  background-color: #071f24;
+  color: #8ea8ab;
+}
+
+.row-number {
+  background-color: #f2f6f7;
+  color: #5c7e84;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  width: 40px;
+  user-select: none;
+}
+
+.dark-theme .row-number {
+  background-color: #071f24;
+  color: #8ea8ab;
+}
+
+.sticky-col-0 { position: sticky; left: 0; z-index: 20; }
+.sticky-col-1 { position: sticky; left: 40px; z-index: 20; }
+.sticky-col-2 { position: sticky; left: 88px; z-index: 20; }
+.freeze-border { border-right: 2px solid #b2c9c5 !important; }
+.dark-theme .freeze-border { border-right: 2px solid #1d525c !important; }
+
+/* Row hover highlight */
+.gsheet-row {
+  cursor: pointer;
+  transition: background-color 100ms ease-out;
+}
+
+.gsheet-row:hover > td {
+  background-color: rgba(178, 201, 197, 0.22) !important;
+}
+
+.dark-theme .gsheet-row:hover > td {
+  background-color: rgba(27, 212, 136, 0.08) !important;
+}
+
+/* Row selection styling (full-row unified highlight) */
+.row-selected > td {
+  background-color: rgba(27, 212, 136, 0.12) !important;
+  border-top: 1.5px solid #1bd488 !important;
+  border-bottom: 1.5px solid #1bd488 !important;
+}
+
+.dark-theme .row-selected > td {
+  background-color: rgba(27, 212, 136, 0.18) !important;
+  border-top: 1.5px solid #1bd488 !important;
+  border-bottom: 1.5px solid #1bd488 !important;
+}
+
+.row-selected > td.row-number {
+  background-color: rgba(178, 201, 197, 0.35) !important;
+  color: #055b65 !important;
+  font-weight: 700 !important;
+  border-left: 3px solid #1bd488 !important;
+}
+
+.dark-theme .row-selected > td.row-number {
+  background-color: #0e3037 !important;
+  color: #1bd488 !important;
+  font-weight: 700 !important;
+  border-left: 3px solid #1bd488 !important;
+}
+
+.row-selected > td:last-child {
+  border-right: 1.5px solid #1bd488 !important;
+}
+
+/* Drawer smooth animation */
+.inspector-drawer {
+  animation: smoothSlideRight 0.28s var(--ease-spring) both;
+}
+
+/* Focus visible styles for keyboard a11y */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 2px solid #1bd488;
+  outline-offset: 2px;
+}
+
+/* OCR Laser Animation */
+@keyframes ocrLaserScan {
+  0% { top: 0%; opacity: 0.3; }
+  50% { top: 92%; opacity: 1; }
+  100% { top: 0%; opacity: 0.3; }
+}
+
+@keyframes ocrPulseCard {
+  0% { box-shadow: 0 0 0 0 rgba(27, 212, 136, 0.4); border-color: #1bd488; }
+  50% { box-shadow: 0 0 0 8px rgba(27, 212, 136, 0.08); border-color: #45828b; }
+  100% { box-shadow: 0 0 0 0 rgba(27, 212, 136, 0.4); border-color: #1bd488; }
+}
+
+/* Accessibility: Honor prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

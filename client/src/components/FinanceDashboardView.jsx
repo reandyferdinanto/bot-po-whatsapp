@@ -262,11 +262,11 @@ export default function FinanceDashboardView({ isDark = false }) {
     }
   };
 
-  const cardBg = isDark ? '#1e293b' : '#ffffff';
-  const tableHeaderBg = isDark ? '#0f172a' : '#f8fafc';
-  const textColor = isDark ? '#f8fafc' : '#0f172a';
-  const subTextColor = isDark ? '#94a3b8' : '#64748b';
-  const borderColor = isDark ? '#334155' : '#e2e8f0';
+  const cardBg = isDark ? '#0a252a' : '#ffffff';
+  const tableHeaderBg = isDark ? '#071f24' : '#f2f6f7';
+  const textColor = isDark ? '#fbfcfc' : '#055b65';
+  const subTextColor = isDark ? '#8ea8ab' : '#5c7e84';
+  const borderColor = isDark ? '#133e46' : '#e0e5e9';
 
   // Render Status Tag
   const renderStatusTag = (status) => {
@@ -524,14 +524,15 @@ export default function FinanceDashboardView({ isDark = false }) {
         <Col xs={24} sm={12} md={6} lg={4}>
           <Card
             bordered={false}
-            style={{ backgroundColor: cardBg, borderRadius: 10, borderLeft: '4px solid #047857' }}
+            className="smooth-card"
+            style={{ backgroundColor: cardBg, borderRadius: 10, borderLeft: '4px solid #055b65' }}
             bodyStyle={{ padding: '14px 16px' }}
           >
             <Statistic
               title={<span style={{ color: subTextColor, fontSize: 12 }}>Total Kasbon (Rp)</span>}
               value={stats.totalNominal || 0}
               formatter={(val) => `Rp ${Number(val).toLocaleString('id-ID')}`}
-              valueStyle={{ color: '#047857', fontWeight: 700, fontSize: 18 }}
+              valueStyle={{ color: isDark ? '#1bd488' : '#055b65', fontWeight: 700, fontSize: 18 }}
             />
           </Card>
         </Col>
@@ -539,6 +540,7 @@ export default function FinanceDashboardView({ isDark = false }) {
         <Col xs={12} sm={6} md={4} lg={3}>
           <Card
             bordered={false}
+            className="smooth-card"
             style={{ backgroundColor: cardBg, borderRadius: 10, borderLeft: '4px solid #d97706' }}
             bodyStyle={{ padding: '14px 16px' }}
           >
@@ -553,13 +555,14 @@ export default function FinanceDashboardView({ isDark = false }) {
         <Col xs={12} sm={6} md={4} lg={3}>
           <Card
             bordered={false}
-            style={{ backgroundColor: cardBg, borderRadius: 10, borderLeft: '4px solid #0284c7' }}
+            className="smooth-card"
+            style={{ backgroundColor: cardBg, borderRadius: 10, borderLeft: '4px solid #45828b' }}
             bodyStyle={{ padding: '14px 16px' }}
           >
             <Statistic
               title={<span style={{ color: subTextColor, fontSize: 12 }}>Dana Dicairkan</span>}
               value={stats.countApproved || 0}
-              valueStyle={{ color: '#0284c7', fontWeight: 700, fontSize: 18 }}
+              valueStyle={{ color: '#45828b', fontWeight: 700, fontSize: 18 }}
             />
           </Card>
         </Col>
@@ -567,13 +570,14 @@ export default function FinanceDashboardView({ isDark = false }) {
         <Col xs={12} sm={6} md={4} lg={3}>
           <Card
             bordered={false}
-            style={{ backgroundColor: cardBg, borderRadius: 10, borderLeft: '4px solid #0ea5e9' }}
+            className="smooth-card"
+            style={{ backgroundColor: cardBg, borderRadius: 10, borderLeft: '4px solid #1bd488' }}
             bodyStyle={{ padding: '14px 16px' }}
           >
             <Statistic
               title={<span style={{ color: subTextColor, fontSize: 12 }}>LPJ Masuk</span>}
               value={stats.countLpjSubmitted || 0}
-              valueStyle={{ color: '#0ea5e9', fontWeight: 700, fontSize: 18 }}
+              valueStyle={{ color: '#1bd488', fontWeight: 700, fontSize: 18 }}
             />
           </Card>
         </Col>
@@ -581,13 +585,14 @@ export default function FinanceDashboardView({ isDark = false }) {
         <Col xs={12} sm={6} md={4} lg={3}>
           <Card
             bordered={false}
-            style={{ backgroundColor: cardBg, borderRadius: 10, borderLeft: '4px solid #10b981' }}
+            className="smooth-card"
+            style={{ backgroundColor: cardBg, borderRadius: 10, borderLeft: '4px solid #1bd488' }}
             bodyStyle={{ padding: '14px 16px' }}
           >
             <Statistic
               title={<span style={{ color: subTextColor, fontSize: 12 }}>Closed / Selesai</span>}
               value={stats.countClosed || 0}
-              valueStyle={{ color: '#10b981', fontWeight: 700, fontSize: 18 }}
+              valueStyle={{ color: '#1bd488', fontWeight: 700, fontSize: 18 }}
             />
           </Card>
         </Col>
@@ -595,7 +600,8 @@ export default function FinanceDashboardView({ isDark = false }) {
         <Col xs={24} sm={12} md={8} lg={8}>
           <Card
             bordered={false}
-            style={{ backgroundColor: cardBg, borderRadius: 10, borderLeft: '4px solid #0369a1' }}
+            className="smooth-card"
+            style={{ backgroundColor: cardBg, borderRadius: 10, borderLeft: '4px solid #055b65' }}
             bodyStyle={{ padding: '14px 16px' }}
           >
             <Row gutter={8}>
@@ -738,7 +744,7 @@ export default function FinanceDashboardView({ isDark = false }) {
         open={createModalVisible}
         onCancel={() => setCreateModalVisible(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={createForm} layout="vertical" onFinish={handleCreateSubmit} style={{ marginTop: 12 }}>
           <Form.Item label="Nama Pemohon" name="nama" rules={[{ required: true, message: 'Nama pemohon wajib diisi!' }]}>
@@ -799,7 +805,7 @@ export default function FinanceDashboardView({ isDark = false }) {
         open={approveModalVisible}
         onCancel={() => setApproveModalVisible(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         {activeBudget && (
           <Form form={approveForm} layout="vertical" onFinish={handleApproveSubmit}>
@@ -838,7 +844,7 @@ export default function FinanceDashboardView({ isDark = false }) {
         open={rejectModalVisible}
         onCancel={() => setRejectModalVisible(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         {activeBudget && (
           <Form form={rejectForm} layout="vertical" onFinish={handleRejectSubmit}>
@@ -868,7 +874,7 @@ export default function FinanceDashboardView({ isDark = false }) {
         open={lpjModalVisible}
         onCancel={() => setLpjModalVisible(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         {activeBudget && (
           <Form form={lpjForm} layout="vertical" onFinish={handleLpjSubmit}>
@@ -933,7 +939,7 @@ export default function FinanceDashboardView({ isDark = false }) {
         open={closeModalVisible}
         onCancel={() => setCloseModalVisible(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         {activeBudget && (
           <Form form={closeForm} layout="vertical" onFinish={handleCloseSubmit}>

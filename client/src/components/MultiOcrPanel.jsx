@@ -279,7 +279,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
       const res = await commitBatchOCR(selected);
       if (res.success) {
         message.success({
-          content: `✅ Sukses memproses ${res.successCount} dari ${selected.length} dokumen di Google Sheets!`,
+          content: `Sukses memproses ${res.successCount} dari ${selected.length} dokumen di Google Sheets!`,
           key: 'commit-proc',
         });
         const successfulNoPos = new Set(res.results.filter((r) => r.success).map((r) => r.noPo));
@@ -306,10 +306,10 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
 
   const selectedCount = parsedDocuments.filter((d) => d.selected).length;
 
-  const cardBg = isDark ? '#0f172a' : '#ffffff';
-  const borderColor = isDark ? '#1e293b' : '#e2e8f0';
-  const textColor = isDark ? '#f8fafc' : '#0f172a';
-  const mutedColor = isDark ? '#94a3b8' : '#64748b';
+  const cardBg = isDark ? '#0a252a' : '#ffffff';
+  const borderColor = isDark ? '#133e46' : '#e0e5e9';
+  const textColor = isDark ? '#fbfcfc' : '#055b65';
+  const mutedColor = isDark ? '#8ea8ab' : '#5c7e84';
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto' }}>
@@ -317,15 +317,15 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
       <div
         style={{
           background: isDark
-            ? 'linear-gradient(135deg, #0c4a6e 0%, #065f46 100%)'
-            : 'linear-gradient(135deg, #e0f2fe 0%, #ecfdf5 100%)',
+            ? 'linear-gradient(135deg, #07252c 0%, #051e23 100%)'
+            : 'linear-gradient(135deg, #f2faf7 0%, #e0e5e9 100%)',
           borderRadius: 14,
           padding: '20px 24px',
-          border: `1px solid ${isDark ? '#0284c7' : '#7dd3fc'}`,
+          border: `1px solid ${isDark ? '#133e46' : '#b2c9c5'}`,
           display: 'flex',
           flexDirection: 'column',
           gap: 10,
-          boxShadow: '0 2px 8px rgba(14, 165, 233, 0.15)',
+          boxShadow: '0 2px 8px rgba(5, 91, 101, 0.12)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -335,8 +335,8 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                 width: 36,
                 height: 36,
                 borderRadius: 10,
-                backgroundColor: '#0284c7',
-                color: '#ffffff',
+                backgroundColor: isDark ? '#1bd488' : '#055b65',
+                color: isDark ? '#05191d' : '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -550,7 +550,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                     {uploadedFiles.length} Berkas Berhasil Di-scan OCR
                   </span>
                   <span style={{ fontSize: 11, color: mutedColor }}>
-                    (Klik tanda silang ✕ untuk membatalkan berkas tertentu)
+                    (Klik ikon hapus untuk membatalkan berkas tertentu)
                   </span>
                 </div>
 
@@ -697,8 +697,9 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                 loading={isCommitting}
                 onClick={handleCommitSelected}
                 style={{
-                  backgroundColor: '#047857',
-                  borderColor: '#047857',
+                  backgroundColor: isDark ? '#1bd488' : '#055b65',
+                  borderColor: isDark ? '#1bd488' : '#055b65',
+                  color: isDark ? '#05191d' : '#ffffff',
                   fontWeight: 700,
                   borderRadius: 8,
                   display: 'inline-flex',
@@ -706,7 +707,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                   gap: 6,
                 }}
               >
-                ✓ Proses {selectedCount} Dokumen Terpilih ke Google Sheets 'PO 2026'
+                Proses {selectedCount} Dokumen Terpilih ke Google Sheets 'PO 2026'
               </Button>
             </div>
           </div>
@@ -791,8 +792,8 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                                 value={doc.tipeDokumen}
                                 onChange={(val) => handleSwitchDocType(doc.id, val)}
                                 options={[
-                                  { label: '📦 GRPO (Update Kolom R-W)', value: 'PURCHASE_DELIVERY_NOTE_GRPO' },
-                                  { label: '📄 PO Baru (Input Baru)', value: 'PURCHASE_ORDER' },
+                                  { label: 'GRPO (Update Kolom R-W)', value: 'PURCHASE_DELIVERY_NOTE_GRPO' },
+                                  { label: 'PO Baru (Input Baru)', value: 'PURCHASE_ORDER' },
                                 ]}
                               />
                               <Tag color="blue" style={{ fontWeight: 600, fontFamily: 'monospace' }}>
@@ -817,7 +818,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                               message={
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
                                   <span>
-                                    ✓ Referensi PO Ditemukan di sheet 'PO 2026': <strong>{doc.noPo}</strong> ({doc.existingPo?.supplier || doc.supplier}) • Status: <strong>{doc.existingPo?.status}</strong>
+                                    Referensi PO Ditemukan di sheet 'PO 2026': <strong>{doc.noPo}</strong> ({doc.existingPo?.supplier || doc.supplier}) • Status: <strong>{doc.existingPo?.status}</strong>
                                   </span>
                                 </div>
                               }
@@ -829,7 +830,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                               showIcon
                               message={
                                 <div style={{ fontWeight: 700, color: '#b45309', fontSize: 13 }}>
-                                  ⚠️ PO tidak ditemukan, scan atau input terlebih dahulu PO nya.
+                                  PO tidak ditemukan, scan atau input terlebih dahulu PO nya.
                                 </div>
                               }
                               description={
@@ -889,8 +890,9 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                               backgroundColor: isDark ? 'rgba(245, 158, 11, 0.08)' : '#fffbeb',
                             }}
                           >
-                            <div style={{ fontSize: 12, fontWeight: 700, color: '#b45309', marginBottom: 10 }}>
-                              📝 Kolom yang Diperbarui pada Baris PO Terkait di Sheet 'PO 2026' (Kolom R s/d W):
+                            <div style={{ fontSize: 12, fontWeight: 700, color: '#b45309', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <AiOutlineEdit />
+                              <span>Kolom yang Diperbarui pada Baris PO Terkait di Sheet 'PO 2026' (Kolom R s/d W):</span>
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
                               <div>
@@ -1010,8 +1012,8 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                           >
                             <span style={{ color: doc.poFound ? '#047857' : '#b45309', fontWeight: 600 }}>
                               {doc.poFound
-                                ? `✓ Siap mengupdate baris PO ${values.noPo} di sheet 'PO 2026' (Kolom R s/d W)`
-                                : '⚠️ PO tidak ditemukan, scan atau input terlebih dahulu PO nya.'}
+                                ? `Siap mengupdate baris PO ${values.noPo} di sheet 'PO 2026' (Kolom R s/d W)`
+                                : 'PO tidak ditemukan, scan atau input terlebih dahulu PO nya.'}
                             </span>
 
                             <Button
@@ -1032,7 +1034,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                               }}
                             >
                               {doc.poFound
-                                ? `✓ Update Baris PO ${values.noPo} (Kolom R-W)`
+                                ? `Update Baris PO ${values.noPo} (Kolom R-W)`
                                 : 'PO Tidak Ditemukan'}
                             </Button>
                           </div>
@@ -1113,8 +1115,8 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                                   }
                                 }}
                                 options={[
-                                  { label: '📄 PO Baru (Input Baru)', value: 'PURCHASE_ORDER' },
-                                  { label: '📦 GRPO (Update Kolom R-W)', value: 'PURCHASE_DELIVERY_NOTE_GRPO' },
+                                  { label: 'PO Baru (Input Baru)', value: 'PURCHASE_ORDER' },
+                                  { label: 'GRPO (Update Kolom R-W)', value: 'PURCHASE_DELIVERY_NOTE_GRPO' },
                                 ]}
                               />
                               <Tag color={doc.tipePo === 'PO_JASA' ? 'orange' : 'green'} style={{ fontWeight: 700 }}>
@@ -1225,7 +1227,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                                             />
                                             {it.matchedMaster && (
                                               <div style={{ fontSize: 9, color: '#059669', marginTop: 2 }}>
-                                                ✓ Sesuai Master: {it.matchedMaster.nama}
+                                                Sesuai Master: {it.matchedMaster.nama}
                                               </div>
                                             )}
                                             {!it.matchedMaster && it.suggestedMaster && (
@@ -1330,28 +1332,29 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                              fontSize: 11,
                            }}
                          >
-                           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                             <span style={{ color: '#059669', fontWeight: 600 }}>
-                               ✓ Subtotal: {formatRupiah(subTotal)}
-                             </span>
-                             <span style={{ color: '#0284c7', fontWeight: 600 }}>
-                               ✓ PPN: {formatRupiah(totalPpn)}
-                             </span>
-                             <span style={{ color: '#047857', fontWeight: 800 }}>
-                               ✓ Grand Total: {formatRupiah(grandTotal)}
-                             </span>
-                           </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <span style={{ color: '#055b65', fontWeight: 600 }}>
+                                Subtotal: {formatRupiah(subTotal)}
+                              </span>
+                              <span style={{ color: '#45828b', fontWeight: 600 }}>
+                                PPN: {formatRupiah(totalPpn)}
+                              </span>
+                              <span style={{ color: '#1bd488', fontWeight: 800 }}>
+                                Grand Total: {formatRupiah(grandTotal)}
+                              </span>
+                            </div>
 
-                           <Button
-                             type="primary"
-                             htmlType="submit"
-                             icon={<AiOutlineSave />}
-                             loading={isCommitting}
-                             style={{
-                               backgroundColor: '#047857',
-                               borderColor: '#047857',
-                               fontSize: 11,
-                               fontWeight: 700,
+                            <Button
+                              type="primary"
+                              htmlType="submit"
+                              icon={<AiOutlineSave />}
+                              loading={isCommitting}
+                              style={{
+                                backgroundColor: isDark ? '#1bd488' : '#055b65',
+                                borderColor: isDark ? '#1bd488' : '#055b65',
+                                color: isDark ? '#05191d' : '#ffffff',
+                                fontSize: 11,
+                                fontWeight: 700,
                                borderRadius: 6,
                                display: 'inline-flex',
                                alignItems: 'center',

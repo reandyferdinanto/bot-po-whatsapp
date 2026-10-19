@@ -213,13 +213,14 @@ export default function FinanceBudgetPublicForm({ mode = 'request', isDark = fal
           >
             Kembali ke Dashboard Finance
           </Button>
-          <Tag color="emerald" style={{ borderColor: '#047857', color: '#047857', fontWeight: 600 }}>
+          <Tag style={{ borderColor: isDark ? '#1bd488' : '#055b65', color: isDark ? '#1bd488' : '#055b65', fontWeight: 600 }}>
             {mode === 'request' ? 'Formulir Permintaan Budget' : 'Formulir LPJ & Nota'}
           </Tag>
         </div>
 
         <Card
           bordered={false}
+          className="smooth-card smooth-page-fade"
           style={{
             backgroundColor: cardBg,
             borderRadius: 16,
@@ -235,8 +236,8 @@ export default function FinanceBudgetPublicForm({ mode = 'request', isDark = fal
                 width: 52,
                 height: 52,
                 borderRadius: 14,
-                backgroundColor: mode === 'request' ? '#ecfdf5' : '#eff6ff',
-                color: mode === 'request' ? '#047857' : '#0284c7',
+                backgroundColor: isDark ? 'rgba(27,212,136,0.15)' : 'rgba(178,201,197,0.3)',
+                color: isDark ? '#1bd488' : '#055b65',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
