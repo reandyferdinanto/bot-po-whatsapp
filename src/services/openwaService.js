@@ -95,8 +95,21 @@ async function getMessageMedia(chatId, messageId) {
 async function sendImage(chatId, options = {}) {
   try {
     const sessionId = env.openwa.sessionId;
+
+    // Deteksi mimetype otomatis jika base64 memakai prefix data URI
+    let detectedMime = null;
+    if (options.base64 && typeof options.base64 === 'string') {
+      const match = options.base64.match(/^data:([^;]+);base64,/);
+      if (match) {
+        detectedMime = match[1];
+      }
+    }
+
+    const mimetype = options.mimetype || options.mimeType || detectedMime || 'image/jpeg';
     const payload = {
       chatId,
+      mimetype,
+      filename: options.filename || 'image.jpg',
       caption: options.caption || '',
     };
     if (options.base64) {

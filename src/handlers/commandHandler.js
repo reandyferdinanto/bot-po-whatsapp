@@ -434,21 +434,25 @@ Opsi Tipe : \`PO\`, \`GRPO\`, \`BUKTI_BAYAR\` (opsional)\n`;
           try {
             const { buffer, mimeType, filename } = await driveService.downloadDocumentBuffer(doc.drive_file_id);
             const base64Str = buffer.toString('base64');
+            const cleanMime = mimeType || doc.mime_type || 'image/jpeg';
+            const cleanFilename = doc.file_name || filename || 'dokumen.jpg';
             const isImage =
-              (mimeType && mimeType.startsWith('image/')) ||
-              /\.(jpg|jpeg|png|webp)$/i.test(filename || doc.file_name);
-            const caption = `*DOKUMEN ${doc.tipe_dokumen}*\nPO : \`${doc.no_po}\`\nBerkas : ${doc.file_name || filename}\n🔗 [Buka di Google Drive](${doc.drive_url})`;
+              (cleanMime && cleanMime.startsWith('image/')) ||
+              /\.(jpg|jpeg|png|webp)$/i.test(cleanFilename);
+            const caption = `*DOKUMEN ${doc.tipe_dokumen}*\nPO : \`${doc.no_po}\`\nBerkas : ${cleanFilename}\n🔗 [Buka di Google Drive](${doc.drive_url})`;
 
             if (isImage) {
               await openwaService.sendImage(chatId, {
-                base64: `data:${mimeType || 'image/jpeg'};base64,${base64Str}`,
+                base64: `data:${cleanMime};base64,${base64Str}`,
+                mimetype: cleanMime,
+                filename: cleanFilename,
                 caption,
               });
             } else {
               await openwaService.sendDocument(chatId, {
-                base64: `data:${mimeType || 'application/pdf'};base64,${base64Str}`,
-                filename: doc.file_name || filename || 'dokumen.pdf',
-                mimetype: mimeType || 'application/pdf',
+                base64: `data:${cleanMime || 'application/pdf'};base64,${base64Str}`,
+                filename: cleanFilename,
+                mimetype: cleanMime || 'application/pdf',
                 caption,
               });
             }
