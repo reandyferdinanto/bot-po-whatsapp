@@ -518,15 +518,15 @@ export default function FinanceDashboardView({ isDark = false }) {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 14, overflowY: 'auto' }}>
+    <div className="smooth-page-fade" style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 14, overflowY: 'auto' }}>
       {/* KPI Statistic Cards */}
       <Row gutter={[12, 12]}>
         <Col xs={24} sm={12} md={6} lg={4}>
           <Card
-            bordered={false}
+            variant="borderless"
             className="smooth-card"
             style={{ backgroundColor: cardBg, borderRadius: 10, borderLeft: '4px solid #055b65' }}
-            bodyStyle={{ padding: '14px 16px' }}
+            styles={{ body: { padding: '14px 16px' } }}
           >
             <Statistic
               title={<span style={{ color: subTextColor, fontSize: 12 }}>Total Kasbon (Rp)</span>}
@@ -539,10 +539,10 @@ export default function FinanceDashboardView({ isDark = false }) {
 
         <Col xs={12} sm={6} md={4} lg={3}>
           <Card
-            bordered={false}
+            variant="borderless"
             className="smooth-card"
             style={{ backgroundColor: cardBg, borderRadius: 10, borderLeft: '4px solid #d97706' }}
-            bodyStyle={{ padding: '14px 16px' }}
+            styles={{ body: { padding: '14px 16px' } }}
           >
             <Statistic
               title={<span style={{ color: subTextColor, fontSize: 12 }}>Pending Approval</span>}
@@ -554,10 +554,10 @@ export default function FinanceDashboardView({ isDark = false }) {
 
         <Col xs={12} sm={6} md={4} lg={3}>
           <Card
-            bordered={false}
+            variant="borderless"
             className="smooth-card"
             style={{ backgroundColor: cardBg, borderRadius: 10, borderLeft: '4px solid #45828b' }}
-            bodyStyle={{ padding: '14px 16px' }}
+            styles={{ body: { padding: '14px 16px' } }}
           >
             <Statistic
               title={<span style={{ color: subTextColor, fontSize: 12 }}>Dana Dicairkan</span>}
@@ -569,10 +569,10 @@ export default function FinanceDashboardView({ isDark = false }) {
 
         <Col xs={12} sm={6} md={4} lg={3}>
           <Card
-            bordered={false}
+            variant="borderless"
             className="smooth-card"
             style={{ backgroundColor: cardBg, borderRadius: 10, borderLeft: '4px solid #1bd488' }}
-            bodyStyle={{ padding: '14px 16px' }}
+            styles={{ body: { padding: '14px 16px' } }}
           >
             <Statistic
               title={<span style={{ color: subTextColor, fontSize: 12 }}>LPJ Masuk</span>}
@@ -584,10 +584,10 @@ export default function FinanceDashboardView({ isDark = false }) {
 
         <Col xs={12} sm={6} md={4} lg={3}>
           <Card
-            bordered={false}
+            variant="borderless"
             className="smooth-card"
             style={{ backgroundColor: cardBg, borderRadius: 10, borderLeft: '4px solid #1bd488' }}
-            bodyStyle={{ padding: '14px 16px' }}
+            styles={{ body: { padding: '14px 16px' } }}
           >
             <Statistic
               title={<span style={{ color: subTextColor, fontSize: 12 }}>Closed / Selesai</span>}
@@ -599,10 +599,10 @@ export default function FinanceDashboardView({ isDark = false }) {
 
         <Col xs={24} sm={12} md={8} lg={8}>
           <Card
-            bordered={false}
+            variant="borderless"
             className="smooth-card"
             style={{ backgroundColor: cardBg, borderRadius: 10, borderLeft: '4px solid #055b65' }}
-            bodyStyle={{ padding: '14px 16px' }}
+            styles={{ body: { padding: '14px 16px' } }}
           >
             <Row gutter={8}>
               <Col span={12}>
@@ -628,9 +628,9 @@ export default function FinanceDashboardView({ isDark = false }) {
 
       {/* Main Table Card */}
       <Card
-        bordered={false}
+        variant="borderless"
         style={{ backgroundColor: cardBg, borderRadius: 10, flex: 1, display: 'flex', flexDirection: 'column' }}
-        bodyStyle={{ padding: 16, flex: 1, display: 'flex', flexDirection: 'column' }}
+        styles={{ body: { padding: 16, flex: 1, display: 'flex', flexDirection: 'column' } }}
       >
         {/* Top Control Bar */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>

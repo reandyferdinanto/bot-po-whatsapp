@@ -155,6 +155,30 @@ export async function uploadNotaFiles(files) {
   return res.data;
 }
 
+// ==========================================
+// Kas Kecil (Petty Cash) 12 Bulan APIs
+// ==========================================
+
+export async function getKasKecil(params = {}) {
+  const res = await api.get('/finance/kas-kecil', { params });
+  return res.data;
+}
+
+export async function getKasKecilSummary() {
+  const res = await api.get('/finance/kas-kecil/summary');
+  return res.data;
+}
+
+export async function createKasKecilEntry(data) {
+  const res = await api.post('/finance/kas-kecil', data);
+  return res.data;
+}
+
+export async function updateKasKecilVoucher(data) {
+  const res = await api.put('/finance/kas-kecil/voucher', data);
+  return res.data;
+}
+
 // Google Drive Settings & Documents
 export async function getDriveSettings() {
   const res = await api.get('/settings/drive');

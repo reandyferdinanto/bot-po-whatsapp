@@ -34,6 +34,7 @@ export default function Sidebar({
   const [expandedSections, setExpandedSections] = useState({
     ocr: true,
     purchasing: true,
+    finance: true,
   });
 
   const toggleSection = (key) => {
@@ -102,37 +103,49 @@ export default function Sidebar({
     },
   ];
 
-  // Standalone Main Menus
-  const standaloneMenus = [
+  // Submenu Finance: Kasbon & Kas Kecil
+  const financeSubItems = [
     {
-      key: 'warehouse',
-      path: '/warehouse',
-      label: 'Warehouse',
-      sub: 'Penerimaan & Stok Fisik',
-      icon: <AiOutlineInbox style={{ fontSize: 18, color: '#059669' }} />,
-      badge: <Tag color="default" style={{ margin: 0, fontSize: 10 }}>Update</Tag>,
+      key: 'finance-kasbon',
+      path: '/finance/kasbon',
+      label: 'Kasbon',
+      icon: <AiOutlineDollar style={{ fontSize: 15 }} />,
+      badge: <Tag color="orange" style={{ margin: 0, fontWeight: 700, fontSize: 10 }}>Kasbon</Tag>,
+      sub: 'Form Permintaan & Nota',
     },
     {
-      key: 'finance',
-      path: '/finance',
-      label: 'Finance',
-      sub: 'Faktur & Pelunasan',
-      icon: <AiOutlineDollar style={{ fontSize: 18, color: '#0284c7' }} />,
-      badge: <Tag color="default" style={{ margin: 0, fontSize: 10 }}>Update</Tag>,
-    },
-    {
-      key: 'maintenance',
-      path: '/maintenance',
-      label: 'Maintenance',
-      sub: 'Permintaan Sparepart',
-      icon: <AiOutlineTool style={{ fontSize: 18, color: '#0d9488' }} />,
-      badge: <Tag color="default" style={{ margin: 0, fontSize: 10 }}>Update</Tag>,
+      key: 'finance-kaskecil',
+      path: '/finance/kas-kecil',
+      label: 'Kas Kecil (Petty Cash)',
+      icon: <AiOutlineFileText style={{ fontSize: 15 }} />,
+      badge: <Tag color="cyan" style={{ margin: 0, fontWeight: 700, fontSize: 10 }}>12 Bln</Tag>,
+      sub: 'Buku Kas & Draft Voucher',
     },
   ];
+
+  // Standalone Main Menus
+  const standaloneWarehouse = {
+    key: 'warehouse',
+    path: '/warehouse',
+    label: 'Warehouse',
+    sub: 'Penerimaan & Stok Fisik',
+    icon: <AiOutlineInbox style={{ fontSize: 18, color: '#059669' }} />,
+    badge: <Tag color="default" style={{ margin: 0, fontSize: 10 }}>Update</Tag>,
+  };
+
+  const standaloneMaintenance = {
+    key: 'maintenance',
+    path: '/maintenance',
+    label: 'Maintenance',
+    sub: 'Permintaan Sparepart',
+    icon: <AiOutlineTool style={{ fontSize: 18, color: '#0d9488' }} />,
+    badge: <Tag color="default" style={{ margin: 0, fontSize: 10 }}>Update</Tag>,
+  };
 
   // Helper active status
   const isOcrActive = activeNav === 'multi-ocr' || activeNav?.startsWith('ocr-');
   const isPurchasingActive = ['po2026', 'material', 'supplier', 'analytics'].includes(activeNav);
+  const isFinanceActive = activeNav === 'finance' || activeNav === 'finance-kasbon' || activeNav === 'finance-kaskecil';
 
   return (
     <aside
@@ -449,54 +462,228 @@ export default function Sidebar({
           </div>
 
           {/* ============================================================== */}
-          {/* 3, 4, 5. MENU UTAMA SETARA: WAREHOUSE, FINANCE, MAINTENANCE   */}
+          {/* 3. MENU UTAMA: WAREHOUSE (STANDALONE)                          */}
           {/* ============================================================== */}
-          {standaloneMenus.map((m) => {
-            const active = activeNav === m.key;
-            const content = (
+          <div>
+            {isCollapsed ? (
+              <Tooltip placement="right" title={`${standaloneWarehouse.label} (${standaloneWarehouse.sub})`}>
+                <div
+                  onClick={() => onNavigate && onNavigate(standaloneWarehouse.path)}
+                  style={{
+                    padding: '10px 0',
+                    borderRadius: 10,
+                    backgroundColor: activeNav === 'warehouse' ? (isDark ? 'rgba(27, 212, 136, 0.2)' : 'rgba(27, 212, 136, 0.12)') : 'transparent',
+                    border: activeNav === 'warehouse' ? `1px solid ${isDark ? 'rgba(27, 212, 136, 0.4)' : '#b2c9c5'}` : '1px solid transparent',
+                    color: activeNav === 'warehouse' ? (isDark ? '#1bd488' : '#055b65') : textColor,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {standaloneWarehouse.icon}
+                </div>
+              </Tooltip>
+            ) : (
               <div
-                key={m.key}
-                onClick={() => onNavigate && onNavigate(m.path)}
+                onClick={() => onNavigate && onNavigate(standaloneWarehouse.path)}
                 style={{
-                  padding: isCollapsed ? '10px 0' : '9px 12px',
+                  padding: '9px 12px',
                   borderRadius: 10,
-                  backgroundColor: active ? (isDark ? 'rgba(27, 212, 136, 0.2)' : 'rgba(27, 212, 136, 0.12)') : 'transparent',
-                  border: active ? `1px solid ${isDark ? 'rgba(27, 212, 136, 0.4)' : '#b2c9c5'}` : '1px solid transparent',
-                  color: active ? (isDark ? '#1bd488' : '#055b65') : textColor,
+                  backgroundColor: activeNav === 'warehouse' ? (isDark ? 'rgba(27, 212, 136, 0.2)' : 'rgba(27, 212, 136, 0.12)') : 'transparent',
+                  border: activeNav === 'warehouse' ? `1px solid ${isDark ? 'rgba(27, 212, 136, 0.4)' : '#b2c9c5'}` : '1px solid transparent',
+                  color: activeNav === 'warehouse' ? (isDark ? '#1bd488' : '#055b65') : textColor,
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: isCollapsed ? 'center' : 'space-between',
+                  justifyContent: 'space-between',
                   transition: 'all 0.15s ease',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: isCollapsed ? 0 : 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {m.icon}
+                    {standaloneWarehouse.icon}
                   </div>
-                  {!isCollapsed && (
-                    <div style={{ whiteSpace: 'nowrap' }}>
-                      <div style={{ fontSize: 13, fontWeight: active ? 700 : 600 }}>
-                        {m.label}
-                      </div>
-                      <div style={{ fontSize: 10, color: mutedColor }}>{m.sub}</div>
+                  <div style={{ whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: 13, fontWeight: activeNav === 'warehouse' ? 700 : 600 }}>
+                      {standaloneWarehouse.label}
                     </div>
-                  )}
+                    <div style={{ fontSize: 10, color: mutedColor }}>{standaloneWarehouse.sub}</div>
+                  </div>
                 </div>
-                {!isCollapsed && <div>{m.badge}</div>}
+                <div>{standaloneWarehouse.badge}</div>
               </div>
-            );
+            )}
+          </div>
 
-            if (isCollapsed) {
-              return (
-                <Tooltip key={m.key} placement="right" title={`${m.label} (${m.sub})`}>
-                  {content}
-                </Tooltip>
-              );
-            }
+          {/* ============================================================== */}
+          {/* 4. MENU UTAMA: FINANCE (DENGAN 2 SUBMENU: KASBON & KAS KECIL)  */}
+          {/* ============================================================== */}
+          <div>
+            {isCollapsed ? (
+              <Tooltip placement="right" title="Finance (Kasbon & Kas Kecil 12 Bulan)">
+                <div
+                  onClick={() => onNavigate && onNavigate('/finance/kasbon')}
+                  style={{
+                    padding: '10px 0',
+                    borderRadius: 10,
+                    backgroundColor: isFinanceActive ? (isDark ? 'rgba(69, 130, 139, 0.25)' : 'rgba(178, 201, 197, 0.3)') : 'transparent',
+                    color: isFinanceActive ? (isDark ? '#1bd488' : '#055b65') : textColor,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: isFinanceActive ? `1px solid ${isDark ? 'rgba(27, 212, 136, 0.4)' : '#b2c9c5'}` : '1px solid transparent',
+                  }}
+                >
+                  <AiOutlineDollar style={{ fontSize: 18, color: isFinanceActive ? (isDark ? '#1bd488' : '#055b65') : '#45828b' }} />
+                </div>
+              </Tooltip>
+            ) : (
+              <div>
+                <div
+                  onClick={() => {
+                    toggleSection('finance');
+                    onNavigate && onNavigate('/finance/kasbon');
+                  }}
+                  style={{
+                    padding: '9px 12px',
+                    borderRadius: 10,
+                    backgroundColor: isFinanceActive ? (isDark ? 'rgba(69, 130, 139, 0.2)' : 'rgba(178, 201, 197, 0.25)') : 'transparent',
+                    border: isFinanceActive ? `1px solid ${isDark ? 'rgba(27, 212, 136, 0.35)' : '#b2c9c5'}` : '1px solid transparent',
+                    color: isFinanceActive ? (isDark ? '#1bd488' : '#055b65') : textColor,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <AiOutlineDollar style={{ fontSize: 18, color: isFinanceActive ? (isDark ? '#1bd488' : '#055b65') : '#45828b' }} />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>
+                        Finance
+                      </div>
+                      <div style={{ fontSize: 10, color: mutedColor }}>
+                        Kasbon &amp; Kas Kecil
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Tag color="cyan" style={{ margin: 0, fontSize: 10, fontWeight: 700 }}>2 Menu</Tag>
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSection('finance');
+                      }}
+                      style={{ color: mutedColor, fontSize: 12, padding: '2px 4px' }}
+                    >
+                      {expandedSections.finance ? <AiOutlineDown /> : <AiOutlineRight />}
+                    </span>
+                  </div>
+                </div>
 
-            return content;
-          })}
+                {/* Submenu Finance */}
+                {expandedSections.finance && (
+                  <div style={{ marginTop: 4, marginLeft: 16, paddingLeft: 12, borderLeft: `1.5px solid ${isDark ? '#133e46' : '#e0e5e9'}`, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    {financeSubItems.map((sub) => {
+                      const active = activeNav === sub.key;
+                      return (
+                        <div
+                          key={sub.key}
+                          onClick={() => onNavigate && onNavigate(sub.path)}
+                          style={{
+                            padding: '7px 10px',
+                            borderRadius: 8,
+                            cursor: 'pointer',
+                            fontSize: 12,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            color: active ? (isDark ? '#1bd488' : '#055b65') : textColor,
+                            backgroundColor: active ? (isDark ? 'rgba(27, 212, 136, 0.2)' : 'rgba(178, 201, 197, 0.35)') : 'transparent',
+                            fontWeight: active ? 700 : 500,
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!active) e.currentTarget.style.backgroundColor = isDark ? '#0a252a' : '#f2f6f7';
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!active) e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            {sub.icon}
+                            <div>
+                              <div>{sub.label}</div>
+                              <div style={{ fontSize: 10, color: mutedColor }}>{sub.sub}</div>
+                            </div>
+                          </div>
+                          <div>{sub.badge}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ============================================================== */}
+          {/* 5. MENU UTAMA: MAINTENANCE (STANDALONE)                        */}
+          {/* ============================================================== */}
+          <div>
+            {isCollapsed ? (
+              <Tooltip placement="right" title={`${standaloneMaintenance.label} (${standaloneMaintenance.sub})`}>
+                <div
+                  onClick={() => onNavigate && onNavigate(standaloneMaintenance.path)}
+                  style={{
+                    padding: '10px 0',
+                    borderRadius: 10,
+                    backgroundColor: activeNav === 'maintenance' ? (isDark ? 'rgba(27, 212, 136, 0.2)' : 'rgba(27, 212, 136, 0.12)') : 'transparent',
+                    border: activeNav === 'maintenance' ? `1px solid ${isDark ? 'rgba(27, 212, 136, 0.4)' : '#b2c9c5'}` : '1px solid transparent',
+                    color: activeNav === 'maintenance' ? (isDark ? '#1bd488' : '#055b65') : textColor,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {standaloneMaintenance.icon}
+                </div>
+              </Tooltip>
+            ) : (
+              <div
+                onClick={() => onNavigate && onNavigate(standaloneMaintenance.path)}
+                style={{
+                  padding: '9px 12px',
+                  borderRadius: 10,
+                  backgroundColor: activeNav === 'maintenance' ? (isDark ? 'rgba(27, 212, 136, 0.2)' : 'rgba(27, 212, 136, 0.12)') : 'transparent',
+                  border: activeNav === 'maintenance' ? `1px solid ${isDark ? 'rgba(27, 212, 136, 0.4)' : '#b2c9c5'}` : '1px solid transparent',
+                  color: activeNav === 'maintenance' ? (isDark ? '#1bd488' : '#055b65') : textColor,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {standaloneMaintenance.icon}
+                  </div>
+                  <div style={{ whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: 13, fontWeight: activeNav === 'maintenance' ? 700 : 600 }}>
+                      {standaloneMaintenance.label}
+                    </div>
+                    <div style={{ fontSize: 10, color: mutedColor }}>{standaloneMaintenance.sub}</div>
+                  </div>
+                </div>
+                <div>{standaloneMaintenance.badge}</div>
+              </div>
+            )}
+          </div>
 
           {/* ============================================================== */}
           {/* 6. MENU UTAMA PALING BAWAH: STATUS BOT & SISTEM                */}

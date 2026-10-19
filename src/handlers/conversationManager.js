@@ -46,8 +46,9 @@ Silakan tentukan menu layanan:
 *[2]*  Pencarian Data _(Vendor, Material & PO)_
 *[3]*  Update Status _(GRPO & Pembayaran)_
 *[4]*  Batalkan PO
+*[5]*  Input Kas Kecil _(Draft & Auto CC)_
 
-▸ _Balas angka [1-4] atau kirim dokumen Foto/PDF langsung._
+▸ _Balas angka [1-5] atau kirim dokumen Foto/PDF langsung._
 ▸ _Ketik *batal* untuk mengakhiri sesi._
 ━━━━━━━━━━━━━━━━━━━━━━━━`;
 }
@@ -144,6 +145,12 @@ async function handleConversationMessage(chatId, messageText, rawMessage) {
     case 'CANCEL_PO_WAIT_NO':
       return handleCancelPOWaitNo(chatId, text);
 
+    case 'WAIT_INPUT_KAS_KECIL':
+      return handleInputKasKecil(chatId, text);
+
+    case 'CONFIRM_KAS_KECIL':
+      return handleConfirmKasKecil(chatId, text, session);
+
     default:
       clearSession(chatId);
       break;
@@ -200,8 +207,28 @@ Contoh : \`PO-2026-001, Salah spesifikasi material\`
       );
       break;
 
+    case '5':
+      setSession(chatId, 'WAIT_INPUT_KAS_KECIL');
+      await openwaService.sendText(
+        chatId,
+        `*INPUT TRANSAKSI KAS KECIL (DRAFT)*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Masukkan *Keterangan Belanja* dan *Nominal* (pisahkan koma).
+
+Contoh:
+• \`BBM operasional GA, 150000\`
+• \`Perbaikan genset SVC, 450000\`
+• \`Pulsa kantor, 100000, GAD\`
+
+▸ _Cost Center (SVC/GAD) otomatis dideteksi dari kata kunci, atau bisa ditulis manual di ujung._
+▸ _Nomor voucher otomatis diisi 'draft'._
+▸ _Ketik *batal* untuk keluar._
+━━━━━━━━━━━━━━━━━━━━━━━━`
+      );
+      break;
+
     default:
-      await openwaService.sendText(chatId, 'Pilihan tidak valid. Silakan balas angka *1*, *2*, *3*, atau *4*.\nKetik *batal* untuk keluar.');
+      await openwaService.sendText(chatId, 'Pilihan tidak valid. Silakan balas angka *1* sampai *5*.\nKetik *batal* untuk keluar.');
       break;
   }
 }
@@ -858,6 +885,120 @@ Alasan  : ${reason}
   } catch (err) {
     if (cancelMsg) await openwaService.deleteMessage(chatId, cancelMsg);
     await openwaService.sendText(chatId, `*Gagal membatalkan PO:* ${err.message}`);
+  }
+}
+
+// -------------------------------------------------------------
+// HANDLER INPUT KAS KECIL
+// -------------------------------------------------------------
+async function handleInputKasKecil(chatId, text) {
+  const kasKecilService = require('../services/kasKecilService');
+  const formatRupiah = (val) => 'Rp ' + Number(val || 0).toLocaleString('id-ID');
+
+  const parts = text.split(',').map((s) => s.trim());
+  let keterangan = '';
+  let nominal = 0;
+  let manualCc = '';
+
+  if (parts.length >= 2) {
+    keterangan = parts[0];
+    nominal = parseFloat(parts[1].replace(/,/g, '').replace(/[^0-9.-]/g, '')) || 0;
+    if (parts[2]) {
+      manualCc = parts[2].toUpperCase();
+    }
+  } else {
+    const match = text.match(/^(.*?)(?:,\s*|\s+)([0-9.,]{4,})(?:\s*,?\s*([a-zA-Z]+))?$/);
+    if (match) {
+      keterangan = match[1].trim();
+      nominal = parseFloat(match[2].replace(/,/g, '').replace(/[^0-9.-]/g, '')) || 0;
+      if (match[3]) manualCc = match[3].trim().toUpperCase();
+    } else {
+      await openwaService.sendText(
+        chatId,
+        `*Format belum lengkap!*\nSilakan masukkan keterangan dan nominal.\nContoh: \`BBM operasional GA, 150000\`\n▸ _Ketik *batal* untuk keluar._`
+      );
+      return;
+    }
+  }
+
+  if (nominal <= 0) {
+    await openwaService.sendText(chatId, `*Nominal tidak valid.* Masukkan angka di atas 0.\nContoh: \`Perbaikan genset SVC, 450000\``);
+    return;
+  }
+
+  const cc = kasKecilService.detectCostCenter(keterangan, manualCc);
+  const activeMonth = kasKecilService.getCurrentMonthName();
+  const today = kasKecilService.getCurrentFormattedDate();
+
+  const sessionData = {
+    bulan: activeMonth,
+    date: today,
+    noVoucher: 'draft',
+    cc,
+    keterangan,
+    tipe: 'KREDIT',
+    nominal,
+  };
+
+  setSession(chatId, 'CONFIRM_KAS_KECIL', sessionData);
+
+  const ccNote = manualCc ? '(Input Manual)' : (cc ? '(Otomatis dari kata kunci)' : '(Tanpa CC)');
+
+  await openwaService.sendText(
+    chatId,
+    `*KONFIRMASI TRANSAKSI KAS KECIL*
+━━━━━━━━━━━━━━━━━━━━━━━━
+▸ *Bulan        :* ${activeMonth} 2026
+▸ *Tanggal      :* ${today}
+▸ *No. Voucher  :* \`draft\`
+▸ *Cost Center  :* *${cc || '-'}* ${ccNote}
+▸ *Keterangan   :* ${keterangan}
+▸ *Pengeluaran  :* ${formatRupiah(nominal)}
+
+Ketik *YA* untuk simpan ke sheet *${activeMonth}*, atau *BATAL*.
+━━━━━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+async function handleConfirmKasKecil(chatId, text, session) {
+  const lower = (text || '').trim().toLowerCase();
+
+  if (['ya', 'simpan', 'ok', 'yes', 'y'].includes(lower)) {
+    const kasKecilService = require('../services/kasKecilService');
+    const formatRupiah = (val) => 'Rp ' + Number(val || 0).toLocaleString('id-ID');
+
+    let progressMsg = null;
+    try {
+      progressMsg = await openwaService.sendText(chatId, `_Menyimpan kas kecil ke sheet ${session.data.bulan}..._`);
+      const res = await kasKecilService.addKasKecilEntry(session.data);
+      if (progressMsg) await openwaService.deleteMessage(chatId, progressMsg);
+
+      clearSession(chatId);
+
+      await openwaService.sendText(
+        chatId,
+        `*KAS KECIL BERHASIL DISIMPAN!*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Data tersimpan di sheet *${res.bulan}*:
+• Baris       : #${res.rowIndex || '-'}
+• No. Voucher : \`draft\`
+• Cost Center : ${res.cc || '-'}
+• Keterangan  : ${res.keterangan}
+• Pengeluaran : ${formatRupiah(session.data.nominal)}
+
+_No. Voucher dapat diperbarui menjadi nomor resmi sewaktu-waktu melalui Dashboard Web._
+━━━━━━━━━━━━━━━━━━━━━━━━`
+      );
+    } catch (err) {
+      if (progressMsg) await openwaService.deleteMessage(chatId, progressMsg);
+      await openwaService.sendText(chatId, `*Gagal menyimpan kas kecil:* ${err.message}`);
+      clearSession(chatId);
+    }
+  } else if (['batal', 'tidak', 'no', 'cancel'].includes(lower)) {
+    clearSession(chatId);
+    await openwaService.sendText(chatId, `_Transaksi kas kecil dibatalkan. Ketik *menu* untuk kembali._`);
+  } else {
+    await openwaService.sendText(chatId, `Ketik *YA* untuk simpan ke Spreadsheet, atau *BATAL*.`);
   }
 }
 

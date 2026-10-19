@@ -16,7 +16,7 @@ async function handleDirectCommand(chatId, text) {
   const lower = trimmed.toLowerCase();
 
   // Kata kunci mandiri yang dapat langsung dieksekusi tanpa awalan simbol
-  const standaloneKeywords = ['kurs', 'usd', 'kursbi', 'help', 'bantuan', 'menu', 'start', 'kasbon', 'budget', 'lpj'];
+  const standaloneKeywords = ['kurs', 'usd', 'kursbi', 'help', 'bantuan', 'menu', 'start', 'kasbon', 'budget', 'lpj', 'kaskecil'];
   const isStandalone = standaloneKeywords.includes(lower);
 
   if (!isPrefixed && !isStandalone) {
@@ -45,7 +45,10 @@ Anda dapat mengirimkan perintah berikut kapan saja tanpa perlu \`start\` terlebi
 ▸ */menu*
   _Membuka navigasi menu interaktif_
 
-\`FINANCE & KASBON\`
+\`FINANCE & KAS KECIL\`
+▸ */kaskecil <keterangan, nominal, [cc]>*
+  _Input kas kecil dengan auto CC (SVC/GAD) & voucher draft_
+  _Contoh: /kaskecil BBM operasional GA, 150000_
 ▸ */kasbon* atau */budget*
   _Dapatkan link formulir pengajuan kasbon/budget operasional_
 ▸ */lpj*
@@ -81,6 +84,30 @@ Anda dapat mengirimkan perintah berikut kapan saja tanpa perlu \`start\` terlebi
 ━━━━━━━━━━━━━━━━━━━━━━━━`
       );
       return true;
+
+    case 'kaskecil': {
+      conversationManager.setSession(chatId, 'WAIT_INPUT_KAS_KECIL');
+      if (args) {
+        return conversationManager.handleConversationMessage(chatId, args);
+      }
+      await openwaService.sendText(
+        chatId,
+        `*INPUT TRANSAKSI KAS KECIL (DRAFT)*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Masukkan *Keterangan Belanja* dan *Nominal* (pisahkan koma).
+
+Contoh:
+• \`BBM operasional GA, 150000\`
+• \`Perbaikan genset SVC, 450000\`
+• \`Pulsa kantor, 100000, GAD\`
+
+▸ _Cost Center (SVC/GAD) otomatis dideteksi dari kata kunci, atau bisa ditulis manual di ujung._
+▸ _Nomor voucher otomatis diisi 'draft'._
+▸ _Ketik *batal* untuk keluar._
+━━━━━━━━━━━━━━━━━━━━━━━━`
+      );
+      return true;
+    }
 
     case 'kasbon':
     case 'budget': {

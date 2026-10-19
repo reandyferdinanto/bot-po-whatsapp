@@ -9,6 +9,7 @@ const openwaService = require('../services/openwaService');
 const dbService = require('../services/dbService');
 const kursService = require('../services/kursService');
 const financeBudgetService = require('../services/financeBudgetService');
+const kasKecilService = require('../services/kasKecilService');
 const driveService = require('../services/driveService');
 const { hasValidToken, getSheetsClient } = require('../config/googleAuth');
 const env = require('../config/env');
@@ -861,6 +862,91 @@ router.post('/finance/upload-nota', uploadNota.array('files', 5), async (req, re
   } catch (err) {
     console.error('❌ Error upload nota:', err.message);
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================================================
+// KAS KECIL (PETTY CASH) 12 BULAN ENDPOINTS
+// ============================================================================
+
+// GET /api/finance/kas-kecil - Ambil data kas kecil per bulan
+router.get('/finance/kas-kecil', async (req, res) => {
+  try {
+    const { bulan, q, cc, draftOnly } = req.query;
+    const targetMonth = bulan || kasKecilService.getCurrentMonthName();
+    const data = await kasKecilService.getKasKecilMonthData(targetMonth);
+
+    let transactions = data.transactions || [];
+    if (q && q.trim()) {
+      const lowerQ = q.trim().toLowerCase();
+      transactions = transactions.filter(t =>
+        (t.keterangan || '').toLowerCase().includes(lowerQ) ||
+        (t.noVoucher || '').toLowerCase().includes(lowerQ)
+      );
+    }
+    if (cc && cc !== 'ALL') {
+      transactions = transactions.filter(t => (t.cc || '').toUpperCase() === cc.toUpperCase());
+    }
+    if (draftOnly === 'true' || draftOnly === true) {
+      transactions = transactions.filter(t => t.isDraft);
+    }
+
+    res.json({
+      success: true,
+      ...data,
+      transactions,
+    });
+  } catch (err) {
+    console.error('❌ Error GET /api/finance/kas-kecil:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/finance/kas-kecil/summary - Ringkasan 12 Bulan
+router.get('/finance/kas-kecil/summary', async (req, res) => {
+  try {
+    const summary = await kasKecilService.getAllMonthsSummary();
+    res.json({ success: true, ...summary });
+  } catch (err) {
+    console.error('❌ Error GET /api/finance/kas-kecil/summary:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/finance/kas-kecil - Tambah entri kas kecil baru
+router.post('/finance/kas-kecil', async (req, res) => {
+  try {
+    const { bulan, date, noVoucher, cc, keterangan, tipe, nominal } = req.body;
+    const result = await kasKecilService.addKasKecilEntry({
+      bulan,
+      date,
+      noVoucher,
+      cc,
+      keterangan,
+      tipe,
+      nominal,
+    });
+    res.json({ success: true, entry: result });
+  } catch (err) {
+    console.error('❌ Error POST /api/finance/kas-kecil:', err.message);
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// PUT /api/finance/kas-kecil/voucher - Update nomor voucher dari 'draft'
+router.put('/finance/kas-kecil/voucher', async (req, res) => {
+  try {
+    const { bulan, rowIndex, noVoucher, cc } = req.body;
+    const result = await kasKecilService.updateKasKecilVoucher({
+      bulan,
+      rowIndex,
+      noVoucher,
+      cc,
+    });
+    res.json({ success: true, result });
+  } catch (err) {
+    console.error('❌ Error PUT /api/finance/kas-kecil/voucher:', err.message);
+    res.status(400).json({ success: false, error: err.message });
   }
 });
 

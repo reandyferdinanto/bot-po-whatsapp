@@ -218,9 +218,31 @@ async function migrateTables() {
           metadata JSONB DEFAULT '{}'::jsonb,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-        CREATE INDEX IF NOT EXISTS idx_pdoc_nopo ON po_documents (no_po);
-        CREATE INDEX IF NOT EXISTS idx_pdoc_tipe ON po_documents (tipe_dokumen);
-        CREATE INDEX IF NOT EXISTS idx_pdoc_created ON po_documents (created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_po_docs_nopo ON po_documents (no_po);
+        CREATE INDEX IF NOT EXISTS idx_po_docs_tipe ON po_documents (tipe_dokumen);
+      `);
+
+      // 10. Tabel Transaksi Kas Kecil (12 Bulan)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS transactions_kas_kecil (
+          id SERIAL PRIMARY KEY,
+          bulan VARCHAR(20) NOT NULL,
+          tahun VARCHAR(10) DEFAULT '2026',
+          row_index INT,
+          tanggal VARCHAR(30),
+          no_voucher VARCHAR(50) DEFAULT 'draft',
+          cc VARCHAR(20),
+          keterangan TEXT,
+          debet NUMERIC DEFAULT 0,
+          kredit NUMERIC DEFAULT 0,
+          saldo NUMERIC DEFAULT 0,
+          is_kasbon BOOLEAN DEFAULT FALSE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_kk_bulan ON transactions_kas_kecil (bulan);
+        CREATE INDEX IF NOT EXISTS idx_kk_cc ON transactions_kas_kecil (cc);
+        CREATE INDEX IF NOT EXISTS idx_kk_voucher ON transactions_kas_kecil (no_voucher);
       `);
 
       isDbConnected = true;
@@ -1279,6 +1301,96 @@ async function deletePoDocument(id) {
   }
 }
 
+/**
+ * Insert entri Kas Kecil ke PostgreSQL
+ */
+async function insertKasKecilToPg(entry) {
+  if (!initDb()) return null;
+  try {
+    const res = await pool.query(
+      `INSERT INTO transactions_kas_kecil (
+        bulan, tahun, row_index, tanggal, no_voucher, cc, keterangan, debet, kredit, saldo, is_kasbon
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING *;`,
+      [
+        entry.bulan,
+        entry.tahun || '2026',
+        entry.rowIndex || 0,
+        entry.tanggal || '',
+        entry.noVoucher || 'draft',
+        entry.cc || '',
+        entry.keterangan || '',
+        parseFloat(entry.debet) || 0,
+        parseFloat(entry.kredit) || 0,
+        parseFloat(entry.saldo) || 0,
+        entry.isKasbon === true,
+      ]
+    );
+    return res.rows[0];
+  } catch (err) {
+    console.warn('[WARN] Gagal insertKasKecilToPg:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Update no_voucher (dan CC opsional) Kas Kecil di PostgreSQL
+ */
+async function updateKasKecilVoucherInPg(bulan, rowIndex, noVoucher, cc) {
+  if (!initDb()) return false;
+  try {
+    let query = 'UPDATE transactions_kas_kecil SET no_voucher = $1, updated_at = CURRENT_TIMESTAMP';
+    const params = [noVoucher, bulan, rowIndex];
+    if (cc && cc.trim()) {
+      query += ', cc = $4';
+      params.push(cc.trim().toUpperCase());
+    }
+    query += ' WHERE LOWER(bulan) = LOWER($2) AND row_index = $3 RETURNING *;';
+    const res = await pool.query(query, params);
+    return res.rows.length > 0;
+  } catch (err) {
+    console.warn('[WARN] Gagal updateKasKecilVoucherInPg:', err.message);
+    return false;
+  }
+}
+
+/**
+ * Mengambil transaksi Kas Kecil dari PostgreSQL
+ */
+async function getAllKasKecilFromPg(filters = {}) {
+  if (!initDb()) return [];
+  try {
+    let query = 'SELECT * FROM transactions_kas_kecil WHERE 1=1';
+    const params = [];
+
+    if (filters.bulan && filters.bulan !== 'ALL') {
+      params.push(filters.bulan.toLowerCase());
+      query += ` AND LOWER(bulan) = $${params.length}`;
+    }
+
+    if (filters.cc && filters.cc !== 'ALL') {
+      params.push(filters.cc.toUpperCase());
+      query += ` AND UPPER(cc) = $${params.length}`;
+    }
+
+    if (filters.draftOnly) {
+      query += ` AND LOWER(no_voucher) = 'draft'`;
+    }
+
+    if (filters.search) {
+      params.push(`%${filters.search}%`);
+      query += ` AND (keterangan ILIKE $${params.length} OR no_voucher ILIKE $${params.length})`;
+    }
+
+    query += ' ORDER BY row_index ASC, id ASC';
+    const res = await pool.query(query, params);
+    return res.rows;
+  } catch (err) {
+    console.warn('[WARN] Gagal getAllKasKecilFromPg:', err.message);
+    return [];
+  }
+}
+
 function isAvailable() {
   return isDbConnected;
 }
@@ -1308,6 +1420,9 @@ module.exports = {
   insertBudgetToPg,
   updateBudgetInPg,
   syncBudgetsFromSheetToPg,
+  insertKasKecilToPg,
+  updateKasKecilVoucherInPg,
+  getAllKasKecilFromPg,
   getSetting,
   setSetting,
   getAllSettings,

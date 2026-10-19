@@ -12,6 +12,7 @@ import {
   AiOutlineDollar,
   AiOutlineTool,
   AiOutlineCluster,
+  AiOutlineFileText,
 } from 'react-icons/ai';
 import UsdRateTicker from './UsdRateTicker';
 
@@ -65,11 +66,23 @@ export default function Header({
       tagColor: 'green',
       icon: <AiOutlineInbox style={{ color: '#059669' }} />,
     },
+    'finance-kasbon': {
+      title: 'Finance: Kasbon & Pertanggungjawaban LPJ',
+      tag: 'Kasbon',
+      tagColor: 'orange',
+      icon: <AiOutlineDollar style={{ color: '#055b65' }} />,
+    },
+    'finance-kaskecil': {
+      title: 'Finance: Laporan Buku Kas Kecil (Januari s/d Desember 2026)',
+      tag: 'Petty Cash 12 Bln',
+      tagColor: 'green',
+      icon: <AiOutlineFileText style={{ color: '#055b65' }} />,
+    },
     finance: {
-      title: 'Finance: Verifikasi Faktur, Perpajakan & Rekonsiliasi Pelunasan',
-      tag: 'Keuangan & Pajak',
-      tagColor: 'blue',
-      icon: <AiOutlineDollar style={{ color: '#0284c7' }} />,
+      title: 'Finance: Kasbon & Pertanggungjawaban LPJ',
+      tag: 'Kasbon',
+      tagColor: 'orange',
+      icon: <AiOutlineDollar style={{ color: '#055b65' }} />,
     },
     maintenance: {
       title: 'Maintenance: Permintaan Suku Cadang Mesin & Jadwal Servis',

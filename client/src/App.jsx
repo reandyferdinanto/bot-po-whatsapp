@@ -16,6 +16,7 @@ import SystemTopologyPanel from './components/SystemTopologyPanel';
 import HistoricalStatsView from './components/HistoricalStatsView';
 import PlaceholderModuleView from './components/PlaceholderModuleView';
 import FinanceDashboardView from './components/FinanceDashboardView';
+import KasKecilView from './components/KasKecilView';
 import FinanceBudgetPublicForm from './components/FinanceBudgetPublicForm';
 import GoogleDriveSettingsView from './components/GoogleDriveSettingsView';
 import { getStats, getPOs, createPO, updatePO, cancelPO, triggerSync, getKursUsd, refreshKursUsd } from './services/api';
@@ -61,7 +62,8 @@ export default function App() {
     if (pathname === '/database-material' || pathname === '/material') return 'material';
     if (pathname === '/database-supplier' || pathname === '/supplier') return 'supplier';
     if (pathname === '/warehouse') return 'warehouse';
-    if (pathname === '/finance') return 'finance';
+    if (pathname === '/finance/kas-kecil' || pathname === '/kas-kecil') return 'finance-kaskecil';
+    if (pathname.startsWith('/finance')) return 'finance-kasbon';
     if (pathname === '/maintenance') return 'maintenance';
     if (pathname === '/status-sistem' || pathname === '/topology') return 'topology';
     if (pathname === '/settings/drive' || pathname === '/drive') return 'drive-settings';
@@ -402,7 +404,15 @@ export default function App() {
                 />
                 <Route
                   path="/finance"
+                  element={<Navigate to="/finance/kasbon" replace />}
+                />
+                <Route
+                  path="/finance/kasbon"
                   element={<FinanceDashboardView isDark={isDark} />}
+                />
+                <Route
+                  path="/finance/kas-kecil"
+                  element={<KasKecilView isDark={isDark} />}
                 />
                 <Route
                   path="/maintenance"
