@@ -7,8 +7,11 @@ import {
   AiOutlineBulb,
   AiFillBulb,
   AiOutlineTable,
-  AiOutlineThunderbolt,
   AiOutlineBarChart,
+  AiOutlineInbox,
+  AiOutlineDollar,
+  AiOutlineTool,
+  AiOutlineCluster,
 } from 'react-icons/ai';
 import UsdRateTicker from './UsdRateTicker';
 
@@ -16,9 +19,7 @@ export default function Header({
   activeNav,
   stats,
   isSyncing,
-  isSyncingAll,
   onSync,
-  onSyncAll,
   onOpenCreateModal,
   onOpenOcrTab,
   isDark,
@@ -29,40 +30,58 @@ export default function Header({
 }) {
   const titles = {
     po2026: {
-      title: 'Data Transaksi: Sheet "PO 2026"',
-      tag: 'Live CRUD Active',
+      title: 'Purchasing: Sheet "PO 2026" (Live Tracking PO • GRPO • Bayar)',
+      tag: 'Live Tracking',
       tagColor: 'green',
       icon: <AiOutlineTable style={{ color: '#059669' }} />,
     },
     analytics: {
-      title: 'Statistik & Analisis Multi-Tahun (PO 2017 s/d PO 2026)',
+      title: 'Purchasing: Statistik & Analisis Belanja (PO 2017 s/d PO 2026)',
       tag: '10 Tahun Historis',
-      tagColor: 'purple',
-      icon: <AiOutlineBarChart style={{ color: '#7c3aed' }} />,
+      tagColor: 'blue',
+      icon: <AiOutlineBarChart style={{ color: '#0284c7' }} />,
     },
     'multi-ocr': {
-      title: '⚡ Smart Multi-OCR: Ekstraksi Dokumen PO Multi-Page & Multi-File',
+      title: 'Smart Multi-OCR: Ekstraksi AI (Purchasing • Finance • Warehouse)',
       tag: 'High-Precision OCR',
       tagColor: 'blue',
       icon: <AiOutlineScan style={{ color: '#0284c7' }} />,
     },
     material: {
-      title: 'Katalog Master Material: Sheet "database Material"',
+      title: 'Purchasing: Katalog Master Material ("database Material")',
       tag: '1.506 Master Items',
-      tagColor: 'purple',
-      icon: <AiOutlineTable style={{ color: '#7c3aed' }} />,
+      tagColor: 'cyan',
+      icon: <AiOutlineTable style={{ color: '#059669' }} />,
     },
     supplier: {
-      title: 'Rekomendasi Vendor: Sheet "database Supplier Material"',
+      title: 'Purchasing: Rekomendasi Vendor ("database Supplier Material")',
       tag: '1.506 Vendor History',
       tagColor: 'orange',
       icon: <AiOutlineTable style={{ color: '#ea580c' }} />,
+    },
+    warehouse: {
+      title: 'Warehouse: Penerimaan Barang, Surat Jalan & Goods Receipt PO',
+      tag: 'Operasional Gudang',
+      tagColor: 'green',
+      icon: <AiOutlineInbox style={{ color: '#059669' }} />,
+    },
+    finance: {
+      title: 'Finance: Verifikasi Faktur, Perpajakan & Rekonsiliasi Pelunasan',
+      tag: 'Keuangan & Pajak',
+      tagColor: 'blue',
+      icon: <AiOutlineDollar style={{ color: '#0284c7' }} />,
+    },
+    maintenance: {
+      title: 'Maintenance: Permintaan Suku Cadang Mesin & Jadwal Servis',
+      tag: 'Teknik & Servis',
+      tagColor: 'cyan',
+      icon: <AiOutlineTool style={{ color: '#0d9488' }} />,
     },
     topology: {
       title: 'Status Infrastruktur: OpenWA WhatsApp & Google Sheets API v4',
       tag: 'System Healthy',
       tagColor: 'success',
-      icon: <AiOutlineTable style={{ color: '#16a34a' }} />,
+      icon: <AiOutlineCluster style={{ color: '#10b981' }} />,
     },
   };
 
@@ -113,26 +132,6 @@ export default function Header({
 
         <div style={{ width: 1, height: 20, backgroundColor: borderColor, margin: '0 2px' }} />
 
-        {/* Sync All Multi-Year Button */}
-        <Button
-          type="primary"
-          icon={<AiOutlineThunderbolt style={{ animation: isSyncingAll ? 'antRotate 1s infinite linear' : 'none' }} />}
-          onClick={onSyncAll}
-          loading={isSyncingAll}
-          style={{
-            fontSize: 12,
-            borderRadius: 8,
-            backgroundColor: '#7c3aed',
-            borderColor: '#7c3aed',
-            fontWeight: 700,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 4,
-            boxShadow: '0 2px 6px rgba(124, 58, 237, 0.25)',
-          }}
-        >
-          ⚡ Sync Semua Sheet (2017-2026)
-        </Button>
 
         {/* Sync Button 2026 */}
         <Button
@@ -160,7 +159,7 @@ export default function Header({
             gap: 4,
           }}
         >
-          ⚡ Multi-OCR Input
+          Multi-OCR Input
         </Button>
 
         {/* Buat PO Baru (Formik Modal) */}

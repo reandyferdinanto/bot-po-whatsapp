@@ -65,10 +65,20 @@
       .sticky-col-1 { position: sticky; left: 40px; z-index: 20; }
       .sticky-col-2 { position: sticky; left: 88px; z-index: 20; }
       .freeze-border { border-right: 2px solid #cbd5e1 !important; }
-      .cell-selected {
-        outline: 2px solid #2563eb !important;
-        outline-offset: -2px;
-        background-color: rgba(37, 99, 235, 0.08) !important;
+      /* Row selection styling (full-row unified highlight) */
+      .row-selected > td {
+        background-color: #edf5ff !important;
+        border-top: 1.5px solid #2563eb !important;
+        border-bottom: 1.5px solid #2563eb !important;
+      }
+      .row-selected > td.row-number {
+        background-color: #dbeafe !important;
+        color: #1d4ed8 !important;
+        font-weight: 700 !important;
+        border-left: 3px solid #2563eb !important;
+      }
+      .row-selected > td:last-child {
+        border-right: 1.5px solid #2563eb !important;
       }
       /* OCR Scanning Animations */
       @keyframes ocrLaserScan {
@@ -87,7 +97,7 @@
         100% { transform: scaleX(0.1); opacity: 0.4; }
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-CIit0gsf.js"></script>
+    <script type="module" crossorigin src="/assets/index-BrFRKChH.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-BdOndhxL.css">
   </head>
   <body>

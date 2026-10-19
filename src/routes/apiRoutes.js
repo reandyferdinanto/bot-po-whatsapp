@@ -1,20 +1,52 @@
 const express = require('express');
 const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const sheetsService = require('../services/sheetsService');
 const cacheService = require('../services/cacheService');
 const ocrService = require('../services/ocrService');
 const openwaService = require('../services/openwaService');
 const dbService = require('../services/dbService');
 const kursService = require('../services/kursService');
+const financeBudgetService = require('../services/financeBudgetService');
+const driveService = require('../services/driveService');
 const { hasValidToken, getSheetsClient } = require('../config/googleAuth');
 const env = require('../config/env');
 
 const router = express.Router();
 
-// Memory storage for file uploads (up to 20 files, max 25MB each)
+// Memory storage for OCR file uploads (up to 20 files, max 25MB each)
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024, files: 20 },
+});
+
+// Disk storage for temporary OCR files pending commit
+const ocrCacheDir = path.resolve(__dirname, '../../uploads/ocr_cache');
+if (!fs.existsSync(ocrCacheDir)) {
+  fs.mkdirSync(ocrCacheDir, { recursive: true });
+}
+
+// Disk storage for Finance Nota/Receipt uploads
+const notaDir = path.resolve(__dirname, '../../uploads/nota');
+if (!fs.existsSync(notaDir)) {
+  fs.mkdirSync(notaDir, { recursive: true });
+}
+
+const notaStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, notaDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+    const cleanBase = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+    cb(null, `nota_${Date.now()}_${cleanBase}${ext}`);
+  },
+});
+
+const uploadNota = multer({
+  storage: notaStorage,
+  limits: { fileSize: 20 * 1024 * 1024, files: 5 },
 });
 
 /**
@@ -120,9 +152,17 @@ router.get('/pos', async (req, res) => {
     let filteredPOs = data.pos;
 
     if (status && status !== 'ALL') {
-      const targetStatus = status.toLowerCase();
-      filteredRows = filteredRows.filter(r => (r.status || '').toLowerCase() === targetStatus);
-      filteredPOs = filteredPOs.filter(p => (p.status || '').toLowerCase() === targetStatus);
+      const targetStatus = status.toLowerCase().trim();
+      const matchStatus = (sVal) => {
+        const s = (sVal || '').toLowerCase().trim();
+        if (targetStatus === 'close') return s.startsWith('clos') || s === 'lunas' || s === 'done';
+        if (targetStatus === 'pending') return s.startsWith('pend') || s === 'hold';
+        if (targetStatus === 'cancelled') return s.startsWith('cancel') || s === 'batal';
+        if (targetStatus === 'open') return s === 'open';
+        return s === targetStatus;
+      };
+      filteredRows = filteredRows.filter(r => matchStatus(r.status));
+      filteredPOs = filteredPOs.filter(p => matchStatus(p.status));
     }
 
     if (search) {
@@ -402,7 +442,29 @@ router.post('/ocr/parse', upload.array('files', 20), async (req, res) => {
     }
 
     console.log(`📥 Menerima ${filesToProcess.length} file untuk OCR ekstraksi...`);
+
+    // Cache file buffers untuk auto-upload Google Drive saat di-commit
+    const fileRefMap = {};
+    for (const f of filesToProcess) {
+      try {
+        const cleanName = path.basename(f.filename || 'dokumen').replace(/[^a-zA-Z0-9_.-]/g, '_');
+        const fileRef = `ocr_${Date.now()}_${Math.random().toString(36).substring(2, 8)}_${cleanName}`;
+        fs.writeFileSync(path.join(ocrCacheDir, fileRef), f.buffer);
+        fileRefMap[f.filename] = { fileRef, mimeType: f.mimeType };
+      } catch (cacheErr) {
+        console.warn('⚠️ Gagal cache file OCR untuk Drive:', cacheErr.message);
+      }
+    }
+
     const parsedBatch = await ocrService.parseBatchDocuments(filesToProcess);
+
+    // Tempelkan fileRef dan mimeType ke setiap parsed document
+    for (const doc of parsedBatch) {
+      if (doc.filename && fileRefMap[doc.filename]) {
+        doc.fileRef = fileRefMap[doc.filename].fileRef;
+        doc.mimeType = fileRefMap[doc.filename].mimeType;
+      }
+    }
 
     // Cross-check PO reference untuk Purchase Delivery Note (GRPO)
     for (const doc of parsedBatch) {
@@ -502,6 +564,28 @@ router.post('/ocr/batch-commit', async (req, res) => {
         const updateRes = await sheetsService.updatePOField(targetPo, updatePayload);
         if (updateRes.success) {
           successCount++;
+
+          // Auto-archive ke Google Drive jika ada fileRef
+          let driveDoc = null;
+          if (po.fileRef) {
+            const cachedPath = path.join(ocrCacheDir, po.fileRef);
+            if (fs.existsSync(cachedPath)) {
+              try {
+                const buffer = fs.readFileSync(cachedPath);
+                driveDoc = await driveService.uploadDocument({
+                  buffer,
+                  filename: po.filename || 'dokumen.pdf',
+                  mimeType: po.mimeType || (po.filename?.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+                  docType: 'GRPO',
+                  noPo: targetPo,
+                });
+                console.log(`📁 Auto-archive GRPO ke Google Drive sukses: ${targetPo}`);
+              } catch (dErr) {
+                console.warn(`⚠️ Auto-archive GRPO ke Drive gagal (${targetPo}):`, dErr.message);
+              }
+            }
+          }
+
           results.push({
             noPo: targetPo,
             tipeDokumen: 'PURCHASE_DELIVERY_NOTE_GRPO',
@@ -509,6 +593,7 @@ router.post('/ocr/batch-commit', async (req, res) => {
             noGrpo: po.noGrpo,
             success: true,
             rowsUpdated: updateRes.rowsUpdated,
+            drive: driveDoc,
           });
         } else {
           results.push({
@@ -542,6 +627,28 @@ router.post('/ocr/batch-commit', async (req, res) => {
         });
 
         successCount++;
+
+        // Auto-archive ke Google Drive jika ada fileRef
+        let driveDoc = null;
+        if (po.fileRef) {
+          const cachedPath = path.join(ocrCacheDir, po.fileRef);
+          if (fs.existsSync(cachedPath)) {
+            try {
+              const buffer = fs.readFileSync(cachedPath);
+              driveDoc = await driveService.uploadDocument({
+                buffer,
+                filename: po.filename || 'dokumen.pdf',
+                mimeType: po.mimeType || (po.filename?.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+                docType: 'PO',
+                noPo: po.noPo,
+              });
+              console.log(`📁 Auto-archive PO ke Google Drive sukses: ${po.noPo}`);
+            } catch (dErr) {
+              console.warn(`⚠️ Auto-archive PO ke Drive gagal (${po.noPo}):`, dErr.message);
+            }
+          }
+        }
+
         results.push({
           noPo: po.noPo,
           tipeDokumen: 'PURCHASE_ORDER',
@@ -549,6 +656,7 @@ router.post('/ocr/batch-commit', async (req, res) => {
           success: true,
           itemsCount: po.items.length,
           grandTotal: commitRes.grandTotal,
+          drive: driveDoc,
         });
       } catch (itemErr) {
         results.push({
@@ -589,4 +697,408 @@ router.post('/openwa/send-test', async (req, res) => {
   }
 });
 
+/**
+ * ====================================================
+ * FINANCE / KASBON & SETTLEMENT (BUDGET) API ROUTES
+ * ====================================================
+ */
+
+// GET /api/finance/budgets - Ambil list kasbon beserta KPI stats
+router.get('/finance/budgets', async (req, res) => {
+  try {
+    const { status, divisi, search } = req.query;
+    const data = await financeBudgetService.getAllBudgets({ status, divisi, search });
+    res.json(data);
+  } catch (err) {
+    console.error('❌ Error GET /api/finance/budgets:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/finance/budgets/:noBudget - Detail kasbon tertentu
+router.get('/finance/budgets/:noBudget', async (req, res) => {
+  try {
+    const budget = await financeBudgetService.getBudgetByNo(req.params.noBudget);
+    if (!budget) {
+      return res.status(404).json({ success: false, error: 'Data kasbon tidak ditemukan.' });
+    }
+    res.json({ success: true, budget });
+  } catch (err) {
+    console.error('❌ Error GET /api/finance/budgets/:noBudget:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/finance/budgets - Buat pengajuan kasbon baru
+router.post('/finance/budgets', async (req, res) => {
+  try {
+    const { nama, uraian, jumlah, divisi, noWa, tglKasbon, catatanFinance } = req.body;
+    const result = await financeBudgetService.createBudget({
+      nama,
+      uraian,
+      jumlah,
+      divisi,
+      noWa,
+      tglKasbon,
+      catatanFinance,
+    });
+    res.json({
+      success: true,
+      budget: result,
+      message: `Pengajuan Kasbon ${result.no_budget || result.noBudget} berhasil dibuat.`,
+    });
+  } catch (err) {
+    console.error('❌ Error POST /api/finance/budgets:', err.message);
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/finance/budgets/:noBudget/approve - Persetujuan & pencairan dana oleh Finance
+router.post('/finance/budgets/:noBudget/approve', async (req, res) => {
+  try {
+    const { catatanFinance } = req.body;
+    const result = await financeBudgetService.approveBudget(req.params.noBudget, { catatanFinance });
+    res.json({
+      success: true,
+      budget: result,
+      message: `Kasbon ${req.params.noBudget} berhasil disetujui & dicairkan.`,
+    });
+  } catch (err) {
+    console.error('❌ Error approve budget:', err.message);
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/finance/budgets/:noBudget/reject - Penolakan kasbon oleh Finance
+router.post('/finance/budgets/:noBudget/reject', async (req, res) => {
+  try {
+    const { alasan } = req.body;
+    const result = await financeBudgetService.rejectBudget(req.params.noBudget, { alasan });
+    res.json({
+      success: true,
+      budget: result,
+      message: `Kasbon ${req.params.noBudget} telah ditolak.`,
+    });
+  } catch (err) {
+    console.error('❌ Error reject budget:', err.message);
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/finance/budgets/:noBudget/lpj - Submit Laporan Pertanggungjawaban & Nota
+router.post('/finance/budgets/:noBudget/lpj', async (req, res) => {
+  try {
+    const { realisasiBelanja, buktiNota, catatanPemohon } = req.body;
+    const result = await financeBudgetService.submitLpj(req.params.noBudget, {
+      realisasiBelanja,
+      buktiNota,
+      catatanPemohon,
+    });
+    res.json({
+      success: true,
+      budget: result,
+      message: `LPJ Kasbon ${req.params.noBudget} berhasil dikirimkan.`,
+    });
+  } catch (err) {
+    console.error('❌ Error submit LPJ:', err.message);
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/finance/budgets/:noBudget/close - Closing budget & verifikasi sisa kas
+router.post('/finance/budgets/:noBudget/close', async (req, res) => {
+  try {
+    const { catatanFinance, sisaKembaliDiterima } = req.body;
+    const result = await financeBudgetService.closeBudget(req.params.noBudget, {
+      catatanFinance,
+      sisaKembaliDiterima,
+    });
+    res.json({
+      success: true,
+      budget: result,
+      message: `Kasbon ${req.params.noBudget} berhasil ditutup (CLOSED).`,
+    });
+  } catch (err) {
+    console.error('❌ Error close budget:', err.message);
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/finance/budgets/sync - Sinkronisasi manual Google Sheets <-> PostgreSQL
+router.post('/finance/budgets/sync', async (req, res) => {
+  try {
+    const result = await financeBudgetService.syncFromSheet();
+    res.json(result);
+  } catch (err) {
+    console.error('❌ Error sync finance budgets:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/finance/upload-nota - Upload foto nota bon / struk belanja
+router.post('/finance/upload-nota', uploadNota.array('files', 5), async (req, res) => {
+  try {
+    const files = req.files || [];
+    if (files.length === 0) {
+      return res.status(400).json({ success: false, error: 'Tidak ada file yang diunggah.' });
+    }
+
+    const host = req.get('host');
+    const protocol = req.protocol;
+    const fileResults = files.map((f) => ({
+      originalName: f.originalname,
+      fileName: f.filename,
+      size: f.size,
+      url: `/uploads/nota/${f.filename}`,
+      fullUrl: `${protocol}://${host}/uploads/nota/${f.filename}`,
+    }));
+
+    res.json({
+      success: true,
+      files: fileResults,
+      firstUrl: fileResults[0].url,
+    });
+  } catch (err) {
+    console.error('❌ Error upload nota:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================================================
+// GOOGLE DRIVE SETTINGS & DOCUMENT ARCHIVE ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /api/auth/google/url - Menghasilkan Auth URL untuk login Google OAuth2
+ */
+router.get('/auth/google/url', (req, res) => {
+  try {
+    const { google } = require('googleapis');
+    const raw = fs.readFileSync(env.sheets.credentialsPath, 'utf8');
+    const creds = JSON.parse(raw);
+    const ci = creds.web || creds.installed;
+
+    const requestedUri =
+      req.query.redirectUri ||
+      process.env.GOOGLE_REDIRECT_URI ||
+      (ci.redirect_uris && ci.redirect_uris[0]) ||
+      'http://localhost:3000/oauth2callback';
+
+    const client = new google.auth.OAuth2(ci.client_id, ci.client_secret, requestedUri);
+    const scopes = [
+      'https://www.googleapis.com/auth/spreadsheets',
+      'https://www.googleapis.com/auth/drive.readonly',
+      'https://www.googleapis.com/auth/drive.file',
+    ];
+    const authUrl = client.generateAuthUrl({
+      access_type: 'offline',
+      scope: scopes,
+      prompt: 'consent',
+    });
+    res.json({ success: true, authUrl, redirectUri: requestedUri });
+  } catch (err) {
+    console.error('❌ Error generate Google Auth URL:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/auth/google/exchange - Menukar Authorization Code dengan Token
+ */
+router.post('/auth/google/exchange', async (req, res) => {
+  try {
+    const { code, redirectUri } = req.body;
+    if (!code || typeof code !== 'string') {
+      return res.status(400).json({ success: false, error: 'Authorization Code wajib diisi.' });
+    }
+
+    const { google } = require('googleapis');
+    const raw = fs.readFileSync(env.sheets.credentialsPath, 'utf8');
+    const creds = JSON.parse(raw);
+    const ci = creds.web || creds.installed;
+
+    const candidateUris = [
+      redirectUri,
+      'http://localhost:3000/oauth2callback',
+      'http://localhost:3001/oauth2callback',
+      'https://bot-whatsapp.ebite.biz.id/oauth2callback',
+    ].filter(Boolean);
+
+    let tokens = null;
+    let lastErr = null;
+
+    for (const uri of candidateUris) {
+      try {
+        const client = new google.auth.OAuth2(ci.client_id, ci.client_secret, uri);
+        const resTok = await client.getToken(code.trim());
+        tokens = resTok.tokens;
+        break;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+
+    if (!tokens) {
+      throw lastErr || new Error('Gagal menukar kode otorisasi.');
+    }
+
+    const { getOAuth2Client } = require('../config/googleAuth');
+    const auth = getOAuth2Client();
+    auth.setCredentials(tokens);
+
+    // Simpan ke credentials/token.json
+    fs.writeFileSync(env.sheets.tokenPath, JSON.stringify(tokens, null, 2), 'utf8');
+    console.log('🎉 Token Google OAuth2 berhasil diperbarui dengan izin Drive File!');
+
+    const scopeStr = tokens.scope || '';
+    res.json({
+      success: true,
+      message: 'Token Google OAuth2 berhasil diperbarui! Izin Google Drive aktif.',
+      tokenInfo: {
+        scope: scopeStr,
+        hasDriveWrite: scopeStr.includes('drive.file') || scopeStr.includes('drive '),
+      },
+    });
+  } catch (err) {
+    console.error('❌ Gagal menukar token Google:', err.message);
+    res.status(400).json({ success: false, error: `Gagal verifikasi kode: ${err.message}` });
+  }
+});
+
+/**
+ * GET /api/settings/drive - Mengambil konfigurasi & status Google Drive
+ */
+router.get('/settings/drive', async (req, res) => {
+  try {
+    const config = await driveService.getDriveConfig();
+    res.json({
+      success: true,
+      config,
+    });
+  } catch (err) {
+    console.error('❌ Error GET /api/settings/drive:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/settings/drive - Menyimpan konfigurasi Google Drive
+ */
+router.post('/settings/drive', async (req, res) => {
+  try {
+    const { folderUrlOrId, autoSubfolders } = req.body;
+    if (!folderUrlOrId) {
+      return res.status(400).json({ success: false, error: 'URL atau ID Folder Google Drive wajib diisi.' });
+    }
+
+    const saved = await driveService.saveDriveConfig({ folderUrlOrId, autoSubfolders });
+    res.json({
+      success: true,
+      config: saved,
+      message: 'Pengaturan Google Drive berhasil disimpan!',
+    });
+  } catch (err) {
+    console.error('❌ Error POST /api/settings/drive:', err.message);
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/settings/drive/test - Menguji akses & izin folder Google Drive
+ */
+router.post('/settings/drive/test', async (req, res) => {
+  try {
+    const { folderUrlOrId } = req.body || {};
+    const result = await driveService.testFolderAccess(folderUrlOrId);
+    res.json(result);
+  } catch (err) {
+    console.error('❌ Error POST /api/settings/drive/test:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/documents/po/:noPo - Mengambil daftar lampiran dokumen untuk PO tertentu
+ */
+router.get('/documents/po/:noPo', async (req, res) => {
+  try {
+    const { noPo } = req.params;
+    const { docType } = req.query;
+    const docs = await driveService.getDocumentsForPo(noPo, docType);
+    res.json({
+      success: true,
+      noPo,
+      total: docs.length,
+      documents: docs,
+    });
+  } catch (err) {
+    console.error('❌ Error GET /api/documents/po:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/documents/download/:id - Unduh file dari Google Drive via stream server
+ */
+router.get('/documents/download/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pool = dbService.getPool();
+    if (!pool) {
+      return res.status(500).json({ success: false, error: 'Database PostgreSQL tidak aktif.' });
+    }
+
+    const docQuery = await pool.query('SELECT * FROM po_documents WHERE id = $1', [id]);
+    if (docQuery.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Dokumen tidak ditemukan di database.' });
+    }
+
+    const doc = docQuery.rows[0];
+    const { buffer, mimeType, filename } = await driveService.downloadDocumentBuffer(doc.drive_file_id);
+
+    res.setHeader('Content-Type', mimeType || doc.mime_type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${filename || doc.file_name}"`);
+    res.setHeader('Content-Length', buffer.length);
+    res.send(buffer);
+  } catch (err) {
+    console.error('❌ Error download document:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/documents/upload - Upload dokumen manual (PO, GRPO, Bukti Bayar) untuk suatu PO
+ */
+router.post('/documents/upload', upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file;
+    const { noPo, docType } = req.body;
+
+    if (!file) {
+      return res.status(400).json({ success: false, error: 'File wajib diunggah.' });
+    }
+    if (!noPo) {
+      return res.status(400).json({ success: false, error: 'Nomor PO (noPo) wajib disertakan.' });
+    }
+
+    const uploadRes = await driveService.uploadDocument({
+      buffer: file.buffer,
+      filename: file.originalname,
+      mimeType: file.mimetype,
+      docType: docType || 'DOKUMEN',
+      noPo,
+    });
+
+    res.json({
+      success: true,
+      document: uploadRes,
+      message: `Dokumen berhasil diunggah dan diarsipkan ke Google Drive!`,
+    });
+  } catch (err) {
+    console.error('❌ Error upload document:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
+

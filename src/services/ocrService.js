@@ -796,19 +796,17 @@ async function parseImageWithOcr(imageBuffer, options = {}) {
   const filename = options.filename || 'foto.jpg';
   const mimeType = options.mimeType || 'image/jpeg';
 
-  // 1. Coba Gemini Vision jika API Key tersedia (Akurasi Tinggi untuk Foto)
-  const env = require('../config/env');
-  if (env.gemini && env.gemini.apiKey) {
-    try {
-      console.log(`🤖 Menganalisis gambar dengan Gemini 1.5 Flash Vision (${filename})...`);
-      const { parseImageWithGemini } = require('./geminiVisionService');
-      const geminiResult = await parseImageWithGemini(imageBuffer, mimeType);
-      geminiResult.filename = filename;
-      geminiResult.items = enrichItemsWithMaster(geminiResult.items);
-      return geminiResult;
-    } catch (gErr) {
-      console.warn(`⚠️ Gemini Vision gagal (${gErr.message}), beralih ke Tesseract OCR lokal...`);
-    }
+  // 1. Coba AI Gemini Flash Vision terlebih dahulu (By Default)
+  try {
+    console.log(`🤖 [AI Vision] Menganalisis dokumen gambar dengan Gemini Flash AI (${filename})...`);
+    const { parseImageWithGemini } = require('./geminiVisionService');
+    const geminiResult = await parseImageWithGemini(imageBuffer, mimeType);
+    geminiResult.filename = filename;
+    geminiResult.items = enrichItemsWithMaster(geminiResult.items);
+    console.log(`✅ [AI Vision] Berhasil mengekstrak ${geminiResult.tipeDokumen} (${geminiResult.items.length} items) via ${geminiResult.source}`);
+    return geminiResult;
+  } catch (gErr) {
+    console.warn(`⚠️ [AI Vision] Gemini Flash tidak tersedia / gagal (${gErr.message}). Otomatis beralih ke Tesseract OCR lokal...`);
   }
 
   // 2. Fallback ke Tesseract OCR Lokal

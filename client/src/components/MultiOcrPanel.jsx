@@ -518,9 +518,9 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                   <AiOutlineFilePdf style={{ fontSize: 22, color: '#dc2626' }} />
                   <span style={{ fontSize: 11, fontWeight: 700, color: '#b91c1c' }}>Dokumen PDF (Multi-Halaman)</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, backgroundColor: isDark ? 'rgba(139, 92, 246, 0.15)' : '#ede9fe', border: '1px solid #c4b5fd' }}>
-                  <AiOutlineFileImage style={{ fontSize: 22, color: '#7c3aed' }} />
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#6d28d9' }}>Foto / Scan (JPG, PNG, WEBP)</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, backgroundColor: isDark ? 'rgba(14, 165, 233, 0.15)' : '#e0f2fe', border: '1px solid #7dd3fc' }}>
+                  <AiOutlineFileImage style={{ fontSize: 22, color: '#0284c7' }} />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#0369a1' }}>Foto / Scan (JPG, PNG, WEBP)</span>
                 </div>
               </div>
 
@@ -581,15 +581,15 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                       borderRadius: 8,
                       backgroundColor: f.isPdf
                         ? (isDark ? 'rgba(239, 68, 68, 0.2)' : '#fef2f2')
-                        : (isDark ? 'rgba(139, 92, 246, 0.2)' : '#f5f3ff'),
-                      border: `1px solid ${f.isPdf ? '#f87171' : '#c084fc'}`,
+                        : (isDark ? 'rgba(14, 165, 233, 0.18)' : '#f0f9ff'),
+                      border: `1px solid ${f.isPdf ? '#f87171' : '#7dd3fc'}`,
                       boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                     }}
                   >
                     {f.isPdf ? (
                       <AiOutlineFilePdf style={{ fontSize: 22, color: '#dc2626', flexShrink: 0 }} />
                     ) : (
-                      <AiOutlineFileImage style={{ fontSize: 22, color: '#7c3aed', flexShrink: 0 }} />
+                      <AiOutlineFileImage style={{ fontSize: 22, color: '#0284c7', flexShrink: 0 }} />
                     )}
                     <div style={{ textAlign: 'left' }}>
                       <div
@@ -611,7 +611,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                       </div>
                     </div>
                     <Tag
-                      color={f.isPdf ? 'red' : 'purple'}
+                      color={f.isPdf ? 'red' : 'blue'}
                       style={{ fontSize: 10, margin: 0, fontWeight: 700, borderRadius: 4 }}
                     >
                       {f.isPdf ? 'PDF' : 'GAMBAR'}
@@ -782,7 +782,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                                   {doc.filename} {doc.pageRange ? `(${doc.pageRange})` : ''}
                                 </Tag>
                               ) : (
-                                <Tag color="purple" icon={<AiOutlineFileImage />} style={{ fontWeight: 600 }}>
+                                <Tag color="blue" icon={<AiOutlineFileImage />} style={{ fontWeight: 600 }}>
                                   {doc.filename}
                                 </Tag>
                               )}
@@ -1099,7 +1099,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                                   {doc.filename} {doc.pageRange ? `(${doc.pageRange})` : ''}
                                 </Tag>
                               ) : (
-                                <Tag color="purple" icon={<AiOutlineFileImage />} style={{ fontWeight: 600 }}>
+                                <Tag color="blue" icon={<AiOutlineFileImage />} style={{ fontWeight: 600 }}>
                                   {doc.filename}
                                 </Tag>
                               )}
@@ -1230,7 +1230,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                                             )}
                                             {!it.matchedMaster && it.suggestedMaster && (
                                               <div style={{ fontSize: 9, color: '#0284c7', marginTop: 2 }}>
-                                                ⚡ Rekomendasi: [{it.suggestedMaster.kode}] {it.suggestedMaster.nama}
+                                                Rekomendasi: [{it.suggestedMaster.kode}] {it.suggestedMaster.nama}
                                               </div>
                                             )}
                                           </td>
@@ -1337,7 +1337,7 @@ export default function MultiOcrPanel({ onPoCommitted, isDark }) {
                              <span style={{ color: '#0284c7', fontWeight: 600 }}>
                                ✓ PPN: {formatRupiah(totalPpn)}
                              </span>
-                             <span style={{ color: '#7c3aed', fontWeight: 700 }}>
+                             <span style={{ color: '#047857', fontWeight: 800 }}>
                                ✓ Grand Total: {formatRupiah(grandTotal)}
                              </span>
                            </div>

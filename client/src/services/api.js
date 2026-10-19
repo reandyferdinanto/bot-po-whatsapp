@@ -99,4 +99,105 @@ export async function refreshKursUsd() {
   return res.data;
 }
 
+// ==========================================
+// Finance / Kasbon & Budget Request APIs
+// ==========================================
+
+export async function getBudgets(params = {}) {
+  const res = await api.get('/finance/budgets', { params });
+  return res.data;
+}
+
+export async function getBudgetDetail(noBudget) {
+  const res = await api.get(`/finance/budgets/${encodeURIComponent(noBudget)}`);
+  return res.data;
+}
+
+export async function createBudget(data) {
+  const res = await api.post('/finance/budgets', data);
+  return res.data;
+}
+
+export async function approveBudget(noBudget, data = {}) {
+  const res = await api.post(`/finance/budgets/${encodeURIComponent(noBudget)}/approve`, data);
+  return res.data;
+}
+
+export async function rejectBudget(noBudget, data = {}) {
+  const res = await api.post(`/finance/budgets/${encodeURIComponent(noBudget)}/reject`, data);
+  return res.data;
+}
+
+export async function submitBudgetLpj(noBudget, data) {
+  const res = await api.post(`/finance/budgets/${encodeURIComponent(noBudget)}/lpj`, data);
+  return res.data;
+}
+
+export async function closeBudget(noBudget, data = {}) {
+  const res = await api.post(`/finance/budgets/${encodeURIComponent(noBudget)}/close`, data);
+  return res.data;
+}
+
+export async function syncBudgets() {
+  const res = await api.post('/finance/budgets/sync');
+  return res.data;
+}
+
+export async function uploadNotaFiles(files) {
+  const formData = new FormData();
+  for (const f of files) {
+    formData.append('files', f);
+  }
+  const res = await api.post('/finance/upload-nota', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000,
+  });
+  return res.data;
+}
+
+// Google Drive Settings & Documents
+export async function getDriveSettings() {
+  const res = await api.get('/settings/drive');
+  return res.data;
+}
+
+export async function saveDriveSettings(data) {
+  const res = await api.post('/settings/drive', data);
+  return res.data;
+}
+
+export async function testDriveAccess(folderUrlOrId) {
+  const res = await api.post('/settings/drive/test', { folderUrlOrId });
+  return res.data;
+}
+
+export async function getPoDocuments(noPo, docType) {
+  const res = await api.get(`/documents/po/${encodeURIComponent(noPo)}`, {
+    params: { docType },
+  });
+  return res.data;
+}
+
+export async function uploadPoDocument(noPo, docType, file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('noPo', noPo);
+  if (docType) formData.append('docType', docType);
+  const res = await api.post('/documents/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return res.data;
+}
+
+export async function getGoogleAuthUrl(redirectUri) {
+  const res = await api.get('/auth/google/url', { params: { redirectUri } });
+  return res.data;
+}
+
+export async function exchangeGoogleCode(code, redirectUri) {
+  const res = await api.post('/auth/google/exchange', { code, redirectUri });
+  return res.data;
+}
+
 export default api;
+

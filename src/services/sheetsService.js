@@ -15,6 +15,18 @@ function getCurrentFormattedDate() {
 }
 
 /**
+ * Normalisasi status PO agar seragam (Close, Open, Pending, Cancelled)
+ */
+function normalizeStatus(val) {
+  if (!val) return 'Open';
+  const s = String(val).trim().toLowerCase();
+  if (s.startsWith('clos') || s === 'lunas' || s === 'done' || s === 'selesai') return 'Close';
+  if (s.startsWith('pend') || s === 'hold' || s === 'menunggu') return 'Pending';
+  if (s.startsWith('cancel') || s === 'batal') return 'Cancelled';
+  return 'Open';
+}
+
+/**
  * Mengambil baris terakhir dan nomor urut terakhir pada tab 'PO 2026'.
  */
 async function getLastRowInfo() {
@@ -153,38 +165,71 @@ async function getPOByNumber(noPo, forceFreshFromSheets = false) {
 
   const rows = res.data.values || [];
   const matchingItems = [];
+  let currentHeader = null;
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
-    const rowNoPo = (row[3] || '').trim().toUpperCase();
+    if (!row || row.length === 0) continue;
 
-    if (rowNoPo === cleanNo) {
-      matchingItems.push({
-        rowIndex: i + 1, // 1-based baris fisik spreadsheet
+    const rowNoPo = (row[3] || '').trim().toUpperCase();
+    const isHeaderName = (row[0] || '').trim().toUpperCase() === 'NO.' || rowNoPo === 'NO. PO';
+    if (isHeaderName) continue;
+
+    if (rowNoPo && rowNoPo !== '-' && rowNoPo !== '"') {
+      currentHeader = {
         no: row[0] || '',
-        status: row[1] || 'Open',
+        status: normalizeStatus(row[1]),
         date: row[2] || '',
-        noPo: row[3] || '',
-        supplier: row[4] || '',
+        noPo: rowNoPo,
+        supplier: (row[4] || '').trim(),
         quotation: row[5] || '',
-        kode: row[6] || '',
-        nama: row[7] || '',
-        qty: parseFloat(row[8]) || 0,
         ttd: row[9] || '',
         em: row[10] || '',
         doNum: row[11] || '',
         fktInv: row[12] || '',
-        priceUnit: parseFloat(row[13]) || 0,
-        discount: parseFloat(row[14]) || 0,
-        ppn: parseFloat(row[15]) || 0,
-        total: row[16] || 0,
         grpo: row[17] || '',
         lastGrpoDate: row[18] || '',
         tglBayar: row[19] || '',
         tglInvoice: row[20] || '',
         noInvoice: row[21] || '',
         ket: row[22] || '',
-      });
+      };
+    }
+
+    if (currentHeader && currentHeader.noPo === cleanNo) {
+      const kode = (row[6] || '').trim();
+      const nama = (row[7] || '').trim();
+      const hasItem = !!(kode || nama || row[8] || row[13] || row[16]);
+      const isHeaderRow = !!rowNoPo;
+
+      if (hasItem || isHeaderRow) {
+        matchingItems.push({
+          rowIndex: i + 1, // 1-based baris fisik spreadsheet
+          no: currentHeader.no,
+          status: row[1] ? normalizeStatus(row[1]) : currentHeader.status,
+          date: currentHeader.date,
+          noPo: currentHeader.noPo,
+          supplier: currentHeader.supplier,
+          quotation: currentHeader.quotation,
+          kode,
+          nama,
+          qty: parseFloat(row[8]) || 0,
+          ttd: row[9] || currentHeader.ttd,
+          em: row[10] || currentHeader.em,
+          doNum: row[11] || currentHeader.doNum,
+          fktInv: row[12] || currentHeader.fktInv,
+          priceUnit: parseFloat(row[13]) || 0,
+          discount: parseFloat(row[14]) || 0,
+          ppn: parseFloat(row[15]) || 0,
+          total: row[16] || 0,
+          grpo: row[17] || currentHeader.grpo,
+          lastGrpoDate: row[18] || currentHeader.lastGrpoDate,
+          tglBayar: row[19] || currentHeader.tglBayar,
+          tglInvoice: row[20] || currentHeader.tglInvoice,
+          noInvoice: row[21] || currentHeader.noInvoice,
+          ket: row[22] || currentHeader.ket,
+        });
+      }
     }
   }
 
@@ -549,7 +594,7 @@ async function getAllTransactions() {
   const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: env.sheets.spreadsheetId,
-    range: "'PO 2026'!A2:W",
+    range: "'PO 2026'!A1:W",
     valueRenderOption: 'FORMATTED_VALUE',
   });
 
@@ -557,30 +602,74 @@ async function getAllTransactions() {
   const rows = [];
   const poMap = new Map();
 
+  let headerRowIdx = -1;
+  for (let i = 0; i < Math.min(rawRows.length, 5); i++) {
+    const row = rawRows[i] || [];
+    const joined = row.join(' ').toUpperCase();
+    if (joined.includes('NO. PO') || (joined.includes('STATUS') && joined.includes('SUPPLIER'))) {
+      headerRowIdx = i;
+      break;
+    }
+  }
+  const dataStartIdx = headerRowIdx >= 0 ? headerRowIdx + 1 : 1;
+
   let totalActiveSum = 0;
   let countOpen = 0;
   let countClose = 0;
   let countPending = 0;
   let countCancelled = 0;
 
-  for (let i = 0; i < rawRows.length; i++) {
-    const r = rawRows[i];
-    if (!r || !r[3]) continue; // Skip jika tidak ada NO. PO
+  let currentHeader = {
+    no: '',
+    status: 'Open',
+    date: '',
+    noPo: '',
+    supplier: '',
+    quotation: '',
+    ttd: '',
+    em: '',
+    doNum: '',
+    fktInv: '',
+    grpo: '',
+    lastGrpoDate: '',
+    tglBayar: '',
+    tglInvoice: '',
+    noInvoice: '',
+    ket: '',
+  };
 
-    const rowIndex = i + 2; // Row index di Google Sheets (1-based, starts at row 2)
-    const no = r[0] || '';
-    const status = (r[1] || 'Open').trim();
-    const date = r[2] || '';
-    const noPo = (r[3] || '').trim();
-    const supplier = (r[4] || '').trim();
-    const quotation = r[5] || '';
+  for (let i = dataStartIdx; i < rawRows.length; i++) {
+    const r = rawRows[i];
+    if (!r || r.length === 0) continue;
+
+    const rowNoPo = (r[3] || '').trim();
+    const isHeaderName = (r[0] || '').trim().toUpperCase() === 'NO.' || rowNoPo.toUpperCase() === 'NO. PO';
+    if (isHeaderName) continue;
+
+    if (rowNoPo && rowNoPo !== '-' && rowNoPo !== '"') {
+      currentHeader = {
+        no: r[0] || '',
+        status: normalizeStatus(r[1]),
+        date: r[2] || '',
+        noPo: rowNoPo,
+        supplier: (r[4] || '').trim(),
+        quotation: r[5] || '',
+        ttd: r[9] || '',
+        em: r[10] || '',
+        doNum: r[11] || '',
+        fktInv: r[12] || '',
+        grpo: r[17] || '',
+        lastGrpoDate: r[18] || '',
+        tglBayar: r[19] || '',
+        tglInvoice: r[20] || '',
+        noInvoice: r[21] || '',
+        ket: r[22] || '',
+      };
+    }
+
     const kode = (r[6] || '').trim().toUpperCase();
-    const nama = r[7] || '';
+    const nama = (r[7] || '').trim();
     const qty = parseFloat(String(r[8] || '0').replace(/,/g, '')) || 0;
-    const ttd = r[9] || '';
-    const em = r[10] || '';
-    const doNum = r[11] || '';
-    const fktInv = r[12] || '';
     const priceUnit = parseFloat(String(r[13] || '0').replace(/[^0-9.-]/g, '')) || 0;
     const discount = parseFloat(String(r[14] || '0').replace(/,/g, '')) || 0;
     const ppn = parseFloat(String(r[15] || '0').replace(/[^0-9.-]/g, '')) || 0;
@@ -591,12 +680,29 @@ async function getAllTransactions() {
       parsedTotal = (qty * priceUnit) * (1 - discount) + ppn;
     }
 
-    const grpo = r[17] || '';
-    const lastGrpoDate = r[18] || '';
-    const tglBayar = r[19] || '';
-    const tglInvoice = r[20] || '';
-    const noInvoice = r[21] || '';
-    const ket = r[22] || '';
+    const hasItem = !!(kode || nama || qty > 0 || priceUnit > 0 || parsedTotal > 0);
+    const isHeaderRow = !!rowNoPo;
+    if (!hasItem && !isHeaderRow) continue;
+    if (!currentHeader.noPo) continue;
+
+    const rowIndex = i + 1; // 1-based baris fisik spreadsheet
+    const status = r[1] ? normalizeStatus(r[1]) : currentHeader.status;
+    const date = r[2] || currentHeader.date;
+    const noPo = currentHeader.noPo;
+    const supplier = (r[4] || '').trim() || currentHeader.supplier;
+    const quotation = r[5] || currentHeader.quotation;
+    const no = r[0] || currentHeader.no;
+
+    const ttd = r[9] || currentHeader.ttd;
+    const em = r[10] || currentHeader.em;
+    const doNum = r[11] || currentHeader.doNum;
+    const fktInv = r[12] || currentHeader.fktInv;
+    const grpo = r[17] || currentHeader.grpo;
+    const lastGrpoDate = r[18] || currentHeader.lastGrpoDate;
+    const tglBayar = r[19] || currentHeader.tglBayar;
+    const tglInvoice = r[20] || currentHeader.tglInvoice;
+    const noInvoice = r[21] || currentHeader.noInvoice;
+    const ket = r[22] || currentHeader.ket;
 
     const rowObj = {
       rowIndex,
@@ -651,14 +757,13 @@ async function getAllTransactions() {
     poEntry.items.push(rowObj);
     poEntry.grandTotal += parsedTotal;
 
-    const statusLower = status.toLowerCase();
-    if (statusLower === 'cancelled') {
+    if (status === 'Cancelled') {
       countCancelled++;
     } else {
       totalActiveSum += parsedTotal;
-      if (statusLower === 'close' || statusLower === 'lunas') {
+      if (status === 'Close') {
         countClose++;
-      } else if (statusLower === 'pending') {
+      } else if (status === 'Pending') {
         countPending++;
       } else {
         countOpen++;

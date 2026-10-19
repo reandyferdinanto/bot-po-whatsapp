@@ -110,6 +110,18 @@ function parseNumeric(val) {
 }
 
 /**
+ * Normalisasi status PO agar seragam (Close, Open, Pending, Cancelled)
+ */
+function normalizeStatus(val) {
+  if (!val) return 'Open';
+  const s = String(val).trim().toLowerCase();
+  if (s.startsWith('clos') || s === 'lunas' || s === 'done' || s === 'selesai') return 'Close';
+  if (s.startsWith('pend') || s === 'hold' || s === 'menunggu') return 'Pending';
+  if (s.startsWith('cancel') || s === 'batal') return 'Cancelled';
+  return 'Open';
+}
+
+/**
  * Memuat dan meng-cache tab 'database Material', 'database Supplier Material', dan 'PO 2026' ke memory & PostgreSQL.
  */
 async function syncMasterData(sheetsClient) {
@@ -212,7 +224,7 @@ async function syncMasterData(sheetsClient) {
       if (rowNoPo && rowNoPo !== '-' && rowNoPo !== '"') {
         currentHeader = {
           no: (map.no !== undefined && row[map.no]) ? String(row[map.no]).trim() : '',
-          status: (map.status !== undefined && row[map.status]) ? String(row[map.status]).trim() : 'Open',
+          status: (map.status !== undefined && row[map.status]) ? normalizeStatus(row[map.status]) : 'Open',
           date: (map.date !== undefined && row[map.date]) ? String(row[map.date]).trim() : '',
           noPo: rowNoPo,
           supplier: (map.supplier !== undefined && row[map.supplier]) ? String(row[map.supplier]).trim() : '',
@@ -880,7 +892,7 @@ async function syncAllSheets(sheetsClient) {
         if (rowNoPo && rowNoPo !== '-' && rowNoPo !== '"') {
           currentHeader = {
             no: (map.no !== undefined && row[map.no]) ? String(row[map.no]).trim() : '',
-            status: (map.status !== undefined && row[map.status]) ? String(row[map.status]).trim() : 'Closed',
+            status: (map.status !== undefined && row[map.status]) ? normalizeStatus(row[map.status]) : 'Close',
             date: (map.date !== undefined && row[map.date]) ? String(row[map.date]).trim() : '',
             noPo: rowNoPo,
             supplier: (map.supplier !== undefined && row[map.supplier]) ? String(row[map.supplier]).trim() : '',

@@ -128,7 +128,7 @@ export default function SuppliersTable({ isDark }) {
       width: 120,
       align: 'center',
       render: (freq, r) => (
-        <Tag color="purple" style={{ fontWeight: 700 }}>
+        <Tag color="blue" style={{ fontWeight: 700 }}>
           {freq || r.totalOrders || 1}x Order
         </Tag>
       ),
@@ -223,7 +223,7 @@ export default function SuppliersTable({ isDark }) {
       width: 170,
       align: 'center',
       render: (freq) => (
-        <Tag color="purple" style={{ fontSize: 12, padding: '3px 8px', borderRadius: 6, fontWeight: 700 }}>
+        <Tag color="blue" style={{ fontSize: 12, padding: '3px 8px', borderRadius: 6, fontWeight: 700 }}>
           {freq || 0}x Order
         </Tag>
       ),

@@ -1,6 +1,7 @@
 const cacheService = require('../services/cacheService');
 const sheetsService = require('../services/sheetsService');
 const openwaService = require('../services/openwaService');
+const driveService = require('../services/driveService');
 const conversationManager = require('./conversationManager');
 const { getSheetsClient, hasValidToken } = require('../config/googleAuth');
 
@@ -15,7 +16,7 @@ async function handleDirectCommand(chatId, text) {
   const lower = trimmed.toLowerCase();
 
   // Kata kunci mandiri yang dapat langsung dieksekusi tanpa awalan simbol
-  const standaloneKeywords = ['kurs', 'usd', 'kursbi', 'help', 'bantuan', 'menu', 'start'];
+  const standaloneKeywords = ['kurs', 'usd', 'kursbi', 'help', 'bantuan', 'menu', 'start', 'kasbon', 'budget', 'lpj'];
   const isStandalone = standaloneKeywords.includes(lower);
 
   if (!isPrefixed && !isStandalone) {
@@ -32,7 +33,7 @@ async function handleDirectCommand(chatId, text) {
     case 'bantuan':
       await openwaService.sendText(
         chatId,
-        `*DAFTAR PERINTAH BOT PROCUREMENT*
+        `*DAFTAR PERINTAH BOT PROCUREMENT & FINANCE*
 ━━━━━━━━━━━━━━━━━━━━━━━━
 Anda dapat mengirimkan perintah berikut kapan saja tanpa perlu \`start\` terlebih dahulu:
 
@@ -43,6 +44,14 @@ Anda dapat mengirimkan perintah berikut kapan saja tanpa perlu \`start\` terlebi
   _Menampilkan panduan semua perintah bot_
 ▸ */menu*
   _Membuka navigasi menu interaktif_
+
+\`FINANCE & KASBON\`
+▸ */kasbon* atau */budget*
+  _Dapatkan link formulir pengajuan kasbon/budget operasional_
+▸ */lpj*
+  _Link form submit LPJ & upload foto nota belanja fisik_
+▸ */cekbudget <no_budget>*
+  _Cek status persetujuan, sisa kasbon & closing finance_
 
 \`PENCARIAN DATA MASTER\`
 ▸ */cari <nama_barang / kode>*
@@ -56,6 +65,9 @@ Anda dapat mengirimkan perintah berikut kapan saja tanpa perlu \`start\` terlebi
 ▸ */cekpo <nomor_po>*
   _Contoh: /cekpo PO-2026-001_
   _Detail item, GRPO, status bayar & total PO_
+▸ */lihatpo <nomor_po>*
+  _Contoh: /lihatpo PO-2026-001_
+  _Lihat & kirimkan foto PO / surat jalan asli dari Google Drive_
 ▸ */batalpo <nomor_po> [alasan]*
   _Contoh: /batalpo PO-2026-001 Salah order_
   _Membatalkan PO secara sistem_
@@ -69,6 +81,103 @@ Anda dapat mengirimkan perintah berikut kapan saja tanpa perlu \`start\` terlebi
 ━━━━━━━━━━━━━━━━━━━━━━━━`
       );
       return true;
+
+    case 'kasbon':
+    case 'budget': {
+      const senderPhone = chatId ? chatId.split('@')[0].replace(/[^0-9]/g, '') : '';
+      const formUrl = `https://bot-whatsapp.ebite.biz.id/form-budget?wa=${senderPhone}`;
+      await openwaService.sendText(
+        chatId,
+        `*FORMULIR PENGAJUAN BUDGET / KASBON*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Permintaan kasbon/budget operasional untuk divisi Purchasing, Gudang, Maintenance, dan lainnya kini diajukan secara digital:
+
+▸ *Link Form Pengajuan:*
+  ${formUrl}
+
+▸ *Alur Pengajuan:*
+  1. Buka link formulir di atas.
+  2. Isi nama, divisi, keperluan/uraian & nominal dana yang diminta.
+  3. Finance akan meninjau dan mencairkan uang kasbon.
+  4. Belanjakan dana, kumpulkan nota fisik & buat laporan LPJ.
+
+_Ketik */lpj* untuk upload bukti belanja, atau */cekbudget <no_budget>* untuk cek status._
+━━━━━━━━━━━━━━━━━━━━━━━━`
+      );
+      return true;
+    }
+
+    case 'lpj':
+    case 'settlement': {
+      const senderPhone = chatId ? chatId.split('@')[0].replace(/[^0-9]/g, '') : '';
+      const formUrl = `https://bot-whatsapp.ebite.biz.id/form-lpj?wa=${senderPhone}`;
+      await openwaService.sendText(
+        chatId,
+        `*LAPORAN PERTANGGUNGJAWABAN (LPJ) KASBON*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Silakan lengkapi laporan realisasi belanja dan unggah foto bukti nota fisik:
+
+▸ *Link Form Submit LPJ:*
+  ${formUrl}
+
+▸ *Petunjuk:*
+  1. Masukkan *Nomor Budget* yang Anda terima (contoh: \`BGT-2026-0001\`).
+  2. Masukkan total realisasi belanja aktual sesuai nota.
+  3. Foto seluruh nota/bon belanja dengan jelas dan unggah.
+  4. Serahkan bukti fisik nota & sisa uang kembalian tunai ke meja Finance.
+━━━━━━━━━━━━━━━━━━━━━━━━`
+      );
+      return true;
+    }
+
+    case 'cekbudget':
+    case 'cekasbon': {
+      if (!args) {
+        await openwaService.sendText(chatId, '⚠️ Mohon sertakan Nomor Budget.\nContoh: */cekbudget BGT-2026-0001*');
+        return true;
+      }
+      try {
+        const financeBudgetService = require('../services/financeBudgetService');
+        const b = await financeBudgetService.getBudgetByNo(args);
+        if (!b) {
+          await openwaService.sendText(chatId, `❌ Nomor budget *${args}* tidak ditemukan di sistem.`);
+          return true;
+        }
+
+        const formatRupiah = (val) => 'Rp ' + Number(val || 0).toLocaleString('id-ID');
+        const statusMap = {
+          PENDING: '⏳ Menunggu Persetujuan Finance',
+          APPROVED: '✅ Disetujui (Dana Siap / Dicairkan)',
+          LPJ_SUBMITTED: '📝 LPJ & Nota Telah Masuk (Menunggu Closing)',
+          CLOSED: '🎉 CLOSED (Selesai & Lunas)',
+          REJECTED: '❌ Ditolak',
+        };
+        const displayStatus = statusMap[b.status] || b.status;
+
+        await openwaService.sendText(
+          chatId,
+          `*STATUS PENGAJUAN KASBON / BUDGET*
+━━━━━━━━━━━━━━━━━━━━━━━━
+▸ *No. Budget :* \`${b.no_budget || b.noBudget}\`
+▸ *Pemohon    :* ${b.nama} (${b.divisi})
+▸ *Tanggal    :* ${b.tgl_kasbon || b.tglKasbon}
+▸ *Status     :* *${displayStatus}*
+
+▸ *Uraian :*
+  _${b.uraian}_
+
+▸ *Rincian Dana :*
+  • Pengajuan Kasbon : ${formatRupiah(b.jumlah)}
+  • Realisasi Belanja: ${formatRupiah(b.realisasi_belanja || b.realisasiBelanja)}
+  • Sisa Kembali     : ${formatRupiah(b.sisa_kembali || b.sisaKembali)}
+
+${b.tgl_selesai ? `▸ *Tgl Selesai  :* ${b.tgl_selesai}\n` : ''}${b.catatan_finance ? `▸ *Catatan Finance :* _${b.catatan_finance}_\n` : ''}━━━━━━━━━━━━━━━━━━━━━━━━`
+        );
+      } catch (err) {
+        await openwaService.sendText(chatId, `❌ Gagal mengambil status budget: ${err.message}`);
+      }
+      return true;
+    }
 
     case 'menu':
     case 'start':
@@ -251,8 +360,110 @@ Supplier  : *${po.supplier}*
       }
       replyPo += `━━━━━━━━━━━━━━━━━━━━━━━━\n`;
       replyPo += `*TOTAL AKHIR : Rp ${po.grandTotal.toLocaleString('id-ID')}*\n`;
+
+      // Cek apakah ada file dokumen fisik di Google Drive
+      try {
+        const poDocs = await driveService.getDocumentsForPo(po.noPo);
+        if (poDocs && poDocs.length > 0) {
+          replyPo += `📎 Arsip Drive: *${poDocs.length} file tersedia*\n`;
+          replyPo += `▸ Ketik */lihatpo ${po.noPo}* untuk melihat gambar/PDF asli\n`;
+        }
+      } catch (docErr) {
+        // Abaikan error pengecekan dokumen agar tidak mengganggu reply utama
+      }
+
       replyPo += `━━━━━━━━━━━━━━━━━━━━━━━━`;
       await openwaService.sendText(chatId, replyPo);
+      return true;
+
+    case 'lihatpo':
+    case 'dokumen':
+    case 'filepo':
+    case 'arsip':
+      if (!args) {
+        let helpMsg = `*LIHAT ARSIP DOKUMEN PO / GRPO*
+━━━━━━━━━━━━━━━━━━━━━━━━
+Format : \`/lihatpo <nomor_po> [tipe]\`
+Contoh : \`/lihatpo PO-2026-001\`
+Opsi Tipe : \`PO\`, \`GRPO\`, \`BUKTI_BAYAR\` (opsional)\n`;
+
+        try {
+          const recents = await driveService.getRecentArchivedPOs(5);
+          if (recents && recents.length > 0) {
+            helpMsg += `\n\`PO TERAKHIR DI GOOGLE DRIVE:\`\n`;
+            for (let i = 0; i < recents.length; i++) {
+              const r = recents[i];
+              const types = (r.doc_types || []).join(', ');
+              helpMsg += `${i + 1}. *${r.no_po}* (${r.total_files} file: ${types})\n   └ Ketik: \`/lihatpo ${r.no_po}\`\n`;
+            }
+          }
+        } catch (e) {
+          // Abaikan error database
+        }
+
+        helpMsg += `━━━━━━━━━━━━━━━━━━━━━━━━`;
+        await openwaService.sendText(chatId, helpMsg);
+        return true;
+      }
+
+      const poArgs = args.trim().split(/\s+/);
+      const searchPo = poArgs[0];
+      const filterDocType = poArgs[1] || null;
+
+      await openwaService.sendText(chatId, `🔍 _Sedang mencari arsip dokumen untuk PO ${searchPo} di Google Drive..._`);
+
+      try {
+        const docs = await driveService.getDocumentsForPo(searchPo, filterDocType);
+        if (!docs || docs.length === 0) {
+          await openwaService.sendText(
+            chatId,
+            `⚠️ Belum ada file arsip dokumen (Foto/PDF) untuk PO *${searchPo}* di Google Drive.\n` +
+              `_Dokumen dapat diunggah melalui scan WhatsApp atau via Dashboard Web._`
+          );
+          return true;
+        }
+
+        await openwaService.sendText(
+          chatId,
+          `📄 Ditemukan *${docs.length} dokumen* untuk PO *${searchPo}*. Sedang mengunduh dan mengirimkan file...`
+        );
+
+        // Batasi maksimal 3 dokumen terbaru agar tidak membebani chat
+        const targetDocs = docs.slice(0, 3);
+        for (const doc of targetDocs) {
+          try {
+            const { buffer, mimeType, filename } = await driveService.downloadDocumentBuffer(doc.drive_file_id);
+            const base64Str = buffer.toString('base64');
+            const isImage =
+              (mimeType && mimeType.startsWith('image/')) ||
+              /\.(jpg|jpeg|png|webp)$/i.test(filename || doc.file_name);
+            const caption = `*DOKUMEN ${doc.tipe_dokumen}*\nPO : \`${doc.no_po}\`\nBerkas : ${doc.file_name || filename}\n🔗 [Buka di Google Drive](${doc.drive_url})`;
+
+            if (isImage) {
+              await openwaService.sendImage(chatId, {
+                base64: `data:${mimeType || 'image/jpeg'};base64,${base64Str}`,
+                caption,
+              });
+            } else {
+              await openwaService.sendDocument(chatId, {
+                base64: `data:${mimeType || 'application/pdf'};base64,${base64Str}`,
+                filename: doc.file_name || filename || 'dokumen.pdf',
+                mimetype: mimeType || 'application/pdf',
+                caption,
+              });
+            }
+          } catch (fileErr) {
+            console.error(`❌ Gagal kirim file ${doc.file_name} ke WA:`, fileErr.message);
+            await openwaService.sendText(
+              chatId,
+              `⚠️ Gagal memuat file *${doc.file_name}*: ${fileErr.message}\n🔗 Link Drive: ${doc.drive_url}`
+            );
+          }
+        }
+      } catch (err) {
+        console.error('❌ Gagal perintah /lihatpo:', err.message);
+        await openwaService.sendText(chatId, `✗ Gagal mengambil dokumen: ${err.message}`);
+      }
       return true;
 
     case 'batalpo':

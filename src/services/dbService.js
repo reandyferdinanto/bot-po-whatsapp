@@ -165,6 +165,62 @@ async function migrateTables() {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         CREATE INDEX IF NOT EXISTS idx_kurs_currency_created ON kurs_history (currency, created_at DESC);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_kurs_currency_tanggal ON kurs_history (currency, tanggal);
+      `);
+
+      // 7. Tabel Finance Budgets (Kasbon & Settlement)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS finance_budgets (
+          id SERIAL PRIMARY KEY,
+          row_index INT,
+          no_budget VARCHAR(50) UNIQUE NOT NULL,
+          nama TEXT NOT NULL,
+          uraian TEXT NOT NULL,
+          jumlah NUMERIC NOT NULL DEFAULT 0,
+          tgl_kasbon TEXT NOT NULL,
+          divisi TEXT NOT NULL,
+          no_wa TEXT,
+          realisasi_belanja NUMERIC DEFAULT 0,
+          sisa_kembali NUMERIC DEFAULT 0,
+          bukti_nota TEXT,
+          status VARCHAR(30) DEFAULT 'PENDING',
+          tgl_selesai TEXT,
+          catatan_finance TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_fb_no_budget ON finance_budgets (no_budget);
+        CREATE INDEX IF NOT EXISTS idx_fb_status ON finance_budgets (status);
+        CREATE INDEX IF NOT EXISTS idx_fb_divisi ON finance_budgets (divisi);
+      `);
+
+      // 8. Tabel App Settings (Konfigurasi Dinamis Google Drive, dsb.)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS app_settings (
+          key VARCHAR(100) PRIMARY KEY,
+          value TEXT,
+          description TEXT,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+
+      // 9. Tabel PO Documents (Riwayat Arsip Dokumen PO, GRPO, Bukti Bayar di Google Drive)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS po_documents (
+          id SERIAL PRIMARY KEY,
+          no_po TEXT NOT NULL,
+          tipe_dokumen VARCHAR(50) NOT NULL,
+          file_name TEXT,
+          drive_file_id TEXT NOT NULL,
+          drive_url TEXT,
+          mime_type VARCHAR(100),
+          file_size INT DEFAULT 0,
+          metadata JSONB DEFAULT '{}'::jsonb,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_pdoc_nopo ON po_documents (no_po);
+        CREATE INDEX IF NOT EXISTS idx_pdoc_tipe ON po_documents (tipe_dokumen);
+        CREATE INDEX IF NOT EXISTS idx_pdoc_created ON po_documents (created_at DESC);
       `);
 
       isDbConnected = true;
@@ -873,6 +929,356 @@ async function updatePoInPg(noPo, rows) {
   }
 }
 
+/**
+ * Mengambil daftar kasbon / budgets dari PostgreSQL
+ */
+async function getAllBudgetsFromPg(filters = {}) {
+  if (!isDbConnected && !(await migrateTables())) return [];
+  try {
+    let query = 'SELECT * FROM finance_budgets';
+    const params = [];
+    const conditions = [];
+
+    if (filters.status && filters.status !== 'ALL') {
+      params.push(filters.status.toUpperCase());
+      conditions.push(`UPPER(status) = $${params.length}`);
+    }
+    if (filters.divisi && filters.divisi !== 'ALL') {
+      params.push(filters.divisi);
+      conditions.push(`LOWER(divisi) = LOWER($${params.length})`);
+    }
+    if (filters.search) {
+      params.push(`%${filters.search}%`);
+      conditions.push(`(nama ILIKE $${params.length} OR no_budget ILIKE $${params.length} OR uraian ILIKE $${params.length})`);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+    query += ' ORDER BY id DESC';
+
+    const res = await pool.query(query, params);
+    return res.rows;
+  } catch (err) {
+    console.warn('⚠️ Gagal mengambil budgets dari PG:', err.message);
+    return [];
+  }
+}
+
+/**
+ * Mengambil satu kasbon berdasarkan no_budget
+ */
+async function getBudgetByNoFromPg(noBudget) {
+  if (!isDbConnected && !(await migrateTables())) return null;
+  try {
+    const res = await pool.query(
+      'SELECT * FROM finance_budgets WHERE UPPER(no_budget) = UPPER($1) LIMIT 1',
+      [String(noBudget).trim()]
+    );
+    return res.rows[0] || null;
+  } catch (err) {
+    console.warn('⚠️ Gagal getBudgetByNoFromPg:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Insert budget baru ke PostgreSQL
+ */
+async function insertBudgetToPg(data) {
+  if (!isDbConnected && !(await migrateTables())) return null;
+  try {
+    const res = await pool.query(`
+      INSERT INTO finance_budgets (
+        row_index, no_budget, nama, uraian, jumlah, tgl_kasbon, divisi, no_wa,
+        realisasi_belanja, sisa_kembali, bukti_nota, status, tgl_selesai, catatan_finance
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      ON CONFLICT (no_budget) DO UPDATE SET
+        nama = EXCLUDED.nama,
+        uraian = EXCLUDED.uraian,
+        jumlah = EXCLUDED.jumlah,
+        tgl_kasbon = EXCLUDED.tgl_kasbon,
+        divisi = EXCLUDED.divisi,
+        no_wa = EXCLUDED.no_wa,
+        realisasi_belanja = EXCLUDED.realisasi_belanja,
+        sisa_kembali = EXCLUDED.sisa_kembali,
+        bukti_nota = EXCLUDED.bukti_nota,
+        status = EXCLUDED.status,
+        tgl_selesai = EXCLUDED.tgl_selesai,
+        catatan_finance = EXCLUDED.catatan_finance,
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING *;
+    `, [
+      data.rowIndex || 0,
+      data.noBudget,
+      data.nama,
+      data.uraian,
+      parseFloat(data.jumlah) || 0,
+      data.tglKasbon,
+      data.divisi,
+      data.noWa || '',
+      parseFloat(data.realisasiBelanja) || 0,
+      parseFloat(data.sisaKembali) || 0,
+      data.buktiNota || '',
+      data.status || 'PENDING',
+      data.tglSelesai || '',
+      data.catatanFinance || ''
+    ]);
+    return res.rows[0];
+  } catch (err) {
+    console.warn('⚠️ Gagal insertBudgetToPg:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Update budget di PostgreSQL
+ */
+async function updateBudgetInPg(noBudget, updates) {
+  if (!isDbConnected && !(await migrateTables())) return null;
+  try {
+    const keys = Object.keys(updates);
+    if (keys.length === 0) return await getBudgetByNoFromPg(noBudget);
+
+    const setClauses = [];
+    const values = [String(noBudget).trim()];
+    let idx = 2;
+
+    const columnMap = {
+      rowIndex: 'row_index',
+      nama: 'nama',
+      uraian: 'uraian',
+      jumlah: 'jumlah',
+      tglKasbon: 'tgl_kasbon',
+      divisi: 'divisi',
+      noWa: 'no_wa',
+      realisasiBelanja: 'realisasi_belanja',
+      sisaKembali: 'sisa_kembali',
+      buktiNota: 'bukti_nota',
+      status: 'status',
+      tglSelesai: 'tgl_selesai',
+      catatanFinance: 'catatan_finance'
+    };
+
+    for (const key of keys) {
+      const col = columnMap[key] || key;
+      setClauses.push(`${col} = $${idx}`);
+      values.push(updates[key]);
+      idx++;
+    }
+    setClauses.push('updated_at = CURRENT_TIMESTAMP');
+
+    const query = `UPDATE finance_budgets SET ${setClauses.join(', ')} WHERE UPPER(no_budget) = UPPER($1) RETURNING *;`;
+    const res = await pool.query(query, values);
+    return res.rows[0] || null;
+  } catch (err) {
+    console.warn('⚠️ Gagal updateBudgetInPg:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Sinkronisasi daftar budget dari Google Sheet ke PostgreSQL (Batch Upsert)
+ */
+async function syncBudgetsFromSheetToPg(budgetRows) {
+  if (!isDbConnected && !(await migrateTables())) return false;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (const b of budgetRows) {
+      if (!b.noBudget) continue;
+      await client.query(`
+        INSERT INTO finance_budgets (
+          row_index, no_budget, nama, uraian, jumlah, tgl_kasbon, divisi, no_wa,
+          realisasi_belanja, sisa_kembali, bukti_nota, status, tgl_selesai, catatan_finance
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        ON CONFLICT (no_budget) DO UPDATE SET
+          row_index = EXCLUDED.row_index,
+          nama = EXCLUDED.nama,
+          uraian = EXCLUDED.uraian,
+          jumlah = EXCLUDED.jumlah,
+          tgl_kasbon = EXCLUDED.tgl_kasbon,
+          divisi = EXCLUDED.divisi,
+          no_wa = EXCLUDED.no_wa,
+          realisasi_belanja = EXCLUDED.realisasi_belanja,
+          sisa_kembali = EXCLUDED.sisa_kembali,
+          bukti_nota = EXCLUDED.bukti_nota,
+          status = EXCLUDED.status,
+          tgl_selesai = EXCLUDED.tgl_selesai,
+          catatan_finance = EXCLUDED.catatan_finance,
+          updated_at = CURRENT_TIMESTAMP;
+      `, [
+        b.rowIndex || 0,
+        b.noBudget,
+        b.nama,
+        b.uraian,
+        parseFloat(b.jumlah) || 0,
+        b.tglKasbon,
+        b.divisi,
+        b.noWa || '',
+        parseFloat(b.realisasiBelanja) || 0,
+        parseFloat(b.sisaKembali) || 0,
+        b.buktiNota || '',
+        b.status || 'PENDING',
+        b.tglSelesai || '',
+        b.catatanFinance || ''
+      ]);
+    }
+    await client.query('COMMIT');
+    return true;
+  } catch (e) {
+    await client.query('ROLLBACK');
+    console.warn('⚠️ Gagal syncBudgetsFromSheetToPg:', e.message);
+    return false;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Mengambil nilai setting aplikasi dari PostgreSQL.
+ */
+async function getSetting(key, defaultValue = null) {
+  if (!initDb()) return defaultValue;
+  try {
+    const res = await pool.query('SELECT value FROM app_settings WHERE key = $1', [key]);
+    if (res.rows.length > 0) {
+      return res.rows[0].value;
+    }
+    return defaultValue;
+  } catch (err) {
+    console.warn(`⚠️ Gagal getSetting(${key}):`, err.message);
+    return defaultValue;
+  }
+}
+
+/**
+ * Menyimpan atau memperbarui nilai setting aplikasi.
+ */
+async function setSetting(key, value, description = null) {
+  if (!initDb()) return false;
+  try {
+    await pool.query(
+      `INSERT INTO app_settings (key, value, description, updated_at)
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+       ON CONFLICT (key) DO UPDATE
+       SET value = EXCLUDED.value,
+           description = COALESCE(EXCLUDED.description, app_settings.description),
+           updated_at = CURRENT_TIMESTAMP`,
+      [key, String(value), description]
+    );
+    return true;
+  } catch (err) {
+    console.error(`❌ Gagal setSetting(${key}):`, err.message);
+    return false;
+  }
+}
+
+/**
+ * Mengambil seluruh setting aplikasi dalam bentuk key-value object.
+ */
+async function getAllSettings() {
+  if (!initDb()) return {};
+  try {
+    const res = await pool.query('SELECT key, value, description, updated_at FROM app_settings');
+    const settings = {};
+    for (const row of res.rows) {
+      settings[row.key] = row.value;
+    }
+    return settings;
+  } catch (err) {
+    console.warn('⚠️ Gagal getAllSettings:', err.message);
+    return {};
+  }
+}
+
+/**
+ * Menyimpan riwayat dokumen PO/GRPO/Bukti Bayar ke database.
+ */
+async function savePoDocument({ noPo, tipeDokumen, fileName, driveFileId, driveUrl, mimeType, fileSize, metadata }) {
+  if (!initDb()) return null;
+  try {
+    const res = await pool.query(
+      `INSERT INTO po_documents (no_po, tipe_dokumen, file_name, drive_file_id, drive_url, mime_type, file_size, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [
+        noPo,
+        tipeDokumen,
+        fileName || 'dokumen',
+        driveFileId,
+        driveUrl || '',
+        mimeType || 'application/octet-stream',
+        fileSize || 0,
+        JSON.stringify(metadata || {}),
+      ]
+    );
+    return res.rows[0];
+  } catch (err) {
+    console.error(`❌ Gagal savePoDocument untuk ${noPo}:`, err.message);
+    throw err;
+  }
+}
+
+/**
+ * Mengambil daftar dokumen lampiran untuk nomor PO tertentu.
+ */
+async function getDocumentsByPo(noPo, tipeDokumen = null) {
+  if (!initDb()) return [];
+  try {
+    let query = 'SELECT * FROM po_documents WHERE UPPER(TRIM(no_po)) = UPPER(TRIM($1))';
+    const params = [noPo];
+    if (tipeDokumen) {
+      params.push(tipeDokumen.toUpperCase());
+      query += ` AND UPPER(tipe_dokumen) = $2`;
+    }
+    query += ' ORDER BY created_at DESC';
+
+    const res = await pool.query(query, params);
+    return res.rows;
+  } catch (err) {
+    console.warn(`⚠️ Gagal getDocumentsByPo(${noPo}):`, err.message);
+    return [];
+  }
+}
+
+/**
+ * Mengambil daftar PO terbaru yang memiliki dokumen arsip di Google Drive.
+ */
+async function getRecentArchivedPOs(limit = 10) {
+  if (!initDb()) return [];
+  try {
+    const res = await pool.query(
+      `SELECT no_po, count(*) as total_files, 
+              array_agg(DISTINCT tipe_dokumen) as doc_types,
+              max(created_at) as last_updated
+       FROM po_documents 
+       GROUP BY no_po 
+       ORDER BY last_updated DESC 
+       LIMIT $1`,
+      [limit]
+    );
+    return res.rows;
+  } catch (err) {
+    console.warn('⚠️ Gagal getRecentArchivedPOs:', err.message);
+    return [];
+  }
+}
+
+/**
+ * Menghapus record lampiran dokumen berdasarkan ID.
+ */
+async function deletePoDocument(id) {
+  if (!initDb()) return false;
+  try {
+    const res = await pool.query('DELETE FROM po_documents WHERE id = $1 RETURNING *', [id]);
+    return res.rows[0] || null;
+  } catch (err) {
+    console.error(`❌ Gagal deletePoDocument(${id}):`, err.message);
+    return null;
+  }
+}
+
 function isAvailable() {
   return isDbConnected;
 }
@@ -897,7 +1303,20 @@ module.exports = {
   getAllSuppliersFromPg,
   getHistoricalStatsFromPg,
   getHistoricalTransactionsFromPg,
+  getAllBudgetsFromPg,
+  getBudgetByNoFromPg,
+  insertBudgetToPg,
+  updateBudgetInPg,
+  syncBudgetsFromSheetToPg,
+  getSetting,
+  setSetting,
+  getAllSettings,
+  savePoDocument,
+  getDocumentsByPo,
+  getRecentArchivedPOs,
+  deletePoDocument,
   isAvailable,
   getPool,
 };
+
 

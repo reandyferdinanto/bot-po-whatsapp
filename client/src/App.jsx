@@ -14,7 +14,11 @@ import MaterialsTable from './components/MaterialsTable';
 import SuppliersTable from './components/SuppliersTable';
 import SystemTopologyPanel from './components/SystemTopologyPanel';
 import HistoricalStatsView from './components/HistoricalStatsView';
-import { getStats, getPOs, createPO, updatePO, cancelPO, triggerSync, syncAllSheets, getKursUsd, refreshKursUsd } from './services/api';
+import PlaceholderModuleView from './components/PlaceholderModuleView';
+import FinanceDashboardView from './components/FinanceDashboardView';
+import FinanceBudgetPublicForm from './components/FinanceBudgetPublicForm';
+import GoogleDriveSettingsView from './components/GoogleDriveSettingsView';
+import { getStats, getPOs, createPO, updatePO, cancelPO, triggerSync, getKursUsd, refreshKursUsd } from './services/api';
 
 export default function App() {
   const location = useLocation();
@@ -22,6 +26,17 @@ export default function App() {
 
   const [isDark, setIsDark] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(true);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    return localStorage.getItem('sidebar_collapsed') === 'true';
+  });
+
+  const toggleSidebarCollapse = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('sidebar_collapsed', String(next));
+      return next;
+    });
+  };
 
   // Data states
   const [stats, setStats] = useState(null);
@@ -30,7 +45,6 @@ export default function App() {
   const [rows, setRows] = useState([]);
   const [selectedRow, setSelectedRow] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isSyncingAll, setIsSyncingAll] = useState(false);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -42,11 +56,15 @@ export default function App() {
 
   // Derive activeNav based on current URL path
   const getActiveNavFromPath = (pathname) => {
+    if (pathname.startsWith('/multi-ocr')) return 'multi-ocr';
     if (pathname === '/statistik' || pathname === '/analytics') return 'analytics';
-    if (pathname === '/multi-ocr') return 'multi-ocr';
     if (pathname === '/database-material' || pathname === '/material') return 'material';
     if (pathname === '/database-supplier' || pathname === '/supplier') return 'supplier';
+    if (pathname === '/warehouse') return 'warehouse';
+    if (pathname === '/finance') return 'finance';
+    if (pathname === '/maintenance') return 'maintenance';
     if (pathname === '/status-sistem' || pathname === '/topology') return 'topology';
+    if (pathname === '/settings/drive' || pathname === '/drive') return 'drive-settings';
     return 'po2026';
   };
 
@@ -113,28 +131,6 @@ export default function App() {
     }
   };
 
-  const handleSyncAll = async () => {
-    setIsSyncingAll(true);
-    message.loading({
-      content: 'Sedang menyinkronkan seluruh sheet (PO 2017 s/d PO 2026)...',
-      key: 'sync-all-header',
-      duration: 0,
-    });
-    try {
-      const res = await syncAllSheets();
-      message.destroy('sync-all-header');
-      if (res.success) {
-        message.success(`Berhasil menyinkronkan ${res.totalSheets} tab sheet (${res.totalAllRows} baris)!`);
-        await loadData();
-      }
-    } catch (err) {
-      message.destroy('sync-all-header');
-      message.error(`Gagal sinkronisasi seluruh sheet: ${err.message}`);
-    } finally {
-      setIsSyncingAll(false);
-    }
-  };
-
   const handleCreatePoSuccess = async (values) => {
     await createPO(values);
     await loadData();
@@ -166,6 +162,27 @@ export default function App() {
   };
 
   const mainBg = isDark ? '#090d16' : '#f1f5f9';
+  const isPublicForm = location.pathname === '/form-budget' || location.pathname === '/form-lpj';
+
+  if (isPublicForm) {
+    return (
+      <ConfigProvider
+        theme={{
+          algorithm: isDark ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
+          token: {
+            colorPrimary: '#047857',
+            borderRadius: 8,
+            fontFamily: "'Calibri', 'Carlito', sans-serif",
+          },
+        }}
+      >
+        <Routes>
+          <Route path="/form-budget" element={<FinanceBudgetPublicForm mode="request" isDark={isDark} />} />
+          <Route path="/form-lpj" element={<FinanceBudgetPublicForm mode="lpj" isDark={isDark} />} />
+        </Routes>
+      </ConfigProvider>
+    );
+  }
 
   return (
     <ConfigProvider
@@ -194,6 +211,8 @@ export default function App() {
           onNavigate={(path) => navigate(path)}
           stats={stats}
           isDark={isDark}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={toggleSidebarCollapse}
         />
 
         {/* Main Content Area */}
@@ -203,9 +222,7 @@ export default function App() {
             activeNav={activeNav}
             stats={stats}
             isSyncing={isSyncing}
-            isSyncingAll={isSyncingAll}
             onSync={handleManualSync}
-            onSyncAll={handleSyncAll}
             onOpenCreateModal={() => setCreateModalOpen(true)}
             onOpenOcrTab={() => navigate('/multi-ocr')}
             isDark={isDark}
@@ -238,6 +255,8 @@ export default function App() {
                       kurs={kurs}
                       onRefreshKurs={handleRefreshKurs}
                       isRefreshingKurs={isRefreshingKurs}
+                      onStatusFilterChange={setStatusFilter}
+                      activeStatusFilter={statusFilter}
                     />
                     <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: 12 }}>
                       <SpreadsheetGrid
@@ -279,6 +298,8 @@ export default function App() {
                       kurs={kurs}
                       onRefreshKurs={handleRefreshKurs}
                       isRefreshingKurs={isRefreshingKurs}
+                      onStatusFilterChange={setStatusFilter}
+                      activeStatusFilter={statusFilter}
                     />
                     <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: 12 }}>
                       <SpreadsheetGrid
@@ -354,6 +375,28 @@ export default function App() {
                 element={<Navigate to="/database-supplier" replace />}
               />
 
+              {/* Modul Standalone: Warehouse, Finance, Maintenance */}
+              <Route
+                path="/warehouse"
+                element={<PlaceholderModuleView module="warehouse" isDark={isDark} />}
+              />
+              <Route
+                path="/finance"
+                element={<FinanceDashboardView isDark={isDark} />}
+              />
+              <Route
+                path="/maintenance"
+                element={<PlaceholderModuleView module="maintenance" isDark={isDark} />}
+              />
+              <Route
+                path="/form-budget"
+                element={<FinanceBudgetPublicForm mode="request" isDark={isDark} />}
+              />
+              <Route
+                path="/form-lpj"
+                element={<FinanceBudgetPublicForm mode="lpj" isDark={isDark} />}
+              />
+
               {/* Halaman 5: Status Sistem & Bot WA */}
               <Route
                 path="/status-sistem"
@@ -371,6 +414,16 @@ export default function App() {
               <Route
                 path="/topology"
                 element={<Navigate to="/status-sistem" replace />}
+              />
+
+              {/* Halaman 6: Pengaturan Google Drive */}
+              <Route
+                path="/settings/drive"
+                element={<GoogleDriveSettingsView isDark={isDark} />}
+              />
+              <Route
+                path="/drive"
+                element={<Navigate to="/settings/drive" replace />}
               />
 
               {/* Fallback to /po-2026 */}

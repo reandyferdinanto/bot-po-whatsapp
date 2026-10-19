@@ -1,6 +1,9 @@
+const fs = require('fs');
+const path = require('path');
 const sheetsService = require('../services/sheetsService');
 const cacheService = require('../services/cacheService');
 const openwaService = require('../services/openwaService');
+const driveService = require('../services/driveService');
 
 // State Storage In-Memory: chatId -> { state, data, lastActive }
 const userSessions = new Map();
@@ -575,6 +578,40 @@ async function handleConfirmOcrPO(chatId, text, session) {
       const result = await sheetsService.appendPOTransaction(draft);
       clearSession(chatId);
 
+      // Auto-upload dokumen ke Google Drive jika ada file fisik
+      let driveMsg = '';
+      if (draft._fileData && draft._fileData.buffer) {
+        try {
+          const driveRes = await driveService.uploadDocument({
+            buffer: draft._fileData.buffer,
+            filename: draft._fileData.filename,
+            mimeType: draft._fileData.mimeType,
+            docType: 'PO',
+            noPo: result.noPo,
+          });
+          driveMsg = `\n📁 Arsip Drive : [Tersimpan](${driveRes.driveUrl})`;
+        } catch (dErr) {
+          console.warn('⚠️ Gagal arsip PO ke Drive via WA:', dErr.message);
+          // Cadangan lokal agar berkas fisik tidak hilang
+          try {
+            const backupDir = path.resolve(__dirname, '../../uploads/documents');
+            if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+            const ext = path.extname(draft._fileData.filename || '').toLowerCase() || (draft._fileData.mimeType.includes('pdf') ? '.pdf' : '.jpg');
+            const cleanPo = (result.noPo || 'TEMP').replace(/[^a-zA-Z0-9_-]/g, '_');
+            const localFile = path.join(backupDir, `PO_${cleanPo}_${Date.now()}${ext}`);
+            fs.writeFileSync(localFile, draft._fileData.buffer);
+            console.log(`💾 Berkas PO berhasil dicadangkan di lokal server: ${localFile}`);
+          } catch (bkErr) {
+            console.warn('⚠️ Gagal membuat cadangan lokal:', bkErr.message);
+          }
+
+          const isScopeErr = dErr.message && (dErr.message.includes('scope') || dErr.message.includes('insufficient'));
+          driveMsg = isScopeErr
+            ? `\n📁 Arsip Drive : ⚠️ Gagal (Izin Google Drive belum aktif di server)`
+            : `\n📁 Arsip Drive : ⚠️ Gagal diunggah (${dErr.message})`;
+        }
+      }
+
       await openwaService.sendText(
         chatId,
         `*PURCHASE ORDER BERHASIL DICATAT*
@@ -582,7 +619,7 @@ async function handleConfirmOcrPO(chatId, text, session) {
 PO Ref      : \`${result.noPo}\`
 Total Item  : *${result.itemsInserted} item*
 Total Nilai : *Rp ${result.grandTotal.toLocaleString('id-ID')}*
-Status      : \`[TERSIMPAN KE PO 2026]\`
+Status      : \`[TERSIMPAN KE PO 2026]\`${driveMsg}
 ━━━━━━━━━━━━━━━━━━━━━━━━`
       );
     } catch (err) {
@@ -624,6 +661,40 @@ async function handleConfirmUpdateGrpo(chatId, text, session) {
       const res = await sheetsService.updatePOField(data.noPo, updatePayload);
       clearSession(chatId);
 
+      // Auto-upload dokumen ke Google Drive jika ada file fisik
+      let driveMsg = '';
+      if (data._fileData && data._fileData.buffer) {
+        try {
+          const driveRes = await driveService.uploadDocument({
+            buffer: data._fileData.buffer,
+            filename: data._fileData.filename,
+            mimeType: data._fileData.mimeType,
+            docType: 'GRPO',
+            noPo: data.noPo,
+          });
+          driveMsg = `\n📁 Arsip Drive : [Tersimpan](${driveRes.driveUrl})`;
+        } catch (dErr) {
+          console.warn('⚠️ Gagal arsip GRPO ke Drive via WA:', dErr.message);
+          // Cadangan lokal agar berkas fisik tidak hilang
+          try {
+            const backupDir = path.resolve(__dirname, '../../uploads/documents');
+            if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+            const ext = path.extname(data._fileData.filename || '').toLowerCase() || (data._fileData.mimeType.includes('pdf') ? '.pdf' : '.jpg');
+            const cleanPo = (data.noPo || 'TEMP').replace(/[^a-zA-Z0-9_-]/g, '_');
+            const localFile = path.join(backupDir, `GRPO_${cleanPo}_${Date.now()}${ext}`);
+            fs.writeFileSync(localFile, data._fileData.buffer);
+            console.log(`💾 Berkas GRPO berhasil dicadangkan di lokal server: ${localFile}`);
+          } catch (bkErr) {
+            console.warn('⚠️ Gagal membuat cadangan lokal:', bkErr.message);
+          }
+
+          const isScopeErr = dErr.message && (dErr.message.includes('scope') || dErr.message.includes('insufficient'));
+          driveMsg = isScopeErr
+            ? `\n📁 Arsip Drive : ⚠️ Gagal (Izin Google Drive belum aktif di server)`
+            : `\n📁 Arsip Drive : ⚠️ Gagal diunggah (${dErr.message})`;
+        }
+      }
+
       if (res.success) {
         await openwaService.sendText(
           chatId,
@@ -632,7 +703,7 @@ async function handleConfirmUpdateGrpo(chatId, text, session) {
 PO Ref       : \`${data.noPo}\` (${res.rowsUpdated} baris)
 No. GRPO     : \`${data.noGrpo}\`
 Tgl Terima   : ${data.lastGrpoDate || '-'}
-Status       : \`[UPDATE BERHASIL]\`
+Status       : \`[UPDATE BERHASIL]\`${driveMsg}
 ━━━━━━━━━━━━━━━━━━━━━━━━`
         );
       } else {

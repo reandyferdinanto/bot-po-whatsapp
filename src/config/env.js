@@ -19,6 +19,13 @@ module.exports = {
   gemini: {
     apiKey: process.env.GEMINI_API_KEY || '',
   },
+  router9: {
+    enabled: process.env.ROUTER9_ENABLED !== 'false',
+    baseUrl: process.env.ROUTER9_BASE_URL || 'http://localhost:20128/v1',
+    apiKey: process.env.ROUTER9_API_KEY || 'sk-40895848c4bbfc69-46eo6g-4a3ee245',
+    model: process.env.ROUTER9_MODEL || 'ag/gemini-3-flash',
+    timeout: parseInt(process.env.ROUTER9_TIMEOUT_MS, 10) || 30000,
+  },
   security: {
     allowedNumbers: (process.env.ALLOWED_NUMBERS || '')
       .split(',')

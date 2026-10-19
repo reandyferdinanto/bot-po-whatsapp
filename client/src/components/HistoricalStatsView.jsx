@@ -16,7 +16,7 @@ import {
 import {
   AiOutlineBarChart,
   AiOutlineSync,
-  AiOutlineThunderbolt,
+  AiOutlineDatabase,
   AiOutlineSearch,
   AiOutlineShop,
   AiOutlineAppstore,
@@ -27,12 +27,11 @@ import {
   AiOutlineCalendar,
   AiOutlineReload,
 } from 'react-icons/ai';
-import { getHistoricalStats, syncAllSheets } from '../services/api';
+import { getHistoricalStats } from '../services/api';
 
 export default function HistoricalStatsView({ isDark }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [syncingAll, setSyncingAll] = useState(false);
 
   const formatRupiah = (val) => 'Rp ' + Number(val || 0).toLocaleString('id-ID');
 
@@ -53,52 +52,6 @@ export default function HistoricalStatsView({ isDark }) {
   useEffect(() => {
     loadStats();
   }, []);
-
-  // Eksekusi Sinkronisasi Seluruh Sheet (2017 - 2026)
-  const handleTriggerSyncAll = async () => {
-    setSyncingAll(true);
-    message.loading({
-      content: 'Sedang menyinkronkan seluruh sheet (PO 2017 s/d PO 2026, database Material, & Supplier)...',
-      key: 'sync-all-proc',
-      duration: 0,
-    });
-
-    try {
-      const res = await syncAllSheets();
-      message.destroy('sync-all-proc');
-
-      if (res.success) {
-        Modal.success({
-          title: '✅ Sinkronisasi Multi-Tahun Berhasil!',
-          width: 520,
-          content: (
-            <div style={{ fontSize: 13, marginTop: 10, lineHeight: 1.6 }}>
-              <p>
-                Berhasil menarik dan mengindeks data dari <strong>{res.totalSheets} Tab PO ({res.sheets?.join(', ')})</strong>.
-              </p>
-              <ul style={{ paddingLeft: 18, margin: '8px 0' }}>
-                <li>Total Baris Transaksi: <strong>{res.totalAllRows} Baris</strong></li>
-                <li>Total Dokumen PO Unik: <strong>{res.totalAllPOs} PO</strong></li>
-                <li>Total Akumulasi Belanja: <strong>{formatRupiah(res.totalAllSpend)}</strong></li>
-                <li>Master Material: <strong>{res.totalMaterials} Item</strong></li>
-                <li>Indeks Histori Harga: <strong>{res.totalPrices} Material</strong></li>
-              </ul>
-              <p style={{ color: '#059669', fontSize: 12, margin: 0 }}>
-                Seluruh statistik kini tersimpan di cache lokal berkecepatan tinggi (&lt;5ms).
-              </p>
-            </div>
-          ),
-        });
-
-        await loadStats();
-      }
-    } catch (err) {
-      message.destroy('sync-all-proc');
-      message.error(`Gagal sinkronisasi seluruh sheet: ${err.message}`);
-    } finally {
-      setSyncingAll(false);
-    }
-  };
 
   const cardBg = isDark ? '#0f172a' : '#ffffff';
   const borderColor = isDark ? '#1e293b' : '#e2e8f0';
@@ -178,17 +131,17 @@ export default function HistoricalStatsView({ isDark }) {
       <div
         style={{
           background: isDark
-            ? 'linear-gradient(135deg, #311042 0%, #064e3b 100%)'
-            : 'linear-gradient(135deg, #f5f3ff 0%, #ecfdf5 100%)',
+            ? 'linear-gradient(135deg, rgba(6, 78, 59, 0.45) 0%, rgba(15, 23, 42, 0.85) 100%)'
+            : 'linear-gradient(135deg, #f0fdf4 0%, #f8fafc 100%)',
           borderRadius: 14,
           padding: '20px 24px',
-          border: `1px solid ${isDark ? '#8b5cf6' : '#c4b5fd'}`,
+          border: `1px solid ${isDark ? 'rgba(5, 150, 105, 0.4)' : '#a7f3d0'}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
           gap: 14,
-          boxShadow: '0 2px 8px rgba(139, 92, 246, 0.15)',
+          boxShadow: '0 2px 8px rgba(4, 120, 87, 0.08)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -197,7 +150,7 @@ export default function HistoricalStatsView({ isDark }) {
               width: 44,
               height: 44,
               borderRadius: 12,
-              backgroundColor: '#7c3aed',
+              backgroundColor: '#047857',
               color: '#ffffff',
               display: 'flex',
               alignItems: 'center',
@@ -212,35 +165,31 @@ export default function HistoricalStatsView({ isDark }) {
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: textColor, letterSpacing: '-0.3px' }}>
                 Statistik &amp; Analisis Multi-Tahun (PO 2017 s/d PO 2026)
               </h2>
-              <Tag color="purple" style={{ fontWeight: 700 }}>
+              <Tag color="blue" style={{ fontWeight: 700 }}>
                 10 Tahun Historis
               </Tag>
             </div>
             <p style={{ margin: '4px 0 0 0', fontSize: 12, color: mutedColor }}>
-              Menyinkronkan seluruh lembar PO tahunan ke dalam cache berkecepatan tinggi agar data statistik dapat diolah langsung secara instan (&lt;5ms).
+              Data statistik multi-tahun (2017-2026) diolah langsung secara instan dari database PostgreSQL (&lt;5ms).
             </p>
           </div>
         </div>
 
-        {/* The One-Click Multi-Sheet Sync Button */}
+        {/* Action: Reload Stats */}
         <Button
-          type="primary"
-          size="large"
-          icon={<AiOutlineThunderbolt style={{ animation: syncingAll ? 'antRotate 1s infinite linear' : 'none' }} />}
-          loading={syncingAll}
-          onClick={handleTriggerSyncAll}
+          size="middle"
+          icon={<AiOutlineReload style={{ animation: loading ? 'antRotate 1s infinite linear' : 'none' }} />}
+          loading={loading}
+          onClick={loadStats}
           style={{
-            backgroundColor: '#7c3aed',
-            borderColor: '#7c3aed',
-            fontWeight: 700,
-            borderRadius: 10,
+            borderRadius: 8,
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 8,
-            boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)',
+            gap: 6,
+            fontWeight: 600,
           }}
         >
-          ⚡ Sync Semua Sheet (2017 - 2026)
+          Muat Ulang Data
         </Button>
       </div>
 
@@ -351,11 +300,11 @@ export default function HistoricalStatsView({ isDark }) {
               width: 42,
               height: 42,
               borderRadius: 10,
-              backgroundColor: isDark ? 'rgba(124, 58, 237, 0.2)' : '#f5f3ff',
+              backgroundColor: isDark ? 'rgba(14, 165, 233, 0.18)' : '#f0f9ff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#7c3aed',
+              color: '#0284c7',
               fontSize: 20,
             }}
           >
@@ -378,7 +327,7 @@ export default function HistoricalStatsView({ isDark }) {
             <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: mutedColor }}>
               TAB TERSINKRONKAN
             </div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#ea580c', fontFamily: 'monospace', marginTop: 4 }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: '#047857', fontFamily: 'monospace', marginTop: 4 }}>
               {stats?.yearlyBreakdown?.length || 1} Tahun Buku
             </div>
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
@@ -390,15 +339,15 @@ export default function HistoricalStatsView({ isDark }) {
               width: 42,
               height: 42,
               borderRadius: 10,
-              backgroundColor: isDark ? 'rgba(234, 88, 12, 0.2)' : '#fff7ed',
+              backgroundColor: isDark ? 'rgba(16, 185, 129, 0.18)' : '#ecfdf5',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#ea580c',
+              color: '#059669',
               fontSize: 20,
             }}
           >
-            <AiOutlineThunderbolt />
+            <AiOutlineDatabase />
           </div>
         </div>
       </div>
@@ -453,7 +402,7 @@ export default function HistoricalStatsView({ isDark }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {(stats?.topSuppliersAllTime || []).length === 0 ? (
               <div style={{ textAlign: 'center', padding: 20, color: mutedColor, fontSize: 12 }}>
-                Klik tombol <strong>"⚡ Sync Semua Sheet"</strong> di atas untuk mengumpulkan data riwayat vendor 10 tahun.
+                Data riwayat supplier 10 tahun sedang diproses atau belum tersedia.
               </div>
             ) : (
               (stats?.topSuppliersAllTime || []).map((s, idx) => (
@@ -523,7 +472,7 @@ export default function HistoricalStatsView({ isDark }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {(stats?.topMaterialsAllTime || []).length === 0 ? (
               <div style={{ textAlign: 'center', padding: 20, color: mutedColor, fontSize: 12 }}>
-                Klik tombol <strong>"⚡ Sync Semua Sheet"</strong> di atas untuk mengumpulkan data riwayat material 10 tahun.
+                Data riwayat material 10 tahun sedang diproses atau belum tersedia.
               </div>
             ) : (
               (stats?.topMaterialsAllTime || []).map((m, idx) => (

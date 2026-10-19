@@ -110,6 +110,12 @@ Supplier     : *${extractedData.supplier}*\n`;
 
       summaryText += `▸ Ketik *YA* untuk konfirmasi update ke Google Sheets\n▸ Ketik *BATAL* untuk membatalkan`;
 
+      extractedData._fileData = {
+        buffer: mediaBuffer,
+        filename: media.filename || (isPdf ? 'surat_jalan.pdf' : 'surat_jalan.jpg'),
+        mimeType,
+      };
+
       conversationManager.setSession(chatId, 'CONFIRM_UPDATE_GRPO', extractedData);
       await openwaService.sendText(chatId, summaryText);
       return true;
@@ -176,6 +182,12 @@ Tanggal   : ${extractedData.date || 'Hari ini'}
     summaryText += `━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
     summaryText += `▸ Ketik *YA* untuk simpan ke sheet 'PO 2026'\n▸ Ketik *BATAL* untuk membatalkan`;
+
+    extractedData._fileData = {
+      buffer: mediaBuffer,
+      filename: media.filename || (isPdf ? 'dokumen_po.pdf' : 'dokumen_po.jpg'),
+      mimeType,
+    };
 
     conversationManager.setSession(chatId, 'CONFIRM_OCR_PO', extractedData);
     await openwaService.sendText(chatId, summaryText);

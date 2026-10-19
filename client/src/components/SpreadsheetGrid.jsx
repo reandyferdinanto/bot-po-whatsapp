@@ -26,9 +26,9 @@ const COLUMNS_DEF = [
   { letter: 'Q', name: 'TOTAL', width: 135, align: 'right', key: 'total', highlight: 'blue' },
   { letter: 'R', name: 'No. GRPO', width: 120, align: 'left', key: 'grpo', highlight: 'amber' },
   { letter: 'S', name: 'LAST DATE OF GRPO', width: 145, align: 'left', key: 'lastGrpoDate', highlight: 'amber' },
-  { letter: 'T', name: 'TANGGAL BAYAR', width: 120, align: 'left', key: 'tglBayar', highlight: 'purple' },
-  { letter: 'U', name: 'TANGGAL INVOICE', width: 120, align: 'left', key: 'tglInvoice', highlight: 'purple' },
-  { letter: 'V', name: 'NO. INVOICE', width: 135, align: 'left', key: 'noInvoice', highlight: 'purple' },
+  { letter: 'T', name: 'TANGGAL BAYAR', width: 120, align: 'left', key: 'tglBayar', highlight: 'cyan' },
+  { letter: 'U', name: 'TANGGAL INVOICE', width: 120, align: 'left', key: 'tglInvoice', highlight: 'cyan' },
+  { letter: 'V', name: 'NO. INVOICE', width: 135, align: 'left', key: 'noInvoice', highlight: 'cyan' },
   { letter: 'W', name: 'KET', width: 210, align: 'left', key: 'ket' },
 ];
 
@@ -47,6 +47,7 @@ export default function SpreadsheetGrid({
   isDark,
 }) {
   const scrollContainerRef = useRef(null);
+  const [pipelineFilter, setPipelineFilter] = React.useState('ALL');
 
   const formatRupiah = (val) => {
     return 'Rp ' + Number(val || 0).toLocaleString('id-ID');
@@ -64,20 +65,67 @@ export default function SpreadsheetGrid({
   };
 
   const getStatusBadge = (status) => {
-    const s = (status || '').toLowerCase();
-    if (s === 'close' || s === 'lunas') return <Tag color="green">Close</Tag>;
-    if (s === 'pending') return <Tag color="orange">Pending</Tag>;
-    if (s === 'cancelled') return <Tag color="red">Cancelled</Tag>;
+    const s = (status || '').toLowerCase().trim();
+    if (s.startsWith('clos') || s === 'lunas' || s === 'done' || s === 'selesai') return <Tag color="green">Close</Tag>;
+    if (s.startsWith('pend') || s === 'hold' || s === 'menunggu') return <Tag color="orange">Pending</Tag>;
+    if (s.startsWith('cancel') || s === 'batal') return <Tag color="red">Cancelled</Tag>;
     return <Tag color="blue">Open</Tag>;
   };
 
-  const totalSumQ = rows.reduce((acc, r) => acc + (r.status?.toLowerCase() !== 'cancelled' ? (r.total || 0) : 0), 0);
+  // Pipeline Filter calculation
+  const filteredRows = React.useMemo(() => {
+    if (pipelineFilter === 'ALL') return rows;
+    return rows.filter((r) => {
+      const isCancelled = (r.status || '').toLowerCase().includes('cancel');
+      if (pipelineFilter === 'BELUM_GRPO') {
+        if (isCancelled) return false;
+        const grpo = (r.grpo || '').trim().toLowerCase();
+        return !grpo || grpo === '-' || grpo.includes('belum');
+      }
+      if (pipelineFilter === 'BELUM_BAYAR') {
+        if (isCancelled) return false;
+        const tglBayar = (r.tglBayar || '').trim().toLowerCase();
+        return !tglBayar || tglBayar === '-' || tglBayar.includes('belum');
+      }
+      if (pipelineFilter === 'LUNAS') {
+        const s = (r.status || '').toLowerCase();
+        const tglBayar = (r.tglBayar || '').trim().toLowerCase();
+        const hasBayar = tglBayar && tglBayar !== '-' && !tglBayar.includes('belum');
+        return s.startsWith('clos') || s === 'lunas' || hasBayar;
+      }
+      return true;
+    });
+  }, [rows, pipelineFilter]);
+
+  const totalSumQ = filteredRows.reduce((acc, r) => acc + (!r.status?.toLowerCase().includes('cancel') ? (r.total || 0) : 0), 0);
 
   const cardBg = isDark ? '#0f172a' : '#ffffff';
   const borderColor = isDark ? '#1e293b' : '#e2e8f0';
   const textColor = isDark ? '#f8fafc' : '#0f172a';
   const headerBg = isDark ? '#162032' : '#f8fafc';
   const mutedColor = isDark ? '#94a3b8' : '#64748b';
+
+  // Counts for pipeline filters
+  const pipelineCounts = React.useMemo(() => {
+    let belumGrpo = 0;
+    let belumBayar = 0;
+    let lunas = 0;
+    rows.forEach((r) => {
+      const isCancelled = (r.status || '').toLowerCase().includes('cancel');
+      if (!isCancelled) {
+        const grpo = (r.grpo || '').trim().toLowerCase();
+        if (!grpo || grpo === '-' || grpo.includes('belum')) belumGrpo++;
+        const tglBayar = (r.tglBayar || '').trim().toLowerCase();
+        if (!tglBayar || tglBayar === '-' || tglBayar.includes('belum')) belumBayar++;
+      }
+      const s = (r.status || '').toLowerCase();
+      const tglBayar = (r.tglBayar || '').trim().toLowerCase();
+      if (s.startsWith('clos') || s === 'lunas' || (tglBayar && tglBayar !== '-' && !tglBayar.includes('belum'))) {
+        lunas++;
+      }
+    });
+    return { belumGrpo, belumBayar, lunas };
+  }, [rows]);
 
   return (
     <div
@@ -92,7 +140,7 @@ export default function SpreadsheetGrid({
         boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
       }}
     >
-      {/* Toolbar: Search, Status Filter & Actions */}
+      {/* Toolbar: Search, Status Filter & Pipeline Filter */}
       <div
         style={{
           padding: '10px 16px',
@@ -112,9 +160,10 @@ export default function SpreadsheetGrid({
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             allowClear
-            style={{ width: 260, borderRadius: 8, fontSize: 12 }}
+            style={{ width: 240, borderRadius: 8, fontSize: 12 }}
           />
 
+          {/* Status Filter */}
           <div
             style={{
               display: 'flex',
@@ -129,7 +178,7 @@ export default function SpreadsheetGrid({
                 key={st}
                 onClick={() => onStatusFilterChange(st)}
                 style={{
-                  padding: '4px 10px',
+                  padding: '4px 9px',
                   borderRadius: 6,
                   border: 'none',
                   fontSize: 11,
@@ -143,6 +192,68 @@ export default function SpreadsheetGrid({
                 {st === 'ALL' ? 'Semua' : st}
               </button>
             ))}
+          </div>
+
+          {/* Quick Pipeline Filter (Operational Stages) */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              backgroundColor: isDark ? 'rgba(30, 41, 59, 0.7)' : '#f8fafc',
+              padding: 2,
+              borderRadius: 8,
+              border: `1px solid ${borderColor}`,
+              gap: 2,
+            }}
+          >
+            {[
+              { id: 'ALL', label: 'Semua Tahap', count: rows.length },
+              { id: 'BELUM_GRPO', label: '📦 Belum GRPO', count: pipelineCounts.belumGrpo },
+              { id: 'BELUM_BAYAR', label: '💳 Belum Bayar', count: pipelineCounts.belumBayar },
+              { id: 'LUNAS', label: '✓ Lunas', count: pipelineCounts.lunas },
+            ].map((p) => {
+              const isActive = pipelineFilter === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setPipelineFilter(p.id)}
+                  style={{
+                    padding: '3px 8px',
+                    borderRadius: 6,
+                    border: 'none',
+                    fontSize: 11,
+                    fontWeight: isActive ? 700 : 500,
+                    backgroundColor: isActive
+                      ? (isDark ? '#047857' : '#ecfdf5')
+                      : 'transparent',
+                    color: isActive
+                      ? (isDark ? '#ffffff' : '#047857')
+                      : mutedColor,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <span>{p.label}</span>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontFamily: "'JetBrains Mono', monospace",
+                      padding: '0 4px',
+                      borderRadius: 4,
+                      backgroundColor: isActive
+                        ? (isDark ? 'rgba(0,0,0,0.2)' : '#d1fae5')
+                        : (isDark ? '#334155' : '#e2e8f0'),
+                      color: isActive ? (isDark ? '#ffffff' : '#065f46') : mutedColor,
+                    }}
+                  >
+                    {p.count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -244,7 +355,7 @@ export default function SpreadsheetGrid({
                 if (col.highlight === 'emerald') colBg = isDark ? 'rgba(5, 150, 105, 0.25)' : '#ecfdf5';
                 if (col.highlight === 'blue') colBg = isDark ? 'rgba(37, 99, 235, 0.25)' : '#eff6ff';
                 if (col.highlight === 'amber') colBg = isDark ? 'rgba(217, 119, 6, 0.2)' : '#fffbeb';
-                if (col.highlight === 'purple') colBg = isDark ? 'rgba(124, 58, 237, 0.2)' : '#f5f3ff';
+                if (col.highlight === 'cyan') colBg = isDark ? 'rgba(8, 145, 178, 0.18)' : '#ecfeff';
 
                 return (
                   <th
@@ -266,23 +377,24 @@ export default function SpreadsheetGrid({
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
+            {filteredRows.length === 0 ? (
               <tr>
                 <td colSpan={24} style={{ textAlign: 'center', padding: '40px 0', color: mutedColor }}>
                   Tidak ada baris transaksi yang cocok dengan filter.
                 </td>
               </tr>
             ) : (
-              rows.map((r, rowIdx) => {
+              filteredRows.map((r, rowIdx) => {
                 const isRowSelected = selectedRow?.rowIndex === r.rowIndex;
                 const rNumber = r.rowIndex || rowIdx + 2;
                 return (
                   <tr
                     key={rNumber}
                     onClick={() => onSelectRow(r)}
+                    className={isRowSelected ? 'row-selected' : ''}
                     style={{
                       backgroundColor: isRowSelected
-                        ? (isDark ? 'rgba(37, 99, 235, 0.15)' : 'rgba(37, 99, 235, 0.05)')
+                        ? (isDark ? 'rgba(37, 99, 235, 0.18)' : '#edf5ff')
                         : 'transparent',
                       cursor: 'pointer',
                     }}
@@ -291,16 +403,24 @@ export default function SpreadsheetGrid({
                     <td
                       className="row-number sticky-col-0"
                       style={{
-                        backgroundColor: headerBg,
-                        color: mutedColor,
-                        borderColor,
+                        backgroundColor: isRowSelected
+                          ? (isDark ? 'rgba(37, 99, 235, 0.35)' : '#dbeafe')
+                          : headerBg,
+                        color: isRowSelected
+                          ? (isDark ? '#93c5fd' : '#1d4ed8')
+                          : mutedColor,
+                        fontWeight: isRowSelected ? 700 : 600,
+                        fontFamily: "'JetBrains Mono', monospace",
+                        borderLeft: isRowSelected ? '3px solid #2563eb' : undefined,
+                        borderTop: isRowSelected ? '1.5px solid #2563eb' : `1px solid ${borderColor}`,
+                        borderBottom: isRowSelected ? '1.5px solid #2563eb' : `1px solid ${borderColor}`,
                       }}
                     >
                       {rNumber}
                     </td>
 
                     {/* 23 Columns */}
-                    {COLUMNS_DEF.map((col) => {
+                    {COLUMNS_DEF.map((col, cIdx) => {
                       let cellContent = r[col.key];
 
                       if (col.key === 'status') {
@@ -315,16 +435,24 @@ export default function SpreadsheetGrid({
                         cellContent = formatRupiah(r.ppn);
                       }
 
+                      const isLastCol = cIdx === COLUMNS_DEF.length - 1;
+                      const isMonospace = col.align === 'right' || ['noPo', 'date', 'lastGrpoDate', 'tglBayar', 'tglInvoice', 'kode'].includes(col.key);
+
                       return (
                         <td
                           key={col.letter}
                           onClick={() => onSelectRow(r)}
-                          className={`${col.sticky ? 'sticky-col-2 freeze-border' : ''} ${isRowSelected ? 'cell-selected' : ''}`}
+                          className={col.sticky ? 'sticky-col-2 freeze-border' : ''}
                           style={{
                             padding: '6px 8px',
                             textAlign: col.align,
-                            fontFamily: col.align === 'right' ? 'monospace' : 'inherit',
-                            borderColor,
+                            fontFamily: isMonospace ? "'JetBrains Mono', monospace" : 'inherit',
+                            backgroundColor: isRowSelected
+                              ? (isDark ? 'rgba(37, 99, 235, 0.16)' : '#edf5ff')
+                              : undefined,
+                            borderTop: isRowSelected ? '1.5px solid #2563eb' : `1px solid ${borderColor}`,
+                            borderBottom: isRowSelected ? '1.5px solid #2563eb' : `1px solid ${borderColor}`,
+                            borderRight: isRowSelected && isLastCol ? '1.5px solid #2563eb' : `1px solid ${borderColor}`,
                             color: textColor,
                           }}
                         >
@@ -360,9 +488,12 @@ export default function SpreadsheetGrid({
           <span>•</span>
           <span>Klik baris untuk melihat ringkasan di panel samping</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontFamily: 'monospace' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontFamily: "'JetBrains Mono', monospace" }}>
           <span>
-            COUNT: <strong style={{ color: textColor }}>{rows.length}</strong>
+            BARIS: <strong style={{ color: textColor }}>{filteredRows.length}</strong>
+            {filteredRows.length !== rows.length && (
+              <span style={{ color: mutedColor }}> / {rows.length}</span>
+            )}
           </span>
           <span>
             SUM (Q): <strong style={{ color: textColor }}>{formatRupiah(totalSumQ)}</strong>

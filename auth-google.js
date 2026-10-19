@@ -8,6 +8,7 @@ const env = require('./src/config/env');
 const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
   'https://www.googleapis.com/auth/drive.readonly',
+  'https://www.googleapis.com/auth/drive.file',
 ];
 
 async function main() {
@@ -29,8 +30,10 @@ async function main() {
     process.exit(1);
   }
 
-  const port = env.port || 3000;
-  const redirectUri = `http://localhost:${port}/oauth2callback`;
+  const redirectUri =
+    process.env.GOOGLE_REDIRECT_URI ||
+    (clientInfo.redirect_uris && clientInfo.redirect_uris[0]) ||
+    'http://localhost:3000/oauth2callback';
 
   const oAuth2Client = new google.auth.OAuth2(
     clientInfo.client_id,
@@ -92,25 +95,36 @@ async function main() {
     }
   });
 
-  server.listen(port, () => {
-    // Also provide terminal prompt fallback
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`ℹ️ Port ${port} sedang aktif digunakan oleh server bot-po.`);
+      console.log('👉 Setelah membuka URL otorisasi, salin parameter "code=" dari URL dan paste di bawah:');
+    } else {
+      console.warn(`⚠️ Warning: ${err.message}`);
+    }
+  });
 
-    rl.question('👉 Atau masukkan Authorization Code secara manual di sini: ', async (code) => {
-      if (code && code.trim()) {
-        try {
-          await saveToken(oAuth2Client, code.trim());
-          server.close();
-          rl.close();
-          process.exit(0);
-        } catch (err) {
-          console.error('❌ Gagal menukar kode:', err.message);
-        }
+  try {
+    server.listen(port);
+  } catch (e) {}
+
+  // Provide terminal prompt fallback
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  rl.question('👉 Masukkan Authorization Code di sini: ', async (code) => {
+    if (code && code.trim()) {
+      try {
+        await saveToken(oAuth2Client, code.trim());
+        try { server.close(); } catch (e) {}
+        rl.close();
+        process.exit(0);
+      } catch (err) {
+        console.error('❌ Gagal menukar kode:', err.message);
       }
-    });
+    }
   });
 }
 

@@ -7,4 +7,6 @@ credentials/*.json
 npm-debug.log*
 *.traineddata
 cache/
+uploads/
+.DS_Store
 

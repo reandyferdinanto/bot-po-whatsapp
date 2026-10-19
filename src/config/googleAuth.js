@@ -23,7 +23,10 @@ function getOAuth2Client() {
     throw new Error('Invalid client_secret.json format. Missing "web" or "installed" key.');
   }
 
-  const redirectUri = (clientInfo.redirect_uris && clientInfo.redirect_uris[0]) || 'http://localhost:3000/oauth2callback';
+  const redirectUri =
+    process.env.GOOGLE_REDIRECT_URI ||
+    (clientInfo.redirect_uris && clientInfo.redirect_uris[0]) ||
+    'http://localhost:3000/oauth2callback';
 
   oauth2Client = new google.auth.OAuth2(
     clientInfo.client_id,
@@ -75,8 +78,42 @@ function getSheetsClient() {
   return google.sheets({ version: 'v4', auth });
 }
 
+/**
+ * Returns Google Drive API v3 instance.
+ */
+function getDriveClient() {
+  const auth = getOAuth2Client();
+  return google.drive({ version: 'v3', auth });
+}
+
+/**
+ * Mendapatkan ringkasan status token Google (scopes, expiry, email jika ada).
+ */
+function getTokenInfo() {
+  if (!fs.existsSync(env.sheets.tokenPath)) {
+    return { hasToken: false, error: 'File token.json tidak ditemukan' };
+  }
+  try {
+    const raw = fs.readFileSync(env.sheets.tokenPath, 'utf8');
+    const token = JSON.parse(raw);
+    const scopeStr = token.scope || '';
+    const hasDriveWrite = scopeStr.includes('drive.file') || scopeStr.includes('drive ');
+    return {
+      hasToken: !!(token.access_token || token.refresh_token),
+      scope: scopeStr,
+      hasDriveWrite,
+      expiryDate: token.expiry_date ? new Date(token.expiry_date).toISOString() : null,
+    };
+  } catch (err) {
+    return { hasToken: false, error: err.message };
+  }
+}
+
 module.exports = {
   getOAuth2Client,
   hasValidToken,
   getSheetsClient,
+  getDriveClient,
+  getTokenInfo,
 };
+

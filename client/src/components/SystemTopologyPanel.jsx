@@ -139,9 +139,9 @@ export default function SystemTopologyPanel({
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontWeight: 700, color: textColor, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <AiOutlineDatabase style={{ color: '#7c3aed', fontSize: 16 }} /> 3. Database &amp; Cache
+              <AiOutlineDatabase style={{ color: '#0284c7', fontSize: 16 }} /> 3. Database &amp; Cache
             </span>
-            <Tag color="purple">HYBRID</Tag>
+            <Tag color="blue">HYBRID</Tag>
           </div>
           <div style={{ fontSize: 11, color: mutedColor }}>
             Mode: PostgreSQL VPS Cache + In-Memory Fuse.js
