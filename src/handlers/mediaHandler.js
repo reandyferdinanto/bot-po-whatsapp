@@ -12,7 +12,7 @@ async function handleIncomingMedia(message) {
 
   if (!media) return false;
 
-  await openwaService.sendText(chatId, '🔍 _Dokumen terdeteksi. Sedang memproses analisis teks via OCR, mohon tunggu..._');
+  const progressOcr = await openwaService.sendText(chatId, '_Dokumen terdeteksi. Sedang memproses analisis teks via OCR, mohon tunggu..._');
 
   let mediaBuffer;
   let mimeType = media.mimetype || 'application/octet-stream';
@@ -33,15 +33,16 @@ async function handleIncomingMedia(message) {
     const isPdf = mimeType.includes('pdf') || (media.filename && media.filename.toLowerCase().endsWith('.pdf'));
 
     if (isPdf) {
-      console.log(`📄 Memproses file PDF (${media.filename || 'dokumen.pdf'})...`);
+      console.log(`Memproses file PDF (${media.filename || 'dokumen.pdf'})...`);
       extractedData = await ocrService.parsePdfDocument(mediaBuffer);
     } else if (mimeType.startsWith('image/')) {
-      console.log(`📷 Memproses foto dokumen via OCR (${mimeType})...`);
+      console.log(`Memproses foto dokumen via OCR (${mimeType})...`);
       extractedData = await ocrService.parseImageWithOcr(mediaBuffer);
     } else {
+      if (progressOcr) await openwaService.deleteMessage(chatId, progressOcr);
       await openwaService.sendText(
         chatId,
-        '⚠️ Tipe berkas tidak didukung. Mohon kirimkan dokumen dalam format *PDF* atau gambar (*JPG / PNG*).'
+        '*Pemberitahuan:* Tipe berkas tidak didukung. Mohon kirimkan dokumen dalam format *PDF* atau gambar (*JPG / PNG*).'
       );
       return true;
     }
@@ -51,7 +52,7 @@ async function handleIncomingMedia(message) {
     // =========================================================================
     if (extractedData.tipeDokumen === 'PURCHASE_DELIVERY_NOTE_GRPO') {
       const targetPo = (extractedData.noPo || '').trim();
-      console.log(`📦 Terdeteksi Purchase Delivery Note ${extractedData.noGrpo} untuk PO ${targetPo}`);
+      console.log(`Terdeteksi Purchase Delivery Note ${extractedData.noGrpo} untuk PO ${targetPo}`);
 
       let existingPo = null;
       if (targetPo && targetPo !== 'PO-2026-TEMP') {
@@ -62,6 +63,9 @@ async function handleIncomingMedia(message) {
         }
       }
 
+      // Hapus pesan progress OCR sementara
+      if (progressOcr) await openwaService.deleteMessage(chatId, progressOcr);
+
       // Jika PO tidak ditemukan di sheet 'PO 2026'
       if (!existingPo) {
         await openwaService.sendText(
@@ -71,8 +75,8 @@ async function handleIncomingMedia(message) {
 Nomor PO  : *${targetPo || '(Tidak terdeteksi)'}*
 Surat Jalan: \`${extractedData.noGrpo || '-'}\`
 
-⚠️ Nomor PO di atas belum tercatat di sheet 'PO 2026'.
-▸ _Silakan rekap / input PO terlebih dahulu sebelum mengunggah Surat Jalan ini._
+*Pemberitahuan:* Nomor PO di atas belum tercatat di sheet 'PO 2026'.
+▸ _Silakan input PO terlebih dahulu sebelum mengunggah Surat Jalan ini._
 ━━━━━━━━━━━━━━━━━━━━━━━━`
         );
         conversationManager.clearSession(chatId);
@@ -124,6 +128,9 @@ Supplier     : *${extractedData.supplier}*\n`;
     // =========================================================================
     // KASUS 2: DOKUMEN PURCHASE ORDER (PO MATERIAL / JASA) -> AUTO INPUT PO
     // =========================================================================
+    // Hapus pesan progress OCR sementara
+    if (progressOcr) await openwaService.deleteMessage(chatId, progressOcr);
+
     if (!extractedData.items || extractedData.items.length === 0) {
       await openwaService.sendText(
         chatId,
@@ -132,7 +139,7 @@ Supplier     : *${extractedData.supplier}*\n`;
 Nomor PO : \`${extractedData.noPo || '-'}\`
 Vendor   : *${extractedData.supplier || '-'}*
 
-⚠️ _Rincian item barang tidak terdeteksi dengan jelas._
+*Pemberitahuan:* _Rincian item barang tidak terdeteksi dengan jelas._
 Silakan gunakan input manual dengan mengetik *menu*.
 ━━━━━━━━━━━━━━━━━━━━━━━━`
       );
@@ -193,10 +200,11 @@ Tanggal   : ${extractedData.date || 'Hari ini'}
     await openwaService.sendText(chatId, summaryText);
     return true;
   } catch (err) {
-    console.error('❌ Gagal memproses media:', err.message);
+    if (progressOcr) await openwaService.deleteMessage(chatId, progressOcr);
+    console.error('Gagal memproses media:', err.message);
     await openwaService.sendText(
       chatId,
-      `✗ _Gagal mengekstrak dokumen:_ ${err.message}\nSilakan kirim ulang foto yang lebih jelas atau gunakan menu manual.`
+      `*Gagal mengekstrak dokumen:* ${err.message}\nSilakan kirim ulang foto yang lebih jelas atau gunakan menu manual.`
     );
     return true;
   }

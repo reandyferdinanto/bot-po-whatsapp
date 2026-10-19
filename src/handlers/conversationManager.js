@@ -96,7 +96,7 @@ async function handleConversationMessage(chatId, messageText, rawMessage) {
   // 2. Jika ada sesi aktif dan user ingin batal
   if (lower === 'batal' || lower === 'cancel') {
     clearSession(chatId);
-    await openwaService.sendText(chatId, '✓ _Sesi interaktif telah diakhiri. Ketik *menu* untuk memulai kembali._');
+    await openwaService.sendText(chatId, '_Sesi interaktif telah diakhiri. Ketik *menu* untuk memulai kembali._');
     return;
   }
 
@@ -278,7 +278,7 @@ async function handleSearchSupplierQuery(chatId, query) {
   const total = Array.isArray(res) ? res.length : (res.total || items.length);
 
   if (!items || items.length === 0) {
-    await openwaService.sendText(chatId, `⚠️ _Tidak ditemukan riwayat supplier untuk kata kunci:_ *"${query}"*.`);
+    await openwaService.sendText(chatId, `*Pemberitahuan:* _Tidak ditemukan riwayat supplier untuk kata kunci:_ *"${query}"*.`);
     return;
   }
 
@@ -317,7 +317,7 @@ async function handleSearchMaterialQuery(chatId, query) {
   const total = Array.isArray(res) ? res.length : (res.total || items.length);
 
   if (!items || items.length === 0) {
-    await openwaService.sendText(chatId, `⚠️ _Material dengan kata kunci "${query}" tidak ditemukan di database master._`);
+    await openwaService.sendText(chatId, `*Pemberitahuan:* _Material dengan kata kunci "${query}" tidak ditemukan di database master._`);
     return;
   }
 
@@ -354,13 +354,15 @@ Kata Kunci : *"${query}"* (${total} ditemukan)
 
 async function handleSearchSupplierItemsQuery(chatId, query) {
   clearSession(chatId);
-  await openwaService.sendText(chatId, `🔍 _Sedang mencari riwayat pembelian vendor:_ *"${query}"*...`);
+  const searchLoading = await openwaService.sendText(chatId, `_Sedang mencari riwayat pembelian vendor:_ *"${query}"*...`);
 
   const result = await cacheService.getSupplierOrderHistory(query, 15);
+  if (searchLoading) await openwaService.deleteMessage(chatId, searchLoading);
+
   if (!result || !result.items || result.items.length === 0) {
     await openwaService.sendText(
       chatId,
-      `⚠️ _Tidak ditemukan riwayat pembelian untuk vendor "${query}" di sheet transaksi._`
+      `*Pemberitahuan:* _Tidak ditemukan riwayat pembelian untuk vendor "${query}" di sheet transaksi._`
     );
     return;
   }
@@ -400,7 +402,7 @@ async function handleSearchPOQuery(chatId, noPo) {
   try {
     const po = await sheetsService.getPOByNumber(noPo);
     if (!po) {
-      await openwaService.sendText(chatId, `⚠️ Dokumen PO *${noPo}* tidak ditemukan di sheet 'PO 2026'.`);
+      await openwaService.sendText(chatId, `*Pemberitahuan:* Dokumen PO *${noPo}* tidak ditemukan di sheet 'PO 2026'.`);
       return;
     }
 
@@ -428,7 +430,7 @@ Supplier  : *${po.supplier}*
 
     await openwaService.sendText(chatId, text);
   } catch (err) {
-    await openwaService.sendText(chatId, `✗ Gagal mengambil data PO: ${err.message}`);
+    await openwaService.sendText(chatId, `*Gagal mengambil data PO:* ${err.message}`);
   }
 }
 
@@ -440,7 +442,7 @@ async function handleInputPOHeader(chatId, text, session) {
   if (parts.length < 2) {
     await openwaService.sendText(
       chatId,
-      `⚠️ Format tidak sesuai. Masukkan *Nomor PO* dan *Supplier* dipisahkan tanda koma.\nContoh: \`PO-2026-001, PT Buana Logam Perkasa\``
+      `*Pemberitahuan:* Format tidak sesuai. Masukkan *Nomor PO* dan *Supplier* dipisahkan tanda koma.\nContoh: \`PO-2026-001, PT Buana Logam Perkasa\``
     );
     return;
   }
@@ -483,14 +485,16 @@ async function handleInputPOItems(chatId, text, session) {
 
   if (lower === 'simpan' || lower === 'ya' || lower === 'save') {
     if (draft.items.length === 0) {
-      await openwaService.sendText(chatId, '⚠️ Keranjang item masih kosong. Masukkan minimal 1 barang terlebih dahulu.');
+      await openwaService.sendText(chatId, '*Pemberitahuan:* Keranjang item masih kosong. Masukkan minimal 1 barang terlebih dahulu.');
       return;
     }
 
+    let savingMsg = null;
     try {
-      await openwaService.sendText(chatId, '⏳ _Sedang mencatat transaksi ke Google Sheets..._');
+      savingMsg = await openwaService.sendText(chatId, '_Sedang mencatat transaksi ke Google Sheets..._');
       const result = await sheetsService.appendPOTransaction(draft);
       clearSession(chatId);
+      if (savingMsg) await openwaService.deleteMessage(chatId, savingMsg);
 
       await openwaService.sendText(
         chatId,
@@ -503,7 +507,8 @@ Status      : \`[TERSIMPAN KE PO 2026]\`
 ━━━━━━━━━━━━━━━━━━━━━━━━`
       );
     } catch (err) {
-      await openwaService.sendText(chatId, `✗ Gagal menyimpan ke Google Sheets: ${err.message}`);
+      if (savingMsg) await openwaService.deleteMessage(chatId, savingMsg);
+      await openwaService.sendText(chatId, `*Gagal menyimpan ke Google Sheets:* ${err.message}`);
     }
     return;
   }
@@ -556,7 +561,7 @@ Status      : \`[TERSIMPAN KE PO 2026]\`
   summaryText += `*SUBTOTAL : Rp ${totalBelanja.toLocaleString('id-ID')}*\n\n`;
 
   if (warnings.length > 0) {
-    summaryText += `⚠️ _Catatan:_\n${warnings.join('\n')}\n\n`;
+    summaryText += `*Catatan:*\n${warnings.join('\n')}\n\n`;
   }
 
   summaryText += `▸ Kirim baris item lagi untuk menambah\n▸ Ketik *SIMPAN* untuk finalisasi\n▸ Ketik *BATAL* untuk membatalkan`;
@@ -573,8 +578,9 @@ async function handleConfirmOcrPO(chatId, text, session) {
   const draft = session.data;
 
   if (lower === 'ya' || lower === 'simpan' || lower === 'oke' || lower === 'ok') {
+    let savingMsg = null;
     try {
-      await openwaService.sendText(chatId, '⏳ _Sedang mencatat pindaian ke Google Sheets..._');
+      savingMsg = await openwaService.sendText(chatId, '_Sedang mencatat pindaian ke Google Sheets..._');
       const result = await sheetsService.appendPOTransaction(draft);
       clearSession(chatId);
 
@@ -589,9 +595,9 @@ async function handleConfirmOcrPO(chatId, text, session) {
             docType: 'PO',
             noPo: result.noPo,
           });
-          driveMsg = `\n📁 Arsip Drive : [Tersimpan](${driveRes.driveUrl})`;
+          driveMsg = `\n*Arsip Drive :* [Tersimpan](${driveRes.driveUrl})`;
         } catch (dErr) {
-          console.warn('⚠️ Gagal arsip PO ke Drive via WA:', dErr.message);
+          console.warn('Gagal arsip PO ke Drive via WA:', dErr.message);
           // Cadangan lokal agar berkas fisik tidak hilang
           try {
             const backupDir = path.resolve(__dirname, '../../uploads/documents');
@@ -600,17 +606,19 @@ async function handleConfirmOcrPO(chatId, text, session) {
             const cleanPo = (result.noPo || 'TEMP').replace(/[^a-zA-Z0-9_-]/g, '_');
             const localFile = path.join(backupDir, `PO_${cleanPo}_${Date.now()}${ext}`);
             fs.writeFileSync(localFile, draft._fileData.buffer);
-            console.log(`💾 Berkas PO berhasil dicadangkan di lokal server: ${localFile}`);
+            console.log(`Berkas PO berhasil dicadangkan di lokal server: ${localFile}`);
           } catch (bkErr) {
-            console.warn('⚠️ Gagal membuat cadangan lokal:', bkErr.message);
+            console.warn('Gagal membuat cadangan lokal:', bkErr.message);
           }
 
           const isScopeErr = dErr.message && (dErr.message.includes('scope') || dErr.message.includes('insufficient'));
           driveMsg = isScopeErr
-            ? `\n📁 Arsip Drive : ⚠️ Gagal (Izin Google Drive belum aktif di server)`
-            : `\n📁 Arsip Drive : ⚠️ Gagal diunggah (${dErr.message})`;
+            ? `\n*Arsip Drive :* _[Gagal: Izin Google Drive belum aktif di server]_`
+            : `\n*Arsip Drive :* _[Gagal diunggah: ${dErr.message}]_`;
         }
       }
+
+      if (savingMsg) await openwaService.deleteMessage(chatId, savingMsg);
 
       await openwaService.sendText(
         chatId,
@@ -623,11 +631,12 @@ Status      : \`[TERSIMPAN KE PO 2026]\`${driveMsg}
 ━━━━━━━━━━━━━━━━━━━━━━━━`
       );
     } catch (err) {
-      await openwaService.sendText(chatId, `✗ Gagal menyimpan ke Google Sheets: ${err.message}`);
+      if (savingMsg) await openwaService.deleteMessage(chatId, savingMsg);
+      await openwaService.sendText(chatId, `*Gagal menyimpan ke Google Sheets:* ${err.message}`);
     }
   } else {
     clearSession(chatId);
-    await openwaService.sendText(chatId, '✓ _Draf pindaian dokumen dibatalkan._');
+    await openwaService.sendText(chatId, '_Draf pindaian dokumen dibatalkan._');
   }
 }
 
@@ -639,18 +648,19 @@ async function handleConfirmUpdateGrpo(chatId, text, session) {
   const data = session.data;
 
   if (lower === 'ya' || lower === 'simpan' || lower === 'oke' || lower === 'ok' || lower === 'update') {
+    let updatingMsg = null;
     try {
       const existing = await sheetsService.getPOByNumber(data.noPo);
       if (!existing) {
         clearSession(chatId);
         await openwaService.sendText(
           chatId,
-          `⚠️ *PO TIDAK DITEMUKAN*\nNomor PO *${data.noPo || '-'}* tidak ditemukan di sheet 'PO 2026'.\nSilakan pastikan PO telah terdaftar sebelum upload Surat Jalan.`
+          `*PO TIDAK DITEMUKAN*\nNomor PO *${data.noPo || '-'}* tidak ditemukan di sheet 'PO 2026'.\nSilakan pastikan PO telah terdaftar sebelum upload Surat Jalan.`
         );
         return;
       }
 
-      await openwaService.sendText(chatId, `⏳ _Sedang memperbarui status GRPO untuk PO ${data.noPo}..._`);
+      updatingMsg = await openwaService.sendText(chatId, `_Sedang memperbarui status GRPO untuk PO ${data.noPo}..._`);
 
       const updatePayload = {
         grpo: data.noGrpo,
@@ -672,9 +682,9 @@ async function handleConfirmUpdateGrpo(chatId, text, session) {
             docType: 'GRPO',
             noPo: data.noPo,
           });
-          driveMsg = `\n📁 Arsip Drive : [Tersimpan](${driveRes.driveUrl})`;
+          driveMsg = `\n*Arsip Drive :* [Tersimpan](${driveRes.driveUrl})`;
         } catch (dErr) {
-          console.warn('⚠️ Gagal arsip GRPO ke Drive via WA:', dErr.message);
+          console.warn('Gagal arsip GRPO ke Drive via WA:', dErr.message);
           // Cadangan lokal agar berkas fisik tidak hilang
           try {
             const backupDir = path.resolve(__dirname, '../../uploads/documents');
@@ -683,17 +693,19 @@ async function handleConfirmUpdateGrpo(chatId, text, session) {
             const cleanPo = (data.noPo || 'TEMP').replace(/[^a-zA-Z0-9_-]/g, '_');
             const localFile = path.join(backupDir, `GRPO_${cleanPo}_${Date.now()}${ext}`);
             fs.writeFileSync(localFile, data._fileData.buffer);
-            console.log(`💾 Berkas GRPO berhasil dicadangkan di lokal server: ${localFile}`);
+            console.log(`Berkas GRPO berhasil dicadangkan di lokal server: ${localFile}`);
           } catch (bkErr) {
-            console.warn('⚠️ Gagal membuat cadangan lokal:', bkErr.message);
+            console.warn('Gagal membuat cadangan lokal:', bkErr.message);
           }
 
           const isScopeErr = dErr.message && (dErr.message.includes('scope') || dErr.message.includes('insufficient'));
           driveMsg = isScopeErr
-            ? `\n📁 Arsip Drive : ⚠️ Gagal (Izin Google Drive belum aktif di server)`
-            : `\n📁 Arsip Drive : ⚠️ Gagal diunggah (${dErr.message})`;
+            ? `\n*Arsip Drive :* _[Gagal: Izin Google Drive belum aktif di server]_`
+            : `\n*Arsip Drive :* _[Gagal diunggah: ${dErr.message}]_`;
         }
       }
+
+      if (updatingMsg) await openwaService.deleteMessage(chatId, updatingMsg);
 
       if (res.success) {
         await openwaService.sendText(
@@ -707,14 +719,15 @@ Status       : \`[UPDATE BERHASIL]\`${driveMsg}
 ━━━━━━━━━━━━━━━━━━━━━━━━`
         );
       } else {
-        await openwaService.sendText(chatId, `⚠️ ${res.message}`);
+        await openwaService.sendText(chatId, `*Pemberitahuan:* ${res.message}`);
       }
     } catch (err) {
-      await openwaService.sendText(chatId, `✗ Gagal update GRPO ke Google Sheets: ${err.message}`);
+      if (updatingMsg) await openwaService.deleteMessage(chatId, updatingMsg);
+      await openwaService.sendText(chatId, `*Gagal update GRPO ke Google Sheets:* ${err.message}`);
     }
   } else {
     clearSession(chatId);
-    await openwaService.sendText(chatId, '✓ _Pembaruan status GRPO dibatalkan._');
+    await openwaService.sendText(chatId, '_Pembaruan status GRPO dibatalkan._');
   }
 }
 
@@ -725,7 +738,7 @@ async function handleUpdatePOWaitNo(chatId, noPo) {
   try {
     const po = await sheetsService.getPOByNumber(noPo);
     if (!po) {
-      await openwaService.sendText(chatId, `⚠️ Dokumen PO *${noPo}* tidak ditemukan di sheet 'PO 2026'.\nKetik *batal* untuk keluar.`);
+      await openwaService.sendText(chatId, `*Pemberitahuan:* Dokumen PO *${noPo}* tidak ditemukan di sheet 'PO 2026'.\nKetik *batal* untuk keluar.`);
       return;
     }
 
@@ -744,7 +757,7 @@ async function handleUpdatePOWaitNo(chatId, noPo) {
 ━━━━━━━━━━━━━━━━━━━━━━━━`
     );
   } catch (err) {
-    await openwaService.sendText(chatId, `✗ Terjadi kendala: ${err.message}`);
+    await openwaService.sendText(chatId, `*Terjadi kendala:* ${err.message}`);
   }
 }
 
@@ -773,7 +786,7 @@ async function handleUpdatePOSelectAction(chatId, choice, session) {
 
     case '0':
       clearSession(chatId);
-      await openwaService.sendText(chatId, '✓ _Update status dibatalkan._');
+      await openwaService.sendText(chatId, '_Update status dibatalkan._');
       break;
 
     default:
@@ -792,9 +805,12 @@ async function handleUpdatePOWaitValue(chatId, value, session) {
   if (type === 'invoice') updatePayload.noInvoice = value.trim();
   if (type === 'status') updatePayload.status = value.trim();
 
+  let updateMsg = null;
   try {
-    await openwaService.sendText(chatId, '⏳ _Sedang memperbarui baris di Google Sheets..._');
+    updateMsg = await openwaService.sendText(chatId, '_Sedang memperbarui baris di Google Sheets..._');
     const res = await sheetsService.updatePOField(noPo, updatePayload);
+    if (updateMsg) await openwaService.deleteMessage(chatId, updateMsg);
+
     await openwaService.sendText(
       chatId,
       `*STATUS PO BERHASIL DIUPDATE*
@@ -806,7 +822,8 @@ Status  : \`[BERHASIL DISIMPAN]\`
 ━━━━━━━━━━━━━━━━━━━━━━━━`
     );
   } catch (err) {
-    await openwaService.sendText(chatId, `✗ Gagal update PO: ${err.message}`);
+    if (updateMsg) await openwaService.deleteMessage(chatId, updateMsg);
+    await openwaService.sendText(chatId, `*Gagal update PO:* ${err.message}`);
   }
 }
 
@@ -819,9 +836,12 @@ async function handleCancelPOWaitNo(chatId, text) {
   const noPo = parts[0];
   const reason = parts[1] || 'Dibatalkan via WhatsApp Bot';
 
+  let cancelMsg = null;
   try {
-    await openwaService.sendText(chatId, `⏳ _Sedang memproses pembatalan PO ${noPo}..._`);
+    cancelMsg = await openwaService.sendText(chatId, `_Sedang memproses pembatalan PO ${noPo}..._`);
     const res = await sheetsService.softDeletePO(noPo, reason);
+    if (cancelMsg) await openwaService.deleteMessage(chatId, cancelMsg);
+
     if (res.success) {
       await openwaService.sendText(
         chatId,
@@ -833,10 +853,11 @@ Alasan  : ${reason}
 ━━━━━━━━━━━━━━━━━━━━━━━━`
       );
     } else {
-      await openwaService.sendText(chatId, `⚠️ ${res.message}`);
+      await openwaService.sendText(chatId, `*Pemberitahuan:* ${res.message}`);
     }
   } catch (err) {
-    await openwaService.sendText(chatId, `✗ Gagal membatalkan PO: ${err.message}`);
+    if (cancelMsg) await openwaService.deleteMessage(chatId, cancelMsg);
+    await openwaService.sendText(chatId, `*Gagal membatalkan PO:* ${err.message}`);
   }
 }
 

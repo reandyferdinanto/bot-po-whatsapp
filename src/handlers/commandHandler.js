@@ -133,24 +133,24 @@ Silakan lengkapi laporan realisasi belanja dan unggah foto bukti nota fisik:
     case 'cekbudget':
     case 'cekasbon': {
       if (!args) {
-        await openwaService.sendText(chatId, '⚠️ Mohon sertakan Nomor Budget.\nContoh: */cekbudget BGT-2026-0001*');
+        await openwaService.sendText(chatId, '*Pemberitahuan:* Mohon sertakan Nomor Budget.\nContoh: */cekbudget BGT-2026-0001*');
         return true;
       }
       try {
         const financeBudgetService = require('../services/financeBudgetService');
         const b = await financeBudgetService.getBudgetByNo(args);
         if (!b) {
-          await openwaService.sendText(chatId, `❌ Nomor budget *${args}* tidak ditemukan di sistem.`);
+          await openwaService.sendText(chatId, `*Pemberitahuan:* Nomor budget *${args}* tidak ditemukan di sistem.`);
           return true;
         }
 
         const formatRupiah = (val) => 'Rp ' + Number(val || 0).toLocaleString('id-ID');
         const statusMap = {
-          PENDING: '⏳ Menunggu Persetujuan Finance',
-          APPROVED: '✅ Disetujui (Dana Siap / Dicairkan)',
-          LPJ_SUBMITTED: '📝 LPJ & Nota Telah Masuk (Menunggu Closing)',
-          CLOSED: '🎉 CLOSED (Selesai & Lunas)',
-          REJECTED: '❌ Ditolak',
+          PENDING: '[MENUNGGU PERSETUJUAN]',
+          APPROVED: '[DISETUJUI — DANA CAIR]',
+          LPJ_SUBMITTED: '[LPJ & NOTA TELAH MASUK]',
+          CLOSED: '[LUNAS / SELESAI]',
+          REJECTED: '[DITOLAK]',
         };
         const displayStatus = statusMap[b.status] || b.status;
 
@@ -174,13 +174,14 @@ Silakan lengkapi laporan realisasi belanja dan unggah foto bukti nota fisik:
 ${b.tgl_selesai ? `▸ *Tgl Selesai  :* ${b.tgl_selesai}\n` : ''}${b.catatan_finance ? `▸ *Catatan Finance :* _${b.catatan_finance}_\n` : ''}━━━━━━━━━━━━━━━━━━━━━━━━`
         );
       } catch (err) {
-        await openwaService.sendText(chatId, `❌ Gagal mengambil status budget: ${err.message}`);
+        await openwaService.sendText(chatId, `*Gagal mengambil status budget:* ${err.message}`);
       }
       return true;
     }
 
     case 'menu':
     case 'start':
+    case 'help':
       conversationManager.setSession(chatId, 'MAIN_MENU');
       await openwaService.sendText(
         chatId,
@@ -210,7 +211,7 @@ Silakan pilih menu layanan:
 
         let replyKurs = `*KURS TENGAH BANK INDONESIA (USD)*
 ━━━━━━━━━━━━━━━━━━━━━━━━
-📅 ${k.tanggal}
+*Tanggal:* ${k.tanggal}
 
 \`RATE RINGKASAN\`
 ▸ Kurs Tengah : *Rp ${k.kursTengah}* ${selisihDisplay}
@@ -223,7 +224,7 @@ Silakan pilih menu layanan:
 ━━━━━━━━━━━━━━━━━━━━━━━━`;
         await openwaService.sendText(chatId, replyKurs);
       } catch (kErr) {
-        await openwaService.sendText(chatId, `✗ Gagal mengambil kurs USD: ${kErr.message}`);
+        await openwaService.sendText(chatId, `*Gagal mengambil kurs USD:* ${kErr.message}`);
       }
       return true;
 
@@ -244,7 +245,7 @@ Contoh : \`/cari RM00355\` atau \`/cari Hex Nipples\`
       const supTotal = Array.isArray(supRes) ? supRes.length : (supRes.total || supItems.length);
 
       if (!supItems || supItems.length === 0) {
-        await openwaService.sendText(chatId, `⚠️ _Tidak ditemukan rekomendasi vendor untuk kata kunci:_ *"${args}"*`);
+        await openwaService.sendText(chatId, `*Pemberitahuan:* _Tidak ditemukan rekomendasi vendor untuk kata kunci:_ *"${args}"*`);
         return true;
       }
       let replyCari = `*HASIL REKOMENDASI VENDOR*
@@ -286,10 +287,12 @@ Contoh : \`/supplier Zen Teknik\`
         );
         return true;
       }
-      await openwaService.sendText(chatId, `🔍 _Sedang mencari riwayat pembelian vendor:_ *"${args}"*...`);
+      const searchLoading = await openwaService.sendText(chatId, `_Sedang mencari riwayat pembelian vendor:_ *"${args}"*...`);
       const vResult = await cacheService.getSupplierOrderHistory(args, 15);
+      if (searchLoading) await openwaService.deleteMessage(chatId, searchLoading);
+
       if (!vResult || !vResult.items || vResult.items.length === 0) {
-        await openwaService.sendText(chatId, `⚠️ _Tidak ditemukan riwayat pembelian untuk vendor:_ *"${args}"*`);
+        await openwaService.sendText(chatId, `*Pemberitahuan:* _Tidak ditemukan riwayat pembelian untuk vendor:_ *"${args}"*`);
         return true;
       }
 
@@ -337,7 +340,7 @@ Contoh : \`/cekpo PO-2026-001\`
       }
       const po = await sheetsService.getPOByNumber(args);
       if (!po) {
-        await openwaService.sendText(chatId, `⚠️ Dokumen PO *${args}* tidak ditemukan di sheet 'PO 2026'.`);
+        await openwaService.sendText(chatId, `*Pemberitahuan:* Dokumen PO *${args}* tidak ditemukan di sheet 'PO 2026'.`);
         return true;
       }
       let replyPo = `*DOKUMEN PURCHASE ORDER*
@@ -365,7 +368,7 @@ Supplier  : *${po.supplier}*
       try {
         const poDocs = await driveService.getDocumentsForPo(po.noPo);
         if (poDocs && poDocs.length > 0) {
-          replyPo += `📎 Arsip Drive: *${poDocs.length} file tersedia*\n`;
+          replyPo += `▸ *Arsip Drive :* ${poDocs.length} file tersedia\n`;
           replyPo += `▸ Ketik */lihatpo ${po.noPo}* untuk melihat gambar/PDF asli\n`;
         }
       } catch (docErr) {
@@ -410,22 +413,23 @@ Opsi Tipe : \`PO\`, \`GRPO\`, \`BUKTI_BAYAR\` (opsional)\n`;
       const searchPo = poArgs[0];
       const filterDocType = poArgs[1] || null;
 
-      await openwaService.sendText(chatId, `🔍 _Sedang mencari arsip dokumen untuk PO ${searchPo} di Google Drive..._`);
+      const progress1 = await openwaService.sendText(chatId, `_Sedang mencari arsip dokumen untuk PO ${searchPo} di Google Drive..._`);
 
       try {
         const docs = await driveService.getDocumentsForPo(searchPo, filterDocType);
         if (!docs || docs.length === 0) {
+          if (progress1) await openwaService.deleteMessage(chatId, progress1);
           await openwaService.sendText(
             chatId,
-            `⚠️ Belum ada file arsip dokumen (Foto/PDF) untuk PO *${searchPo}* di Google Drive.\n` +
+            `*Pemberitahuan:* Belum ada file arsip dokumen (Foto/PDF) untuk PO *${searchPo}* di Google Drive.\n` +
               `_Dokumen dapat diunggah melalui scan WhatsApp atau via Dashboard Web._`
           );
           return true;
         }
 
-        await openwaService.sendText(
+        const progress2 = await openwaService.sendText(
           chatId,
-          `📄 Ditemukan *${docs.length} dokumen* untuk PO *${searchPo}*. Sedang mengunduh dan mengirimkan file...`
+          `_Ditemukan *${docs.length} dokumen* untuk PO *${searchPo}*. Sedang mengunduh dan mengirimkan file..._`
         );
 
         // Batasi maksimal 3 dokumen terbaru agar tidak membebani chat
@@ -439,7 +443,7 @@ Opsi Tipe : \`PO\`, \`GRPO\`, \`BUKTI_BAYAR\` (opsional)\n`;
             const isImage =
               (cleanMime && cleanMime.startsWith('image/')) ||
               /\.(jpg|jpeg|png|webp)$/i.test(cleanFilename);
-            const caption = `*DOKUMEN ${doc.tipe_dokumen}*\nPO : \`${doc.no_po}\`\nBerkas : ${cleanFilename}\n🔗 [Buka di Google Drive](${doc.drive_url})`;
+            const caption = `*DOKUMEN ${doc.tipe_dokumen}*\nPO : \`${doc.no_po}\`\nBerkas : ${cleanFilename}\n*Link Drive:* ${doc.drive_url}`;
 
             if (isImage) {
               await openwaService.sendImage(chatId, {
@@ -457,16 +461,20 @@ Opsi Tipe : \`PO\`, \`GRPO\`, \`BUKTI_BAYAR\` (opsional)\n`;
               });
             }
           } catch (fileErr) {
-            console.error(`❌ Gagal kirim file ${doc.file_name} ke WA:`, fileErr.message);
+            console.error(`Gagal kirim file ${doc.file_name} ke WA:`, fileErr.message);
             await openwaService.sendText(
               chatId,
-              `⚠️ Gagal memuat file *${doc.file_name}*: ${fileErr.message}\n🔗 Link Drive: ${doc.drive_url}`
+              `*Pemberitahuan:* Gagal memuat file *${doc.file_name}*: ${fileErr.message}\n*Link Drive:* ${doc.drive_url}`
             );
           }
         }
+
+        // Hapus pesan progress sementara agar chat rapi
+        await openwaService.deleteMessages(chatId, [progress1, progress2]);
       } catch (err) {
-        console.error('❌ Gagal perintah /lihatpo:', err.message);
-        await openwaService.sendText(chatId, `✗ Gagal mengambil dokumen: ${err.message}`);
+        if (progress1) await openwaService.deleteMessage(chatId, progress1);
+        console.error('Gagal perintah /lihatpo:', err.message);
+        await openwaService.sendText(chatId, `*Gagal mengambil dokumen:* ${err.message}`);
       }
       return true;
 
@@ -497,18 +505,19 @@ Alasan  : ${alasan}
 ━━━━━━━━━━━━━━━━━━━━━━━━`
         );
       } else {
-        await openwaService.sendText(chatId, `⚠️ ${batalRes.message}`);
+        await openwaService.sendText(chatId, `*Pemberitahuan:* ${batalRes.message}`);
       }
       return true;
 
     case 'sync':
       if (!hasValidToken()) {
-        await openwaService.sendText(chatId, '⚠️ _Token Google Sheets belum diotorisasi. Jalankan `npm run auth` di server._');
+        await openwaService.sendText(chatId, '*Pemberitahuan:* _Token Google Sheets belum diotorisasi. Jalankan `npm run auth` di server._');
         return true;
       }
-      await openwaService.sendText(chatId, '⏳ _Sedang menyinkronkan data master dari Google Sheets..._');
+      const syncLoading = await openwaService.sendText(chatId, '_Sedang menyinkronkan data master dari Google Sheets..._');
       try {
         const syncRes = await cacheService.syncMasterData(getSheetsClient());
+        if (syncLoading) await openwaService.deleteMessage(chatId, syncLoading);
         await openwaService.sendText(
           chatId,
           `*SINKRONISASI SELESAI*
@@ -519,7 +528,8 @@ Alasan  : ${alasan}
 ━━━━━━━━━━━━━━━━━━━━━━━━`
         );
       } catch (err) {
-        await openwaService.sendText(chatId, `✗ Gagal sinkronisasi: ${err.message}`);
+        if (syncLoading) await openwaService.deleteMessage(chatId, syncLoading);
+        await openwaService.sendText(chatId, `*Gagal sinkronisasi:* ${err.message}`);
       }
       return true;
 

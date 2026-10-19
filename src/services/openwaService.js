@@ -174,6 +174,45 @@ async function sendDocument(chatId, options = {}) {
 }
 
 /**
+ * Menghapus pesan WhatsApp (delete for everyone).
+ *
+ * @param {string} chatId
+ * @param {string|Object} message - ID pesan (string) atau response object dari sendText
+ */
+async function deleteMessage(chatId, message) {
+  if (!chatId || !message) return false;
+  const messageId = typeof message === 'string' ? message : (message.id || message.messageId);
+  if (!messageId) return false;
+
+  try {
+    const sessionId = env.openwa.sessionId;
+    await apiClient.post(`/sessions/${sessionId}/messages/delete`, {
+      chatId,
+      messageId,
+    });
+    return true;
+  } catch (err) {
+    console.warn(`[OpenWA] Gagal hapus pesan sementara ${messageId}:`, err.response?.data?.message || err.message);
+    return false;
+  }
+}
+
+/**
+ * Menghapus sekumpulan pesan WhatsApp (delete for everyone).
+ *
+ * @param {string} chatId
+ * @param {Array<string|Object>} messages
+ */
+async function deleteMessages(chatId, messages = []) {
+  if (!chatId || !Array.isArray(messages) || messages.length === 0) return;
+  for (const m of messages) {
+    if (m) {
+      await deleteMessage(chatId, m);
+    }
+  }
+}
+
+/**
  * Mengecek status sesi OpenWA.
  */
 async function getSessionStatus() {
@@ -193,5 +232,8 @@ module.exports = {
   getSessionStatus,
   sendImage,
   sendDocument,
+  deleteMessage,
+  deleteMessages,
 };
+
 
